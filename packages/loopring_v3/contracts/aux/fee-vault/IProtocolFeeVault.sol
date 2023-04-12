@@ -85,7 +85,7 @@ abstract contract IProtocolFeeVault
     /// @return remainingDAOFund The remaining amount of LRC as developer pool.
     /// @return remainingReward The remaining amount of LRC as staking reward.
     function getProtocolFeeStats()
-        public
+        external
         virtual
         view
         returns (

@@ -33,14 +33,16 @@ contract LoopringV3 is ILoopringV3, ReentrancyGuard
         require(address(0) != _lrcAddress, "ZERO_ADDRESS");
 
         lrcAddress = _lrcAddress;
+        blockVerifierAddress = _blockVerifierAddress;
 
-        updateSettingsInternal(_protocolFeeVault, _blockVerifierAddress, 0);
+        protocolFeeBips = ExchangeData.DEFAULT_PROTOCOL_FEE_BIPS;
+
+        updateSettingsInternal(_protocolFeeVault, 0);
     }
 
     // == Public Functions ==
     function updateSettings(
         address payable _protocolFeeVault,
-        address _blockVerifierAddress,
         uint    _forcedWithdrawalFee
         )
         external
@@ -50,7 +52,6 @@ contract LoopringV3 is ILoopringV3, ReentrancyGuard
     {
         updateSettingsInternal(
             _protocolFeeVault,
-            _blockVerifierAddress,
             _forcedWithdrawalFee
         );
     }
@@ -63,6 +64,8 @@ contract LoopringV3 is ILoopringV3, ReentrancyGuard
         nonReentrant
         onlyOwner
     {
+        require(_protocolFeeBips <= ExchangeData.MAX_PROTOCOL_FEE_BIPS, "INVALID_PROTOCOL_FEE_BIPS");
+
         protocolFeeBips = _protocolFeeBips;
 
         emit SettingsUpdated(block.timestamp);
@@ -71,7 +74,7 @@ contract LoopringV3 is ILoopringV3, ReentrancyGuard
     function getExchangeStake(
         address exchangeAddr
         )
-        public
+        external
         override
         view
         returns (uint)
@@ -146,7 +149,7 @@ contract LoopringV3 is ILoopringV3, ReentrancyGuard
     }
 
     function getProtocolFeeValues()
-        public
+        external
         override
         view
         returns (
@@ -159,17 +162,14 @@ contract LoopringV3 is ILoopringV3, ReentrancyGuard
     // == Internal Functions ==
     function updateSettingsInternal(
         address payable  _protocolFeeVault,
-        address _blockVerifierAddress,
         uint    _forcedWithdrawalFee
         )
         private
     {
         require(address(0) != _protocolFeeVault, "ZERO_ADDRESS");
-        require(address(0) != _blockVerifierAddress, "ZERO_ADDRESS");
         require(_forcedWithdrawalFee <= ExchangeData.MAX_FORCED_WITHDRAWAL_FEE, "INVALID_FORCED_WITHDRAWAL_FEE");
 
         protocolFeeVault = _protocolFeeVault;
-        blockVerifierAddress = _blockVerifierAddress;
         forcedWithdrawalFee = _forcedWithdrawalFee;
 
         emit SettingsUpdated(block.timestamp);

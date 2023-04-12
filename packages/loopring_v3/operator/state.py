@@ -798,8 +798,8 @@ class State(object):
             # Amount filled in the trade history
             # filled_A = self.getData(ring.orderA.accountID, ring.orderA.tokenS, ring.orderA.storageID)
             # filled_B = self.getData(ring.orderB.accountID, ring.orderB.tokenS, ring.orderB.storageID)
-            tokenSID_A, tokenBID_A, filled_A, gasFee_A, cancelled_A, forward_A = self.calculate.getData(ring.orderA.accountID, ring.orderA.storageID)
-            tokenSID_B, tokenBID_B, filled_B, gasFee_B, cancelled_B, forward_B = self.calculate.getData(ring.orderB.accountID, ring.orderB.storageID)
+            tokenSID_A, tokenBID_A, filled_A, gasFee_A, cancelled_A, forward_A = self.calculate.getData(self.getAccount(ring.orderA.accountID), ring.orderA.storageID)
+            tokenSID_B, tokenBID_B, filled_B, gasFee_B, cancelled_B, forward_B = self.calculate.getData(self.getAccount(ring.orderB.accountID), ring.orderB.storageID)
             
             if ring.orderA.type == 6 or ring.orderA.type == 7:
                 newState.TXV_STORAGE_A_FORWARD = self.calculate.calculateAutoMarketForward(forward_A, ring.orderA)
@@ -994,6 +994,7 @@ class State(object):
             firstTokenFloatReverse = 0
             secondTokenFloatReverse = 0
             thirdTokenFloatReverse = 0
+            # Cycle through all orders to get useful information
             (tokenSIDArray, tokenBIDArray, filledArray, gasFeeArray, cancelledArray, forwardArray, 
                 fill, tradingFee, tradingFeeUser, gasFeeOrder, gasFeeUser, newState.signaturesTemp, newState.signatures, 
                 firstTokenTradingFeeSum, secondTokenTradingFeeSum, thirdTokenTradingFeeSum, 
@@ -1066,6 +1067,7 @@ class State(object):
 
             # UserA AutoMarket, Order0
             if orderA.type == typeAutoMarketSell or orderA.type == typeAutoMarketBuy:
+                # Deg-347 storage migration - new fields and constraints
                 # storageA = accountA.getStorage(orderA.storageID)
                 newState.TXV_STORAGE_A_FORWARD = self.calculate.calculateAutoMarketForward(forwardArray[0][0], orderA)
                 self.calculate.addTwoDimDict(storageForwardMap, orderA.accountID, orderA.storageID, int(newState.TXV_STORAGE_A_FORWARD))
@@ -1261,6 +1263,7 @@ class State(object):
                     if order.isNoop == 1 or (order.type != typeAutoMarketSell and order.type != typeAutoMarketBuy):
                         orderIndex = orderIndex + 1
                         continue
+                    # Deg-347 storage migration - new fields and constraints
                     # storageC = accountC.getStorage(order.storageID)
 
                     (newState.TXV_STORAGE_C_FORWARD_ARRAY[orderIndex], forward) = self.calculate.getBatchSpotTradeStorageForward(storageForwardMap, order, forwardArray[2][orderIndex])
@@ -1460,6 +1463,7 @@ class State(object):
                     if order.isNoop == 1 or (order.type != typeAutoMarketSell and order.type != typeAutoMarketBuy):
                         orderIndex = orderIndex + 1
                         continue
+                    # Deg-347 storage migration - new fields and constraints
                     # storageF = accountF.getStorage(order.storageID)
 
                     (newState.TXV_STORAGE_F_FORWARD_ARRAY[orderIndex], forward) = self.calculate.getBatchSpotTradeStorageForward(storageForwardMap, order, forwardArray[5][orderIndex])
@@ -1514,7 +1518,7 @@ class State(object):
         elif txInput.txType == "Transfer":
 
             # storageData = self.getData(txInput.fromAccountID, txInput.tokenID, txInput.storageID)
-            tokenSID, tokenBID, storageData, gasFee, cancelled, forward = self.calculate.getData(txInput.fromAccountID, txInput.storageID)
+            tokenSID, tokenBID, storageData, gasFee, cancelled, forward = self.calculate.getData(self.getAccount(txInput.fromAccountID), txInput.storageID)
 
             # transferAmount = roundToFloatValue(int(txInput.amount), Float24Encoding)
             transferAmount = roundToFloatValue(int(txInput.amount), Float32Encoding)
@@ -1573,7 +1577,7 @@ class State(object):
             elif int(txInput.type) == 3:
                 txInput.amount = str(0)
 
-            tokenSID, tokenBID, storageData, gasFee, cancelled, forward = self.calculate.getData(txInput.accountID, txInput.storageID)
+            tokenSID, tokenBID, storageData, gasFee, cancelled, forward = self.calculate.getData(self.getAccount(txInput.accountID), txInput.storageID)
 
             # Protocol fee withdrawals are handled a bit differently
             # as the balance needs to be withdrawn from the already opened protocol pool account
@@ -1658,7 +1662,7 @@ class State(object):
 
             accountA = self.getAccount(txInput.accountID)
 
-            tokenSID, tokenBID, storageData, gasFee, cancelled, forward = self.calculate.getData(txInput.accountID, txInput.storageID)
+            tokenSID, tokenBID, storageData, gasFee, cancelled, forward = self.calculate.getData(self.getAccount(txInput.accountID), txInput.storageID)
 
             newState.TXV_ACCOUNT_A_ADDRESS = txInput.accountID
 
@@ -1673,6 +1677,7 @@ class State(object):
             newState.balanceDeltaB_O_Address = txInput.feeTokenID
             newState.TXV_STORAGE_B_GASSFEE = feeValue
             
+            # This approach theoretically supports the cancellation of a new storage rather than a used storage
             newState.TXV_STORAGE_A_TOKENSID = tokenSID
             newState.TXV_STORAGE_A_TOKENBID = tokenBID
             newState.TXV_STORAGE_A_DATA = storageData
@@ -1712,6 +1717,9 @@ class State(object):
         newState.TXV_BALANCE_B_S_ADDRESS = setValue(newState.TXV_BALANCE_B_S_ADDRESS, 0)
         newState.TXV_BALANCE_B_B_ADDRESS = setValue(newState.TXV_BALANCE_B_B_ADDRESS, 0)
 
+        '''
+        In the requirement of splitting taking fee and protocol fee, reset the operator tokenid value
+        '''
         newState.balanceDeltaA_O_Address = setValue(newState.balanceDeltaA_O_Address, 0)
         newState.balanceDeltaB_O_Address = setValue(newState.balanceDeltaB_O_Address, 0)
         newState.balanceDeltaC_O_Address = setValue(newState.balanceDeltaC_O_Address, 0)
@@ -1737,8 +1745,6 @@ class State(object):
         newState.TXV_ACCOUNT_A_DISABLE_APPKEY_SPOTTRADE = setValue(newState.TXV_ACCOUNT_A_DISABLE_APPKEY_SPOTTRADE, accountA.disableAppKeySpotTrade)
         newState.TXV_ACCOUNT_A_DISABLE_APPKEY_WITHDRAW = setValue(newState.TXV_ACCOUNT_A_DISABLE_APPKEY_WITHDRAW, accountA.disableAppKeyWithdraw)
         newState.TXV_ACCOUNT_A_DISABLE_APPKEY_TRANSFER_TO_OTHER = setValue(newState.TXV_ACCOUNT_A_DISABLE_APPKEY_TRANSFER_TO_OTHER, accountA.disableAppKeyTransferToOther)
-        
-        # newState.TXV_ACCOUNT_A_REFERID = setValue(newState.TXV_ACCOUNT_A_REFERID, accountA.referID)
 
         balanceLeafA_S = accountA.getBalanceLeaf(newState.TXV_BALANCE_A_S_ADDRESS)
         newState.TXV_BALANCE_A_S_BALANCE = setValue(newState.TXV_BALANCE_A_S_BALANCE, 0)
@@ -1754,7 +1760,7 @@ class State(object):
         newState.TXV_STORAGE_A_DATA = setValue(newState.TXV_STORAGE_A_DATA, storageA.data)
         newState.TXV_STORAGE_A_STORAGEID = setValue(newState.TXV_STORAGE_A_STORAGEID, storageA.storageID)
         newState.TXV_STORAGE_A_FORWARD = setValue(newState.TXV_STORAGE_A_FORWARD, storageA.forward)
-
+        # delta value
         newState.TXV_STORAGE_A_GASFEE = setValue(newState.TXV_STORAGE_A_GASFEE, storageA.gasFee)
         
 
@@ -1792,7 +1798,7 @@ class State(object):
             newState.TXV_BALANCE_A_S_BALANCE,
             newState.TXV_STORAGE_A_FORWARD
         )
-
+        # Additional storage updates from user a batchspottrade
         (newState.TXV_STORAGE_A_ADDRESS_ARRAY, 
         newState.TXV_STORAGE_A_TOKENSID_ARRAY, 
         newState.TXV_STORAGE_A_TOKENBID_ARRAY, 
@@ -1874,7 +1880,7 @@ class State(object):
         newState.TXV_STORAGE_B_DATA = setValue(newState.TXV_STORAGE_B_DATA, storageB.data)
         newState.TXV_STORAGE_B_STORAGEID = setValue(newState.TXV_STORAGE_B_STORAGEID, storageB.storageID)
         newState.TXV_STORAGE_B_FORWARD = setValue(newState.TXV_STORAGE_B_FORWARD, storageB.forward)
-
+        # delta value
         newState.TXV_STORAGE_B_GASFEE = setValue(newState.TXV_STORAGE_B_GASFEE, storageB.gasFee)
 
         # Update B
@@ -1900,6 +1906,7 @@ class State(object):
             newState.TXV_STORAGE_B_FORWARD
         )
 
+        # Additional storage updates from user B batchspottrade
         (newState.TXV_STORAGE_B_ADDRESS_ARRAY, 
         newState.TXV_STORAGE_B_TOKENSID_ARRAY, 
         newState.TXV_STORAGE_B_TOKENBID_ARRAY, 

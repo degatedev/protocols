@@ -16,7 +16,8 @@ using namespace ethsnarks;
 
 namespace Loopring
 {
-
+// To split the original key function and make the transaction more flexible. AssetKey(original key) is handed over to the institution manager, 
+// who has the final right to manage the account. The manager can set the permission of AppKey(trade, transfer and withdraw), and then hand the AppKey to the trader for trading.
 class AppKeyUpdateCircuit : public BaseTransactionCircuit
 {
   public:

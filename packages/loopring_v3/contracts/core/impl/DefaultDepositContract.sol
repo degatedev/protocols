@@ -29,7 +29,7 @@ contract DefaultDepositContract is IDepositContract, Claimable
 
     address public exchange;
 
-    mapping (address => bool) needCheckBalance;
+    mapping (address => bool) private needCheckBalance;
 
     modifier onlyExchange()
     {
@@ -88,14 +88,13 @@ contract DefaultDepositContract is IDepositContract, Claimable
     function deposit(
         address from,
         address token,
-        uint248  amount,
+        uint248  amount, // 0-value supported
         bytes   calldata /*extraData*/
         )
         external
         override
         payable
         onlyExchange
-        ifNotZero(amount)
         returns (uint248 amountReceived)
     {
         uint ethToReturn = 0;
@@ -178,10 +177,10 @@ contract DefaultDepositContract is IDepositContract, Claimable
         return isETHInternal(addr);
     }
 
-    // -- Internal --
+    // -- private --
 
     function isETHInternal(address addr)
-        internal
+        private
         pure
         returns (bool)
     {

@@ -57,6 +57,9 @@ library ExchangeGenesis
         S.protocolFeeData.protocolFeeBips = S.loopring.protocolFeeBips();
         S.protocolFeeData.previousProtocolFeeBips = S.protocolFeeData.protocolFeeBips;
 
+        S.protocolFeeData.nextProtocolFeeBips = S.protocolFeeData.protocolFeeBips;
+        S.protocolFeeData.executeTimeOfNextProtocolFeeBips = uint32(0);
+
         // Call these after the main state has been set up
         S.registerToken(address(0), true);
         S.registerToken(loopring.lrcAddress(), true);

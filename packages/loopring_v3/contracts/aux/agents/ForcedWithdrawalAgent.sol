@@ -24,7 +24,7 @@ contract ForcedWithdrawalAgent is ReentrancyGuard, OwnerManagable, Drainable
 
     function doForcedWithdrawalFor(
         address exchangeAddress,
-        address owner,
+        address from,
         address token,
         uint32 accountID
         )
@@ -33,7 +33,7 @@ contract ForcedWithdrawalAgent is ReentrancyGuard, OwnerManagable, Drainable
         nonReentrant
         onlyOwnerOrManager
     {
-        IExchangeV3(exchangeAddress).forceWithdraw{value: msg.value}(owner, token, accountID);
+        IExchangeV3(exchangeAddress).forceWithdraw{value: msg.value}(from, token, accountID);
 
         if (address(this).balance > 0) {
             drain(msg.sender, address(0));

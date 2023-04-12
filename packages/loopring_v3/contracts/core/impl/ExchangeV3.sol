@@ -21,7 +21,6 @@ import "./libexchange/ExchangeMode.sol";
 import "./libexchange/ExchangeTokens.sol";
 import "./libexchange/ExchangeWithdrawals.sol";
 
-
 /// @title An Implementation of IExchangeV3.
 /// @dev This contract supports upgradability proxy, therefore its constructor
 ///      must do NOTHING.
@@ -42,21 +41,20 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
     using ExchangeWithdrawals   for ExchangeData.State;
 
     ExchangeData.State public state;
-    address public loopringAddr;
     bool public allowOnchainTransferFrom = false;
 
     modifier onlyWhenUninitialized()
     {
         require(
-            loopringAddr == address(0) && state.merkleRoot == bytes32(0),
+            address(state.loopring) == address(0) && state.merkleRoot == bytes32(0),
             "INITIALIZED"
         );
         _;
     }
 
-    modifier onlyFromUserOrAgent(address owner)
+    modifier onlyFromUserOrAgent(address from)
     {
-        require(isUserOrAgent(owner), "UNAUTHORIZED");
+        require(isUserOrAgent(from), "UNAUTHORIZED");
         _;
     }
 
@@ -72,7 +70,7 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
     }
 
     function domainSeparator()
-        public
+        external
         view
         returns (bytes32)
     {
@@ -93,7 +91,6 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
     {
         require(address(0) != _owner, "ZERO_ADDRESS");
         owner = _owner;
-        loopringAddr = _loopring;
 
         state.initializeGenesisBlock(
             _loopring,
@@ -102,38 +99,6 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
             EIP712.hash(EIP712.Domain("DeGate Protocol", version(), address(this)))
         );
     }
-
-    // function setAgentRegistry(address _agentRegistry)
-    //     external
-    //     override
-    //     nonReentrant
-    //     onlyOwner
-    // {
-    //     require(_agentRegistry != address(0), "ZERO_ADDRESS");
-    //     require(state.agentRegistry == IAgentRegistry(0), "ALREADY_SET");
-    //     state.agentRegistry = IAgentRegistry(_agentRegistry);
-    // }
-
-    function refreshBlockVerifier()
-        external
-        override
-        nonReentrant
-        onlyOwner
-    {
-        require(state.loopring.blockVerifierAddress() != address(0), "ZERO_ADDRESS");
-        state.blockVerifier = IBlockVerifier(state.loopring.blockVerifierAddress());
-
-        emit BlockVerifierRefreshed(address(state.blockVerifier));
-    }
-
-    // function getAgentRegistry()
-    //     external
-    //     override
-    //     view
-    //     returns (IAgentRegistry)
-    // {
-    //     return state.agentRegistry;
-    // }
 
     function setDepositContract(address _depositContract)
         external
@@ -185,11 +150,11 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
         uint256 freeDepositRemained,
         uint256 freeSlotPerBlock,
         uint256 depositFee
-        ) 
-        external 
-        override 
-        nonReentrant 
-        onlyOwner 
+        )
+        external
+        override
+        nonReentrant
+        onlyOwner
     {
         state.setDepositParams(
             freeDepositMax,
@@ -201,14 +166,14 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
         emit DepositParamsUpdate(freeDepositMax, freeDepositRemained, freeSlotPerBlock, depositFee);
     }
 
-    function isUserOrAgent(address owner)
+    function isUserOrAgent(address from)
         public
         view
         returns (bool)
     {
-         return owner == msg.sender ||
+         return from == msg.sender ||
             state.agentRegistry != IAgentRegistry(address(0)) &&
-            state.agentRegistry.isAgent(owner, msg.sender);
+            state.agentRegistry.isAgent(from, msg.sender);
     }
 
     // -- Constants --
@@ -229,7 +194,9 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
             uint(ExchangeData.MIN_TIME_IN_SHUTDOWN),
             uint(ExchangeData.TX_DATA_AVAILABILITY_SIZE),
             uint(ExchangeData.MAX_AGE_DEPOSIT_UNTIL_WITHDRAWABLE_UPPERBOUND),
-            uint(ExchangeData.MAX_FORCED_WITHDRAWAL_FEE)
+            uint(ExchangeData.MAX_FORCED_WITHDRAWAL_FEE),
+            uint(ExchangeData.MAX_PROTOCOL_FEE_BIPS),
+            uint(ExchangeData.DEFAULT_PROTOCOL_FEE_BIPS)
         );
     }
 
@@ -309,7 +276,6 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
         return state.withdrawExchangeStake(recipient);
     }
 
-
     function getProtocolFeeLastWithdrawnTime(
         address tokenAddress
         )
@@ -353,7 +319,6 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
     {
         return state.merkleAssetRoot;
     }
-
 
     function getBlockHeight()
         external
@@ -410,7 +375,7 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
     }
 
     function getPendingDepositAmount(
-        address owner,
+        address from,
         address tokenAddress
         )
         external
@@ -419,13 +384,13 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
         returns (uint248)
     {
         uint32 tokenID = state.getTokenID(tokenAddress);
-        return state.pendingDeposits[owner][tokenID].amount;
+        return state.pendingDeposits[from][tokenID].amount;
     }
 
     // -- Withdrawals --
 
     function forceWithdraw(
-        address owner,
+        address from,
         address token,
         uint32  accountID
         )
@@ -433,9 +398,9 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
         override
         nonReentrant
         payable
-        onlyFromUserOrAgent(owner)
+        onlyFromUserOrAgent(from)
     {
-        state.forceWithdraw(owner, token, accountID);
+        state.forceWithdraw(from, token, accountID);
     }
 
     function isForcedWithdrawalPending(
@@ -488,7 +453,7 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
     }
 
     function withdrawFromDepositRequest(
-        address owner,
+        address from,
         address token
         )
         external
@@ -496,7 +461,7 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
         nonReentrant
     {
         state.withdrawFromDepositRequest(
-            owner,
+            from,
             token
         );
     }
@@ -516,7 +481,7 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
     }
 
     function getAmountWithdrawable(
-        address owner,
+        address from,
         address token
         )
         external
@@ -525,7 +490,7 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
         returns (uint)
     {
         uint32 tokenID = state.getTokenID(token);
-        return state.amountWithdrawable[owner][tokenID];
+        return state.amountWithdrawable[from][tokenID];
     }
 
     function notifyForcedRequestTooOld(
@@ -602,16 +567,16 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
     }
 
     function approveTransaction(
-        address owner,
+        address from,
         bytes32 transactionHash
         )
         external
         override
         nonReentrant
-        onlyFromUserOrAgent(owner)
+        onlyFromUserOrAgent(from)
     {
-        state.approvedTx[owner][transactionHash] = true;
-        emit TransactionApproved(owner, transactionHash);
+        state.approvedTx[from][transactionHash] = true;
+        emit TransactionApproved(from, transactionHash);
     }
 
     function approveTransactions(
@@ -631,7 +596,7 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
     }
 
     function isTransactionApproved(
-        address owner,
+        address from,
         bytes32 transactionHash
         )
         external
@@ -639,7 +604,7 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
         view
         returns (bool)
     {
-        return state.approvedTx[owner][transactionHash];
+        return state.approvedTx[from][transactionHash];
     }
 
     function getDomainSeparator()
@@ -694,12 +659,16 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
         returns (
             uint32 syncedAt,
             uint8  protocolFeeBips,
-            uint8  previousProtocolFeeBips
+            uint8  previousProtocolFeeBips,
+            uint32 executeTimeOfNextProtocolFeeBips,
+            uint32 nextProtocolFeeBips
         )
     {
         syncedAt = state.protocolFeeData.syncedAt;
         protocolFeeBips = state.protocolFeeData.protocolFeeBips;
         previousProtocolFeeBips = state.protocolFeeData.previousProtocolFeeBips;
+        executeTimeOfNextProtocolFeeBips = state.protocolFeeData.executeTimeOfNextProtocolFeeBips;
+        nextProtocolFeeBips = state.protocolFeeData.nextProtocolFeeBips;
     }
 
     function setAllowOnchainTransferFrom(bool value)
@@ -735,7 +704,7 @@ contract ExchangeV3 is IExchangeV3, ReentrancyGuard
         external
         override
         view
-        returns(uint256) 
+        returns(uint256)
     {
         return state.depositState.freeDepositRemained;
     }

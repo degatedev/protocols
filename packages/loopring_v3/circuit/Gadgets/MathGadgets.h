@@ -31,11 +31,9 @@ using Poseidon_9 = Poseidon_gadget_T<10, 1, 6, 53, 9, 1>;
 using Poseidon_10 = Poseidon_gadget_T<11, 1, 6, 53, 10, 1>;
 using Poseidon_11 = Poseidon_gadget_T<12, 1, 6, 53, 11, 1>;
 using Poseidon_12 = Poseidon_gadget_T<13, 1, 6, 53, 12, 1>;
-// split trading fee and gas fee
 using Poseidon_13 = Poseidon_gadget_T<14, 1, 6, 53, 13, 1>;
 using Poseidon_14 = Poseidon_gadget_T<15, 1, 6, 53, 14, 1>;
 using Poseidon_15 = Poseidon_gadget_T<16, 1, 6, 53, 15, 1>;
-// DEG-265 auto market
 using Poseidon_16 = Poseidon_gadget_T<17, 1, 6, 53, 16, 1>;
 using Poseidon_17 = Poseidon_gadget_T<18, 1, 6, 53, 17, 1>;
 
@@ -1735,7 +1733,6 @@ class IfThenRequireGadget : public GadgetT
     {
         notC.generate_r1cs_witness();
         res.generate_r1cs_witness();
-        // DEG-146:order cancel
         ASSERT(pb.val(res.result()) == FieldT::one(), annotation_prefix);
     }
 
@@ -2168,13 +2165,11 @@ class AccuracyGadget : public GadgetT
     VariableT original;
     Accuracy accuracy;
 
-    // RequireLeqGadget value_leq_original;
     LeqGadget value_leq_original;
 
     VariableT original_mul_accuracyN;
     VariableT value_mul_accuracyD;
 
-    // RequireLeqGadget original_mul_accuracyN_LEQ_value_mul_accuracyD;
     LeqGadget original_mul_accuracyN_LEQ_value_mul_accuracyD;
 
     AndGadget valid;
@@ -2294,13 +2289,11 @@ class IfThenRequireAccuracyGadget : public GadgetT
     VariableT original;
     Accuracy accuracy;
 
-    // RequireLeqGadget value_leq_original;
     IfThenRequireLeqGadget value_leq_original;
 
     VariableT original_mul_accuracyN;
     VariableT value_mul_accuracyD;
 
-    // RequireLeqGadget original_mul_accuracyN_LEQ_value_mul_accuracyD;
     IfThenRequireLeqGadget original_mul_accuracyN_LEQ_value_mul_accuracyD;
 
     IfThenRequireAccuracyGadget(
@@ -2434,10 +2427,7 @@ class PublicDataGadget : public GadgetT
         //Adjust the number of token layers. After adding batchspottrade, it needs to be modified. 
         //   At present, it is subject to the addition of batchspottrade
         //There are six users in the aggregate transaction, and only two tokens for six users. When the token changes, it needs 80 bytes to split
-        // unsigned int sizePart1 = 29 * 8;
         unsigned int sizePart1 = 80 * 8;
-        // unsigned int sizePart2 = 39 * 8;
-        // unsigned int sizePart2 = 44 * 8;
         unsigned int sizePart2 = 3 * 8;
 
         unsigned int startPart1 = start;
@@ -3062,43 +3052,6 @@ struct ExistSelectorGadget : public GadgetT
     }
 };
 
-// class SumGadget : public GadgetT 
-// {
-//   public:
-//     std::vector<AddGadget> sum;
-//     SumGadget(
-//       ProtoboardT &pb,
-//       const VariableArrayT &values,
-//       unsigned int n,
-//       const std::string &prefix)
-//       : GadgetT(pb, prefix)
-//     {
-//       for (unsigned int i = 0; i < values.size(); i++) 
-//       {
-//         sum.emplace_back(pb, (i == 0) ? constants._0 : sum.back().result(), values[i], n, FMT(annotation_prefix, ".sum"));
-//       }
-//     }
-//     void generate_r1cs_witness()
-//     {
-//         for (unsigned int i = 0; i < sum.size(); i++)
-//         {
-//             sum[i].generate_r1cs_witness();
-//         }
-//     }
-
-//     void generate_r1cs_constraints()
-//     {
-//         for (unsigned int i = 0; i < sum.size(); i++)
-//         {
-//             sum[i].generate_r1cs_constraints();
-//         }
-//     }
-
-//     const VariableArrayT &result() const
-//     {
-//         return sum.back().result();
-//     }
-// };
 // Checks that the new ower equals the current onwer or the current ower is 0.
 class OwnerValidGadget : public GadgetT
 {
@@ -3334,250 +3287,6 @@ class SignedSubGadget : public GadgetT
         return signedAddGadget.result();
     }
 };
-
-// // sA * sB / C
-// // Always rounds towards zero, even for negative values.
-// class SignedMulDivGadget : public GadgetT
-// {
-//   public:
-//     MulDivGadget res;
-//     EqualGadget sign;
-
-//     EqualGadget isZero;
-//     TernaryGadget normalizedSign;
-
-//     SignedMulDivGadget(
-//       ProtoboardT &pb,
-//       const Constants &constants,
-//       const SignedVariableT &_value,
-//       const SignedVariableT &_numerator,
-//       const VariableT &_denominator,
-//       unsigned int numBitsValue,
-//       unsigned int numBitsNumerator,
-//       unsigned int numBitsDenominator,
-//       const std::string &prefix)
-//         : GadgetT(pb, prefix),
-
-//           res(
-//             pb,
-//             constants,
-//             _value.value,
-//             _numerator.value,
-//             _denominator,
-//             numBitsValue,
-//             numBitsNumerator,
-//             numBitsDenominator,
-//             FMT(prefix, ".res")),
-//           sign(pb, _value.sign, _numerator.sign, FMT(prefix, ".sign")),
-
-//           isZero(pb, res.result(), constants._0, FMT(prefix, ".isZero")),
-//           normalizedSign(pb, isZero.result(), constants._0, sign.result(), FMT(prefix, ".sign"))
-//     {
-//     }
-
-//     void generate_r1cs_witness()
-//     {
-//         res.generate_r1cs_witness();
-//         sign.generate_r1cs_witness();
-
-//         isZero.generate_r1cs_witness();
-//         normalizedSign.generate_r1cs_witness();
-//     }
-
-//     void generate_r1cs_constraints()
-//     {
-//         res.generate_r1cs_constraints();
-//         sign.generate_r1cs_constraints();
-
-//         isZero.generate_r1cs_constraints();
-//         normalizedSign.generate_r1cs_constraints();
-//     }
-
-//     const SignedVariableT result() const
-//     {
-//         return SignedVariableT(normalizedSign.result(), res.result());
-//     }
-// };
-
-// Calculates [0, 1]**[0, inf) using an approximation. The closer the base is to 1, the higher the accuracy.
-// The result is enforced to be containable in NUM_BITS_AMOUNT bits.
-// The higher the number of iterations, the higher the accuracy (and the greater the cost).
-/*
-    const x = (_x - BASE_FIXED);
-    const bn = [BASE_FIXED, BASE_FIXED];
-    const cn = [BASE_FIXED, y];
-    const xn = [BASE_FIXED, x];
-    let sum = xn[0]*cn[0] + xn[1]*cn[1];
-    for (let i = 2; i < iterations; i++) {
-        const v = y - bn[i-1];
-        bn.push(bn[i-1] + BASE_FIXED);
-        xn.push(Math.floor((xn[i-1] * x) / BASE_FIXED));
-        cn.push(Math.floor((cn[i-1] * v) / bn[i]));
-        sum += xn[i]*cn[i];
-    }
-    return Math.floor(sum / BASE_FIXED);
-*/
-// class PowerGadget : public GadgetT
-// {
-//   public:
-//     UnsafeMulGadget sum0;
-
-//     SubGadget x1;
-//     UnsafeMulGadget t1;
-//     SignedAddGadget sum1;
-
-//     std::vector<UnsafeMulGadget> bn;
-//     std::vector<SignedSubGadget> vn;
-//     std::vector<MulDivGadget> xn;
-//     std::vector<SignedMulDivGadget> cn;
-//     std::vector<SignedMulDivGadget> tn;
-//     std::vector<SignedAddGadget> sum;
-//     std::vector<RangeCheckGadget> cnRangeCheck;
-
-//     std::unique_ptr<MulDivGadget> res;
-//     std::unique_ptr<RangeCheckGadget> resRangeCheck;
-//     std::unique_ptr<RequireEqualGadget> requirePositive;
-
-//     PowerGadget(
-//       ProtoboardT &pb,
-//       const Constants &constants,
-//       const VariableT &x,
-//       const VariableT &y,
-//       const unsigned int iterations,
-//       const std::string &prefix)
-//         : GadgetT(pb, prefix),
-
-//           sum0(pb, constants.fixedBase, constants.fixedBase, FMT(prefix, ".sum0")),
-
-//           x1(pb, constants.fixedBase, x, NUM_BITS_FIXED_BASE, FMT(prefix, ".x1")),
-//           t1(pb, x1.result(), y, FMT(prefix, ".t1")),
-//           sum1(
-//             pb,
-//             constants,
-//             SignedVariableT(constants._1, sum0.result()),
-//             SignedVariableT(constants._0, t1.result()),
-//             NUM_BITS_AMOUNT * 2,
-//             FMT(prefix, ".sum1"))
-//     {
-//         assert(iterations >= 3);
-
-//         for (unsigned int i = 2; i < iterations; i++)
-//         {
-//             bn.emplace_back(pb, constants.fixedBase, constants.values[i], FMT(prefix, ".bn"));
-//             vn.emplace_back(
-//               pb,
-//               constants,
-//               SignedVariableT(constants._1, y),
-//               i > 2 ? SignedVariableT(constants._1, bn[i - 2 - 1].result())
-//                     : SignedVariableT(constants._1, constants.fixedBase),
-//               NUM_BITS_AMOUNT,
-//               FMT(prefix, ".vn"));
-//             xn.emplace_back(
-//               pb,
-//               constants,
-//               xn.size() > 0 ? xn.back().result() : x1.result(),
-//               x1.result(),
-//               constants.fixedBase,
-//               NUM_BITS_FIXED_BASE,
-//               NUM_BITS_FIXED_BASE,
-//               NUM_BITS_FIXED_BASE,
-//               FMT(prefix, ".xn"));
-//             cn.emplace_back(
-//               pb,
-//               constants,
-//               (i > 2) ? cn.back().result() : SignedVariableT(constants._1, y),
-//               vn.back().result(),
-//               bn.back().result(),
-//               NUM_BITS_AMOUNT,
-//               NUM_BITS_AMOUNT,
-//               NUM_BITS_AMOUNT,
-//               FMT(prefix, ".cn"));
-//             tn.emplace_back(
-//               pb,
-//               constants,
-//               SignedVariableT(constants.values[(i + 1) % 2], xn.back().result()),
-//               cn.back().result(),
-//               constants._1,
-//               NUM_BITS_FIXED_BASE,
-//               NUM_BITS_AMOUNT,
-//               1,
-//               FMT(prefix, ".t2"));
-//             sum.emplace_back(
-//               pb,
-//               constants,
-//               sum.size() > 0 ? sum.back().result() : sum1.result(),
-//               tn.back().result(),
-//               NUM_BITS_AMOUNT * 2,
-//               FMT(prefix, ".sum"));
-//             cnRangeCheck.emplace_back(pb, cn.back().result().value, NUM_BITS_AMOUNT, FMT(prefix, ".cnRangeCheck"));
-//         }
-
-//         res.reset(new MulDivGadget(
-//           pb,
-//           constants,
-//           sum.back().result().value,
-//           constants._1,
-//           constants.fixedBase,
-//           NUM_BITS_AMOUNT * 2,
-//           1,
-//           NUM_BITS_FIXED_BASE,
-//           FMT(prefix, ".res")));
-//         resRangeCheck.reset(new RangeCheckGadget(pb, res->result(), NUM_BITS_AMOUNT, FMT(prefix, ".resRangeCheck")));
-//         requirePositive.reset(
-//           new RequireEqualGadget(pb, sum.back().result().sign, constants._1, FMT(prefix, ".requirePositive")));
-//     }
-
-//     void generate_r1cs_witness()
-//     {
-//         sum0.generate_r1cs_witness();
-
-//         x1.generate_r1cs_witness();
-//         t1.generate_r1cs_witness();
-//         sum1.generate_r1cs_witness();
-
-//         for (unsigned int i = 0; i < sum.size(); i++)
-//         {
-//             bn[i].generate_r1cs_witness();
-//             vn[i].generate_r1cs_witness();
-//             xn[i].generate_r1cs_witness();
-//             cn[i].generate_r1cs_witness();
-//             tn[i].generate_r1cs_witness();
-//             sum[i].generate_r1cs_witness();
-//             cnRangeCheck[i].generate_r1cs_witness();
-//         }
-//         res->generate_r1cs_witness();
-//         resRangeCheck->generate_r1cs_witness();
-//         requirePositive->generate_r1cs_witness();
-//     }
-
-//     void generate_r1cs_constraints()
-//     {
-//         sum0.generate_r1cs_constraints();
-
-//         x1.generate_r1cs_constraints();
-//         t1.generate_r1cs_constraints();
-//         sum1.generate_r1cs_constraints();
-
-//         for (unsigned int i = 0; i < sum.size(); i++)
-//         {
-//             bn[i].generate_r1cs_constraints();
-//             vn[i].generate_r1cs_constraints();
-//             xn[i].generate_r1cs_constraints();
-//             cn[i].generate_r1cs_constraints();
-//             tn[i].generate_r1cs_constraints();
-//             sum[i].generate_r1cs_constraints();
-//             cnRangeCheck[i].generate_r1cs_constraints();
-//         }
-//         res->generate_r1cs_constraints();
-//         resRangeCheck->generate_r1cs_constraints();
-//         requirePositive->generate_r1cs_constraints();
-//     }
-
-//     const VariableT &result() const
-//     {
-//         return res->result();
-//     }
-// };
 
 } // namespace Loopring
 

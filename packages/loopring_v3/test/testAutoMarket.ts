@@ -349,7 +349,17 @@ contract("Exchange", (accounts: string[]) => {
         new BN(web3.utils.toWei("20", "ether"))
       );
 
+      // auto market order
+      // Auto Market StorageID，256-512，After 512, it is reserved for normal orders
+      // type = 6: Sell Order，Fixed amountS means that the number of bases is fixed. Adjust the number of quotes. The larger the level, the larger the number of quotes that can be sold by the base of the fixed unit
+      // In order to ensure that the boundary value seen by the user has no accuracy problem, levelmax sets the price for the user.
+      // At this level, base and quote are determined, visible and understandable by the user. Levelmax to l0, the number of bases is fixed, and the number of quotes decreases layer by layer
       exchangeTestUtil.reserveMultiStorageID(1024);
+      // Price:
+      //             WETH：1
+      //             GTO：0.5
+      // What the user sees is the top sale order, that is, the highest price sale order. The sale order of level0 is at the bottom and needs to be calculated
+      // amountS, calculate amountB。amountB = 0.5 - gridOffset * 10 = 0.495
       const autoMarketOrderA: OrderInfo = {
         tokenS: "WETH",
         tokenB: "GTO",
@@ -357,7 +367,7 @@ contract("Exchange", (accounts: string[]) => {
         amountB: new BN(web3.utils.toWei("0.495", "ether")),
         owner: exchangeTestUtil.testContext.orderOwners[0],
         // maxFeeBips: 50,
-        feeBips: 50,
+        feeBips: 18, // can not more the protocolFeeBips
         fillAmountBorS: false,
         feeTokenID: 0,
         fee: new BN("12300000000000"),
@@ -379,7 +389,7 @@ contract("Exchange", (accounts: string[]) => {
         amountB: new BN(web3.utils.toWei("2", "ether")),
         owner: exchangeTestUtil.testContext.orderOwners[1],
         // maxFeeBips: 0,
-        feeBips: 0,
+        feeBips: 0, // can not more the protocolFeeBips
         fillAmountBorS: false,
         feeTokenID: 0,
         fee: new BN("21000000000000"),
@@ -408,6 +418,15 @@ contract("Exchange", (accounts: string[]) => {
       );
       await exchangeTestUtil.sendRing(ringAutoMarket);
 
+      // AutoMarketOrder Level = 0 Subsequent orders
+      // Reverse order: the forward order is the sales order, the reverse order is the purchase order, the number of base currencies is fixed, and the number of quote currencies is adjusted
+      // Positive single fillAmountBorS = 0, fixed amountA quantity
+      // Reverse single fillAmountBorS = 1, fixed amountB quantity
+      // Example: 1eth sold for 6000 USDC, and then paid 4000 USDC to buy 1eth. Then you need to subtract orderoffset from the number of quotes in the reverse order
+      // amountS: new BN(web3.utils.toWei("1", "ether")),
+      // amountB: new BN(web3.utils.toWei("0.495", "ether")),
+      // gridOffset: new BN(web3.utils.toWei("0.0005", "ether")),
+      // orderOffset: new BN(web3.utils.toWei("0.0002", "ether")),
       {
         const autoMarketOrderANext: OrderInfo = {
           tokenS: "GTO",
@@ -416,7 +435,7 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[0],
           // maxFeeBips: 50,
-          feeBips: 50,
+          feeBips: 18,
           fillAmountBorS: true,
           feeTokenID: 0,
           fee: new BN("12300000000000"),
@@ -467,7 +486,16 @@ contract("Exchange", (accounts: string[]) => {
         );
         await exchangeTestUtil.sendRing(ringAutoMarket);
       }
-
+      // AutoMarket,level = 1
+      // Base == WETH, Quote == GTO
+      // Price:
+      //             WETH：1
+      //             GTO：0.5
+      // What the user sees is the top sale order, that is, the highest price sale order. The sale order of level0 is at the bottom and needs to be calculated
+      // level0:
+      //     amountS, calculate amountB。amountB = 0.5 - gridOffset * 10 = 0.495
+      // level1:
+      //     amountS, calculate amountB。amountB = 0.5 - gridOffset * 9 = 0.4955
       {
         const autoMarketOrderALevelOne: OrderInfo = {
           tokenS: "WETH",
@@ -476,7 +504,7 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("0.4955", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[0],
           // maxFeeBips: 50,
-          feeBips: 50,
+          feeBips: 18,
           fillAmountBorS: false,
           feeTokenID: 0,
           fee: new BN("12300000000000"),
@@ -526,7 +554,16 @@ contract("Exchange", (accounts: string[]) => {
         );
         await exchangeTestUtil.sendRing(ringAutoMarket);
       }
-
+      // level = 1 Reverse order
+      // Base == WETH, Quote == GTO
+      // Price:
+      //             WETH：1
+      //             GTO：0.5
+      // What the user sees is the top sale order, that is, the highest price sale order. The sale order of level0 is at the bottom and needs to be calculated
+      // level0:
+      //     amountS, calculate amountB。amountB = 0.5 - gridOffset * 10 = 0.495
+      // level1:
+      //     amountS, calculate amountB。amountB = 0.5 - gridOffset * 9 = 0.4955
       {
         const autoMarketOrderALevelOneNext: OrderInfo = {
           tokenS: "GTO",
@@ -535,7 +572,7 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[0],
           // maxFeeBips: 50,
-          feeBips: 50,
+          feeBips: 18,
           fillAmountBorS: true,
           feeTokenID: 0,
           fee: new BN("12300000000000"),
@@ -586,6 +623,15 @@ contract("Exchange", (accounts: string[]) => {
         await exchangeTestUtil.sendRing(ringAutoMarket);
       }
 
+      // AutoMarket Buy Order Test
+      // What users see is the bill at the bottom, that is, the bill with the lowest price. The bill of level0 is at the top, which needs to be calculated
+      // Base == WETH, Quote == GTO
+      // Price:
+      //             WETH：1
+      //             GTO：0.3
+      // What the user sees is the top sale order, that is, the highest price sale order. The sale order of level0 is at the bottom and needs to be calculated
+      // level0:
+      //     amountB, calculate amountS。amountS = 0.3 + gridOffset * 10 = 0.305
       const autoMarketOrderABuy: OrderInfo = {
         tokenS: "GTO",
         tokenB: "WETH",
@@ -593,7 +639,7 @@ contract("Exchange", (accounts: string[]) => {
         amountB: new BN(web3.utils.toWei("1", "ether")),
         owner: exchangeTestUtil.testContext.orderOwners[0],
         // maxFeeBips: 50,
-        feeBips: 50,
+        feeBips: 18,
         fillAmountBorS: true,
         feeTokenID: 0,
         fee: new BN("12300000000000"),
@@ -620,6 +666,7 @@ contract("Exchange", (accounts: string[]) => {
         feeTokenID: 0,
         fee: new BN("21000000000000"),
         maxFee: new BN("21000000000000"),
+        // uiReferID: 1,
         type: 0
       };
 
@@ -642,6 +689,16 @@ contract("Exchange", (accounts: string[]) => {
       );
       await exchangeTestUtil.sendRing(ringAutoMarketBuy);
 
+      // buy order， level = 0 Reverse order
+      // Base == WETH, Quote == GTO
+      // Price:
+      //             WETH：1
+      //             GTO：0.3
+      // What the user sees is the top sale order, that is, the highest price sale order. The sale order of level0 is at the bottom and needs to be calculated
+      // level0:
+      //     amountB, calculate amountS。amountS = 0.3 + gridOffset * 10 = 0.305
+      // level1:
+      //     amountB, calculate amountS。amountS = 0.3 + gridOffset * 9 = 0.3045
       {
         const autoMarketOrderABuyReverse: OrderInfo = {
           tokenS: "WETH",
@@ -650,7 +707,7 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("0.3052", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[0],
           // maxFeeBips: 50,
-          feeBips: 50,
+          feeBips: 18,
           fillAmountBorS: false,
           feeTokenID: 0,
           fee: new BN("12300000000000"),
@@ -703,6 +760,16 @@ contract("Exchange", (accounts: string[]) => {
         await exchangeTestUtil.sendRing(ringAutoMarketBuy);
       }
 
+      // Buy Order， level = 1
+      // Base == WETH, Quote == GTO
+      // price:
+      //             WETH：1
+      //             GTO：0.3
+      // What the user sees is the top sale order, that is, the highest price sale order. The sale order of level0 is at the bottom and needs to be calculated
+      // level0:
+      //     amountB, calculate amountS。amountS = 0.3 + gridOffset * 10 = 0.305
+      // level1:
+      //     amountB, calculate amountS。amountS = 0.3 + gridOffset * 9 = 0.3045
       {
         const autoMarketOrderABuyLevel1: OrderInfo = {
           tokenS: "GTO",
@@ -711,7 +778,7 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[0],
           // maxFeeBips: 50,
-          feeBips: 50,
+          feeBips: 18,
           fillAmountBorS: true,
           feeTokenID: 0,
           fee: new BN("12300000000000"),
@@ -763,6 +830,16 @@ contract("Exchange", (accounts: string[]) => {
         await exchangeTestUtil.sendRing(ringAutoMarketBuy);
       }
 
+      // buy order, level = 1 Reverse order
+      // Base == WETH, Quote == GTO
+      // Price：
+      //             WETH：1
+      //             GTO：0.3
+      // What the user sees is the top sale order, that is, the highest price sale order. The sale order of level0 is at the bottom and needs to be calculated
+      // level0:
+      //     amountB, calculate amountS。amountS = 0.3 + gridOffset * 10 = 0.305
+      // level1:
+      //     amountB, calculate amountS。amountS = 0.3 + gridOffset * 9 = 0.3045
       {
         const autoMarketOrderABuyReverse: OrderInfo = {
           tokenS: "WETH",
@@ -771,7 +848,7 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("0.3047", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[0],
           // maxFeeBips: 50,
-          feeBips: 50,
+          feeBips: 18,
           fillAmountBorS: false,
           feeTokenID: 0,
           fee: new BN("12300000000000"),
@@ -884,12 +961,12 @@ contract("Exchange", (accounts: string[]) => {
         amountB: new BN(web3.utils.toWei("0.495", "ether")),
         owner: exchangeTestUtil.testContext.orderOwners[0],
         // maxFeeBips: 50,
-        feeBips: 50,
+        feeBips: 18,
         fillAmountBorS: false,
-        feeTokenID: 0, 
-        fee: new BN("12300000000000"), 
-        maxFee: new BN("12300000000000"), 
-        uiReferID: 3, 
+        feeTokenID: 0,
+        fee: new BN("12300000000000"),
+        maxFee: new BN("12300000000000"),
+        uiReferID: 3,
         // autoMarketID: 0,
         type: 6,
         level: 0,
@@ -906,9 +983,9 @@ contract("Exchange", (accounts: string[]) => {
         amountB: new BN(web3.utils.toWei("2", "ether")),
         owner: exchangeTestUtil.testContext.orderOwners[1],
         // maxFeeBips: 0,
-        feeBips: 0, 
+        feeBips: 0,
         fillAmountBorS: false,
-        feeTokenID: 0, 
+        feeTokenID: 0,
         fee: new BN("21000000000000"),
         maxFee: new BN("21000000000000"),
         uiReferID: 1,
@@ -943,12 +1020,12 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[0],
           // maxFeeBips: 50,
-          feeBips: 50, //protocolTakerFeeBips
+          feeBips: 18,
           fillAmountBorS: true,
-          feeTokenID: 0, //
-          fee: new BN("12300000000000"), //
-          maxFee: new BN("12300000000000"), //
-          uiReferID: 3, //
+          feeTokenID: 0,
+          fee: new BN("12300000000000"),
+          maxFee: new BN("12300000000000"),
+          uiReferID: 3,
           // autoMarketID: 0,
           type: 6,
           level: 0,
@@ -966,12 +1043,12 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("0.4948", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[1],
           // maxFeeBips: 0,
-          feeBips: 0, //protocolMakerFeeBips
+          feeBips: 0,
           fillAmountBorS: false,
-          feeTokenID: 0, //
-          fee: new BN("21000000000000"), //
-          maxFee: new BN("21000000000000"), //
-          uiReferID: 1 //
+          feeTokenID: 0,
+          fee: new BN("21000000000000"),
+          maxFee: new BN("21000000000000"),
+          uiReferID: 1
         };
 
         const spread = new BN(web3.utils.toWei("1", "ether"));
@@ -994,6 +1071,7 @@ contract("Exchange", (accounts: string[]) => {
         );
         await exchangeTestUtil.sendRing(ringAutoMarket);
       }
+
       {
         const autoMarketOrderALevelOne: OrderInfo = {
           tokenS: "WETH",
@@ -1002,12 +1080,12 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("0.4955", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[0],
           // maxFeeBips: 50,
-          feeBips: 50, //protocolTakerFeeBips
+          feeBips: 18,
           fillAmountBorS: false,
-          feeTokenID: 0, //
-          fee: new BN("12300000000000"), //
-          maxFee: new BN("12300000000000"), //
-          // uiReferID: 3, //
+          feeTokenID: 0,
+          fee: new BN("12300000000000"),
+          maxFee: new BN("12300000000000"),
+          // uiReferID: 3,
           // autoMarketID: 0,
           type: 6,
           level: 1,
@@ -1024,12 +1102,12 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[1],
           // maxFeeBips: 0,
-          feeBips: 0, //protocolMakerFeeBips
+          feeBips: 0,
           fillAmountBorS: false,
-          feeTokenID: 0, //
-          fee: new BN("21000000000000"), //
-          maxFee: new BN("21000000000000"), //
-          uiReferID: 1 //
+          feeTokenID: 0,
+          fee: new BN("21000000000000"),
+          maxFee: new BN("21000000000000"),
+          uiReferID: 1
         };
 
         const spread = new BN(web3.utils.toWei("1", "ether"));
@@ -1052,6 +1130,7 @@ contract("Exchange", (accounts: string[]) => {
         );
         await exchangeTestUtil.sendRing(ringAutoMarket);
       }
+
       {
         const autoMarketOrderALevelOneNext: OrderInfo = {
           tokenS: "GTO",
@@ -1060,12 +1139,12 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[0],
           // maxFeeBips: 50,
-          feeBips: 50, //protocolTakerFeeBips
+          feeBips: 18,
           fillAmountBorS: true,
-          feeTokenID: 0, //
-          fee: new BN("12300000000000"), //
-          maxFee: new BN("12300000000000"), //
-          // uiReferID: 3, //
+          feeTokenID: 0,
+          fee: new BN("12300000000000"),
+          maxFee: new BN("12300000000000"),
+          // uiReferID: 3,
           // autoMarketID: 0,
           type: 6,
           level: 1,
@@ -1082,12 +1161,12 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("0.4953", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[1],
           // maxFeeBips: 0,
-          feeBips: 0, //protocolMakerFeeBips
+          feeBips: 0,
           fillAmountBorS: false,
-          feeTokenID: 0, //
-          fee: new BN("21000000000000"), //
-          maxFee: new BN("21000000000000"), //
-          uiReferID: 1 //
+          feeTokenID: 0,
+          fee: new BN("21000000000000"),
+          maxFee: new BN("21000000000000"),
+          uiReferID: 1
         };
 
         const spread = new BN(web3.utils.toWei("1", "ether"));
@@ -1118,12 +1197,12 @@ contract("Exchange", (accounts: string[]) => {
         amountB: new BN(web3.utils.toWei("1", "ether")),
         owner: exchangeTestUtil.testContext.orderOwners[0],
         // maxFeeBips: 50,
-        feeBips: 50, //protocolTakerFeeBips
+        feeBips: 18,
         fillAmountBorS: true,
-        feeTokenID: 0, //
-        fee: new BN("12300000000000"), //
-        maxFee: new BN("12300000000000"), //
-        // uiReferID: 3, //
+        feeTokenID: 0,
+        fee: new BN("12300000000000"),
+        maxFee: new BN("12300000000000"),
+        // uiReferID: 3,
         // autoMarketID: 0,
         type: 7,
         level: 0,
@@ -1140,12 +1219,12 @@ contract("Exchange", (accounts: string[]) => {
         amountB: new BN(web3.utils.toWei("0.305", "ether")),
         owner: exchangeTestUtil.testContext.orderOwners[1],
         // maxFeeBips: 0,
-        feeBips: 0, //protocolMakerFeeBips
+        feeBips: 0,
         fillAmountBorS: false,
-        feeTokenID: 0, //
-        fee: new BN("21000000000000"), //
-        maxFee: new BN("21000000000000"), //
-        // uiReferID: 1, //
+        feeTokenID: 0,
+        fee: new BN("21000000000000"),
+        maxFee: new BN("21000000000000"),
+        // uiReferID: 1,
         type: 0
       };
 
@@ -1176,12 +1255,12 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("0.3052", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[0],
           // maxFeeBips: 50,
-          feeBips: 50, //protocolTakerFeeBips
+          feeBips: 18,
           fillAmountBorS: false,
-          feeTokenID: 0, //
-          fee: new BN("12300000000000"), //
-          maxFee: new BN("12300000000000"), //
-          // uiReferID: 3, //
+          feeTokenID: 0,
+          fee: new BN("12300000000000"),
+          maxFee: new BN("12300000000000"),
+          // uiReferID: 3,
           // autoMarketID: 0,
           type: 7,
           level: 0,
@@ -1200,12 +1279,12 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[1],
           // maxFeeBips: 0,
-          feeBips: 0, //protocolMakerFeeBips
+          feeBips: 0,
           fillAmountBorS: false,
-          feeTokenID: 0, //
-          fee: new BN("21000000000000"), //
-          maxFee: new BN("21000000000000"), //
-          // uiReferID: 1, //
+          feeTokenID: 0,
+          fee: new BN("21000000000000"),
+          maxFee: new BN("21000000000000"),
+          // uiReferID: 1,
           type: 0
         };
 
@@ -1237,12 +1316,12 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[0],
           // maxFeeBips: 50,
-          feeBips: 50, //protocolTakerFeeBips
+          feeBips: 18,
           fillAmountBorS: true,
-          feeTokenID: 0, //
-          fee: new BN("12300000000000"), //
-          maxFee: new BN("12300000000000"), //
-          // uiReferID: 3, //
+          feeTokenID: 0,
+          fee: new BN("12300000000000"),
+          maxFee: new BN("12300000000000"),
+          // uiReferID: 3,
           // autoMarketID: 0,
           type: 7,
           level: 1,
@@ -1260,12 +1339,12 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("0.3045", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[1],
           // maxFeeBips: 0,
-          feeBips: 0, //protocolMakerFeeBips
+          feeBips: 0,
           fillAmountBorS: false,
-          feeTokenID: 0, //
-          fee: new BN("21000000000000"), //
-          maxFee: new BN("21000000000000"), //
-          // uiReferID: 1, //
+          feeTokenID: 0,
+          fee: new BN("21000000000000"),
+          maxFee: new BN("21000000000000"),
+          // uiReferID: 1,
           type: 0
         };
 
@@ -1297,12 +1376,12 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("0.3047", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[0],
           // maxFeeBips: 50,
-          feeBips: 50, //protocolTakerFeeBips
+          feeBips: 18,
           fillAmountBorS: false,
-          feeTokenID: 0, //
-          fee: new BN("12300000000000"), //
-          maxFee: new BN("12300000000000"), //
-          // uiReferID: 3, //
+          feeTokenID: 0,
+          fee: new BN("12300000000000"),
+          maxFee: new BN("12300000000000"),
+          // uiReferID: 3,
           // autoMarketID: 0,
           type: 7,
           level: 1,
@@ -1320,12 +1399,12 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[1],
           // maxFeeBips: 0,
-          feeBips: 0, //protocolMakerFeeBips
+          feeBips: 0,
           fillAmountBorS: false,
-          feeTokenID: 0, //
-          fee: new BN("21000000000000"), //
-          maxFee: new BN("21000000000000"), //
-          // uiReferID: 1, //
+          feeTokenID: 0,
+          fee: new BN("21000000000000"),
+          maxFee: new BN("21000000000000"),
+          // uiReferID: 1,
           type: 0
         };
 

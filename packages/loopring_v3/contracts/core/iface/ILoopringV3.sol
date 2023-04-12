@@ -44,7 +44,6 @@ abstract contract ILoopringV3 is Claimable
     ///      new Loopring exchanges.
     function updateSettings(
         address payable _protocolFeeVault,   // address(0) not allowed
-        address _blockVerifierAddress,       // address(0) not allowed
         uint    _forcedWithdrawalFee
         )
         external
@@ -67,7 +66,7 @@ abstract contract ILoopringV3 is Claimable
     function getExchangeStake(
         address exchangeAddr
         )
-        public
+        external
         virtual
         view
         returns (uint stakedLRC);
@@ -112,7 +111,7 @@ abstract contract ILoopringV3 is Claimable
     /// @return feeBips The protocol fee
     function getProtocolFeeValues(
         )
-        public
+        external
         virtual
         view
         returns (

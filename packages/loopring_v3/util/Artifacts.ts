@@ -17,7 +17,7 @@ export class Artifacts {
   public PoseidonContract: any;
   // public UserStakingPool: any;
   public ProtocolFeeVault: any;
-  public UniswapTokenSeller: any;
+  // public UniswapTokenSeller: any;
   public AddressWhitelist: any;
   public DelayedOwnerContract: any;
   public DelayedTargetContract: any;
@@ -49,6 +49,6 @@ export class Artifacts {
     this.DelayedTargetContract = artifacts.require("DelayedTargetContract");
     this.DefaultDepositContract = artifacts.require("DefaultDepositContract");
     this.OwnedUpgradabilityProxy = artifacts.require("OwnedUpgradabilityProxy");
-    this.ChiToken = artifacts.require("ChiToken");
+    // this.ChiToken = artifacts.require("ChiToken");
   }
 }

@@ -26,35 +26,6 @@ abstract contract IBlockVerifier is Claimable
 
     // -- Public functions --
 
-    /// @dev Sets the verifying key for the specified circuit.
-    ///      Every block permutation needs its own circuit and thus its own set of
-    ///      verification keys. Only a limited number of block sizes per block
-    ///      type are supported.
-    /// @param blockType The type of the block
-    /// @param blockSize The number of requests handled in the block
-    /// @param blockVersion The block version (i.e. which circuit version needs to be used)
-    /// @param vk The verification key
-    function registerCircuit(
-        uint8    blockType,
-        uint16   blockSize,
-        uint8    blockVersion,
-        uint[18] calldata vk
-        )
-        external
-        virtual;
-
-    /// @dev Disables the use of the specified circuit.
-    /// @param blockType The type of the block
-    /// @param blockSize The number of requests handled in the block
-    /// @param blockVersion The block version (i.e. which circuit version needs to be used)
-    function disableCircuit(
-        uint8  blockType,
-        uint16 blockSize,
-        uint8  blockVersion
-        )
-        external
-        virtual;
-
     /// @dev Verifies blocks with the given public data and proofs.
     ///      Verifying a block makes sure all requests handled in the block
     ///      are correctly handled by the operator.

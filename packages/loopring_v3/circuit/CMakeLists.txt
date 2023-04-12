@@ -23,8 +23,8 @@ if("${ZKP_WORKER_MODE}")
         ethsnarks_jubjub
         rdkafka
         rdkafka++
-        aws-cpp-sdk-core
-        aws-cpp-sdk-s3
+        # aws-cpp-sdk-core
+        # aws-cpp-sdk-s3
     )
 else()
     set( PROJECT_LINK_LIBS
@@ -44,6 +44,14 @@ file(GLOB test_filenames
 
 add_executable(dex_circuit_tests ${test_filenames})
 target_link_libraries(dex_circuit_tests ethsnarks_jubjub)
+
+# # zkpproxy
+# add_executable(dex_proxy "${circuit_src_folder}/zkpproxy.cpp")
+# target_link_libraries(dex_proxy ${PROJECT_LINK_LIBS})
+# if("${PERFORMANCE}")
+#   set_target_properties(dex_proxy PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+# endif()
+
 
 if("${GPU_PROVE}")
   add_definitions(-DGPU_PROVE=1)

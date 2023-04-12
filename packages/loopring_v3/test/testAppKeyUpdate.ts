@@ -337,6 +337,7 @@ contract("Exchange", (accounts: string[]) => {
         0
       );
 
+      // AppKey Transfer
       await exchangeTestUtil.transfer(
         exchangeTestUtil.testContext.orderOwners[3],
         exchangeTestUtil.testContext.orderOwners[2],
@@ -370,7 +371,7 @@ contract("Exchange", (accounts: string[]) => {
           amountS: new BN(web3.utils.toWei("1", "ether")),
           amountB: new BN(web3.utils.toWei("0.5", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[3],
-          feeBips: 50,
+          feeBips: 18, // can not more than protocolFeeBips
           fillAmountBorS: true,
           feeTokenID: 0,
           fee: new BN("12300000000000"),
@@ -383,7 +384,7 @@ contract("Exchange", (accounts: string[]) => {
           amountS: new BN(web3.utils.toWei("4", "ether")),
           amountB: new BN(web3.utils.toWei("2", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[2],
-          feeBips: 0,
+          feeBips: 0, // can not more than protocolFeeBips
           fillAmountBorS: false,
           feeTokenID: 0,
           fee: new BN("21000000000000"),
@@ -414,7 +415,7 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[3],
           // maxFeeBips: 50,
-          feeBips: 50,
+          feeBips: 18, // can not more than protocolFeeBips
           fillAmountBorS: true,
           feeTokenID: 0,
           fee: new BN("12300000000000"),
@@ -430,9 +431,9 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[2],
           // maxFeeBips: 0,
-          feeBips: 0,
+          feeBips: 0, // can not more than protocolFeeBips
           fillAmountBorS: false,
-          feeTokenID: 0,
+          feeTokenID: 2,
           fee: new BN("21000000000000"),
           maxFee: new BN("21000000000000"),
           deltaFilledS: new BN("1000000000000000000"),
@@ -446,7 +447,7 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("2", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[3],
           // maxFeeBips: 50,
-          feeBips: 50,
+          feeBips: 18, // can not more than protocolFeeBips
           fillAmountBorS: true,
           feeTokenID: 0,
           fee: new BN("22300000000000"),
@@ -461,9 +462,9 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("2", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[2],
           // maxFeeBips: 0,
-          feeBips: 0,
+          feeBips: 0, // can not more than protocolFeeBips
           fillAmountBorS: false,
-          feeTokenID: 0,
+          feeTokenID: 2,
           fee: new BN("31000000000000"),
           maxFee: new BN("31000000000000"),
           deltaFilledS: new BN("2000000000000000000"),
@@ -478,7 +479,7 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("2", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[3],
           // maxFeeBips: 50,
-          feeBips: 50,
+          feeBips: 18, // can not more than protocolFeeBips
           fillAmountBorS: true,
           feeTokenID: 0,
           fee: new BN("42300000000000"),
@@ -493,9 +494,9 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("2", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[2],
           // maxFeeBips: 0,
-          feeBips: 0,
+          feeBips: 0, // can not more than protocolFeeBips
           fillAmountBorS: false,
-          feeTokenID: 0,
+          feeTokenID: 2,
           fee: new BN("51000000000000"),
           maxFee: new BN("51000000000000"),
           deltaFilledS: new BN("2000000000000000000"),
@@ -508,9 +509,9 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[3],
           // maxFeeBips: 50,
-          feeBips: 50,
+          feeBips: 18, // can not more than protocolFeeBips
           fillAmountBorS: true,
-          feeTokenID: 0,
+          feeTokenID: 2,
           fee: new BN("62300000000000"),
           maxFee: new BN("62300000000000"),
           deltaFilledS: new BN("1000000000000000000"),
@@ -523,9 +524,9 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[2],
           // maxFeeBips: 0,
-          feeBips: 0,
+          feeBips: 0, // can not more than protocolFeeBips
           fillAmountBorS: false,
-          feeTokenID: 0,
+          feeTokenID: 2,
           fee: new BN("71000000000000"),
           maxFee: new BN("71000000000000"),
           deltaFilledS: new BN("1000000000000000000"),
@@ -554,12 +555,12 @@ contract("Exchange", (accounts: string[]) => {
         const spread = new BN(web3.utils.toWei("1", "ether"));
         const batchSpotTrade: BatchSpotTrade = {
           users: [batchSpotTradeUser1, batchSpotTradeUser2, batchSpotTradeUser3, batchSpotTradeUser4, batchSpotTradeUser5],
-          tokens: [2,3,0],
+          tokens: [0,3,2],
           expected: {
             orderA: { filledFraction: 1.0, spread },
             orderB: { filledFraction: 0.5 }
           },
-          bindTokenID: 0
+          bindTokenID: 2
           // stableToken: 0
         };
 
@@ -578,9 +579,9 @@ contract("Exchange", (accounts: string[]) => {
         1
       );
 
-      await exchangeTestUtil.submitTransactions(20);
-      // // // Submit the block
-      await exchangeTestUtil.submitPendingBlocks();
+      await exchangeTestUtil.submitTransactions(20, true);
+      // // Submit the block
+      // await exchangeTestUtil.submitPendingBlocks();
     });
   });
 });

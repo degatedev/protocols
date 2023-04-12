@@ -24,14 +24,10 @@ export interface AutoMarketStartOrderInfo {
   feeBips?: number;
   tradingFee?: BN;
   maxFee?: BN;
-  // uiReferID?: number;
   type?: number;
-  // autoMarketID?: number;
-  // (fillAmountBorS = 1 ? sell token: buy token
   gridOffset?: BN;
-  // (fillAmountBorS = 1 ? sell token: buy token
   orderOffset?: BN;
-  //(<256)
+  // max(<256)
   maxLevel?: number;
   useAppKey?: number;
 
@@ -52,37 +48,28 @@ export interface OrderInfo {
   tokenIdB?: number;
 
   validUntil?: number;
-  //TradingFeGasFee-TradingFeProtocolFeeBips
-  // maxFeeBips?: number;
   fillAmountBorS?: boolean;
   taker?: string;
 
   feeBips?: number;
   tradingFee?: BN;
 
-  //trading fegas fee
-  feeTokenID?: number; //
-  fee?: BN; //
-  maxFee?: BN; //
+  feeTokenID?: number;
+  fee?: BN;
+  maxFee?: BN;
 
-  // //refeUrefe
-  // uiReferID?: number, //
-  // accountReferID?: number, //
-
-  //(<6),(6),(7)
+  // normal(<6), auto market buy(7), auto market sell(6)
   type?: number;
   // autoMarketID?: number;
   level?: number;
   startOrder?: AutoMarketStartOrderInfo;
 
-  // (fillAmountBorS = 1 ? sell token: buy token
   gridOffset?: BN;
-  // (fillAmountBorS = 1 ? sell token: buy token
   orderOffset?: BN;
-  //(<256)
+  // max(<256)
   maxLevel?: number;
 
-  //BatchSpotTrade
+  // used in BatchSpotTrade
   deltaFilledS?: BN;
   deltaFilledB?: BN;
 
@@ -178,7 +165,6 @@ export interface BatchSpotTrade {
 
   bindTokenID: number;
 
-  //
   enableDataCheck?: boolean;
   userAFirstEstimateExchange?: string;
   userASecondEstimateExchange?: string;
@@ -242,9 +228,6 @@ export interface AccountUpdate {
 
   signature?: Signature;
   onchainSignature?: any;
-
-  // //refe-refe
-  // referID?: number;
 }
 
 export interface AppKeyUpdate {
@@ -394,10 +377,6 @@ export interface AutoMarketUpdate {
 export interface TxBlock {
   transactions: any[];
   protocolFeeBips?: number;
-  // protocolTakerFeeBips?: number;
-  // protocolMakerFeeBips?: number;
-
-  //refeUrefe
   referFeeBips?: number;
   uiFeeBips?: number;
 
@@ -459,6 +438,5 @@ export interface Account {
   secretKey: string;
   appKeySecretKey: string;
   nonce: number;
-  //refe-refe
   referID?: number;
 }

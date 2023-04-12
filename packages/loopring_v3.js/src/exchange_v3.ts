@@ -791,8 +791,7 @@ export class ExchangeV3 {
     const timestamp = Number(ethereumBlock.timestamp);
 
     // Get the block data from the transaction data
-    //const submitBlocksFunctionSignature = "0x8dadd3af"; // submitBlocks
-    const submitBlocksFunctionSignature = "0xdcb2aa31"; // submitBlocksWithCallbacks
+    const submitBlocksFunctionSignature = "0x377bb770"; // submitBlocks
 
     const transaction = await this.web3.eth.getTransaction(
       event.transactionHash
@@ -802,8 +801,8 @@ export class ExchangeV3 {
       const decodedInput = this.web3.eth.abi.decodeParameters(
         [
           "bool",
-          "bytes",
           "bytes"
+          // "bytes"
           /*{
             "struct CallbackConfig": {
               "struct BlockCallback[]": {

@@ -10,7 +10,7 @@ const AgentRegistry = artifacts.require("AgentRegistry");
 const FastWithdrawalAgent = artifacts.require("FastWithdrawalAgent");
 
 module.exports = function(deployer, network, accounts) {
-  if (network != "live" && network != "live-fork") {
+  if (network != "live" && network != "live-fork" && network != "goerli") {
     deployer.then(async () => {
       // await deployer.deploy(UserStakingPool, LRCToken.address);
       await deployer.deploy(ProtocolFeeVault, LRCToken.address);
@@ -19,6 +19,14 @@ module.exports = function(deployer, network, accounts) {
       await deployer.deploy(BlockVerifier);
       await deployer.deploy(AgentRegistry);
       await deployer.deploy(FastWithdrawalAgent);
+    });
+  } else {
+    deployer.then(async () => {
+      const DGTokenAddress = "0x53c8395465a84955c95159814461466053dedede"; // DG token
+      await deployer.deploy(ProtocolFeeVault, DGTokenAddress);
+
+      await deployer.link(BatchVerifier, BlockVerifier);
+      await deployer.deploy(BlockVerifier);
     });
   }
 };

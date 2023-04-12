@@ -16,34 +16,47 @@ using namespace ethsnarks;
 namespace Loopring
 {
 
-struct TransactionAccountState : public GadgetT
+struct BaseTransactionAccountState : public GadgetT 
 {
-    StorageGadget storage;
     std::vector<StorageGadget> storageArray;
     BalanceGadget balanceS;
     BalanceGadget balanceB;
     // split trading fee and gas fee
     BalanceGadget balanceFee;
     AccountGadget account;
-
-    TransactionAccountState( //
+    BaseTransactionAccountState( //
       ProtoboardT &pb,
       unsigned int storageArraySize,
       const std::string &prefix)
         : GadgetT(pb, prefix),
 
-          storage(pb, FMT(prefix, ".storage")),
           balanceS(pb, FMT(prefix, ".balanceS")),
           balanceB(pb, FMT(prefix, ".balanceB")),
           // split trading fee and gas fee
           balanceFee(pb, FMT(prefix, ".balanceFee")),
           account(pb, FMT(prefix, ".account"))
     {
-      LOG(LogDebug, "in TransactionAccountState", "");
+      LOG(LogDebug, "in BaseTransactionAccountState", "");
       for (size_t i = 0; i < storageArraySize; i++) 
       {
-        storageArray.emplace_back(pb, "TransactionAccountState.storageArray_" + std::to_string(i));
+        storageArray.emplace_back(pb, "BaseTransactionAccountState.storageArray_" + std::to_string(i));
       }
+    }
+};
+
+struct TransactionAccountState : public BaseTransactionAccountState
+{
+    StorageGadget storage;
+
+    TransactionAccountState( //
+      ProtoboardT &pb,
+      unsigned int storageArraySize,
+      const std::string &prefix)
+        : BaseTransactionAccountState(pb, storageArraySize, prefix),
+
+          storage(pb, FMT(prefix, ".storage"))
+    {
+      LOG(LogDebug, "in TransactionAccountState", "");
     }
 
     void generate_r1cs_witness(
@@ -56,6 +69,38 @@ struct TransactionAccountState : public GadgetT
     {
         LOG(LogDebug, "in TransactionAccountState", "generate_r1cs_witness");
         storage.generate_r1cs_witness(storageLeaf);
+        balanceS.generate_r1cs_witness(balanceLeafS);
+        balanceB.generate_r1cs_witness(balanceLeafB);
+        // split trading fee and gas fee
+        balanceFee.generate_r1cs_witness(balanceLeafFee);
+        account.generate_r1cs_witness(accountLeaf);
+        for (size_t i = 0; i < storageUpdate_array.size(); i ++) {
+          storageArray[i].generate_r1cs_witness(storageUpdate_array[i].before);
+        }
+    }
+};
+
+
+struct TransactionBatchAccountState : public BaseTransactionAccountState
+{
+
+    TransactionBatchAccountState( //
+      ProtoboardT &pb,
+      unsigned int storageArraySize,
+      const std::string &prefix)
+        : BaseTransactionAccountState(pb, storageArraySize, prefix)
+    {
+      LOG(LogDebug, "in TransactionBatchAccountState", "");
+    }
+
+    void generate_r1cs_witness(
+      const AccountLeaf &accountLeaf,
+      const BalanceLeaf &balanceLeafS,
+      const BalanceLeaf &balanceLeafB,
+      const BalanceLeaf &balanceLeafFee,
+      const std::vector<StorageUpdate> &storageUpdate_array)
+    {
+        LOG(LogDebug, "in TransactionBatchAccountState", "generate_r1cs_witness");
         balanceS.generate_r1cs_witness(balanceLeafS);
         balanceB.generate_r1cs_witness(balanceLeafB);
         // split trading fee and gas fee
@@ -146,10 +191,10 @@ struct TransactionState : public GadgetT
 
     TransactionAccountState accountA;
     TransactionAccountState accountB;
-    TransactionAccountState accountC;
-    TransactionAccountState accountD;
-    TransactionAccountState accountE;
-    TransactionAccountState accountF;
+    TransactionBatchAccountState accountC;
+    TransactionBatchAccountState accountD;
+    TransactionBatchAccountState accountE;
+    TransactionBatchAccountState accountF;
     TransactionAccountOperatorState oper;
 
     TransactionState(
@@ -189,14 +234,12 @@ struct TransactionState : public GadgetT
       const AccountLeaf &account_A,
       const BalanceLeaf &balanceLeafS_A,
       const BalanceLeaf &balanceLeafB_A,
-      // split trading fee and gas fee
       const BalanceLeaf &balanceLeafFee_A,
       const StorageLeaf &storageLeaf_A,
       const std::vector<StorageUpdate> &storageUpdate_A_array,
       const AccountLeaf &account_B,
       const BalanceLeaf &balanceLeafS_B,
       const BalanceLeaf &balanceLeafB_B,
-      // split trading fee and gas fee
       const BalanceLeaf &balanceLeafFee_B,
       const StorageLeaf &storageLeaf_B,
       const std::vector<StorageUpdate> &storageUpdate_B_array,
@@ -232,40 +275,39 @@ struct TransactionState : public GadgetT
     )
     {
         LOG(LogDebug, "in TransactionState", "generate_r1cs_witness");
-        // split trading fee and gas fee
         accountA.generate_r1cs_witness(account_A, balanceLeafS_A, balanceLeafB_A, balanceLeafFee_A, storageLeaf_A, storageUpdate_A_array);
         accountB.generate_r1cs_witness(account_B, balanceLeafS_B, balanceLeafB_B, balanceLeafFee_B, storageLeaf_B, storageUpdate_B_array);
         // storageLeaf_A in next is not used, because the circuit is not easy to handle heavy load
-        accountC.generate_r1cs_witness(account_C, balanceLeafS_C, balanceLeafB_C, balanceLeafFee_C, storageLeaf_A, storageUpdate_C_array);
-        accountD.generate_r1cs_witness(account_D, balanceLeafS_D, balanceLeafB_D, balanceLeafFee_D, storageLeaf_A, storageUpdate_D_array);
-        accountE.generate_r1cs_witness(account_E, balanceLeafS_E, balanceLeafB_E, balanceLeafFee_E, storageLeaf_A, storageUpdate_E_array);
-        accountF.generate_r1cs_witness(account_F, balanceLeafS_F, balanceLeafB_F, balanceLeafFee_F, storageLeaf_A, storageUpdate_F_array);
+        accountC.generate_r1cs_witness(account_C, balanceLeafS_C, balanceLeafB_C, balanceLeafFee_C, storageUpdate_C_array);
+        accountD.generate_r1cs_witness(account_D, balanceLeafS_D, balanceLeafB_D, balanceLeafFee_D, storageUpdate_D_array);
+        accountE.generate_r1cs_witness(account_E, balanceLeafS_E, balanceLeafB_E, balanceLeafFee_E, storageUpdate_E_array);
+        accountF.generate_r1cs_witness(account_F, balanceLeafS_F, balanceLeafB_F, balanceLeafFee_F, storageUpdate_F_array);
         oper.generate_r1cs_witness(account_O, balanceLeafA_O, balanceLeafB_O, balanceLeafC_O, balanceLeafD_O);
     }
 };
 
 enum TxVariable
 {
+    // storage leaf: tokenSID, tokenBID, data, storageID, gasFee, cancelled, forward
     TXV_STORAGE_A_ADDRESS,
-    // DEG-347 Storage move-add variable and constraint
     TXV_STORAGE_A_TOKENSID,
     TXV_STORAGE_A_TOKENBID,
     TXV_STORAGE_A_DATA,
     TXV_STORAGE_A_STORAGEID,
-    // split trading fee and gas fee - add up gas
     TXV_STORAGE_A_GASFEE,
-    // DEG-146:order cancel
-    // add new variable into storage leaf
     TXV_STORAGE_A_CANCELLED,
-    // DEG-347 Storage move-add variable and constraint
     TXV_STORAGE_A_FORWARD,
 
+    // balance leaf: balance
     TXV_BALANCE_A_S_ADDRESS,
     TXV_BALANCE_A_S_BALANCE,
 
     TXV_BALANCE_A_B_ADDRESS,
     TXV_BALANCE_A_B_BALANCE,
 
+    // asset tree account leaf: owner, publicKeyX, publicKeyY, nonce, balanceRoot
+    // full tree account leaf: owner, publicKeyX, publicKeyY, appKeyPublicKeyX, appKeyPublicKeyY, nonce, disableAppKeySpotTrade, 
+    //   disableAppKeyWithdraw, disableAppKeyTransferToOther, balanceRoot, storageRoot
     TXV_ACCOUNT_A_ADDRESS,
     TXV_ACCOUNT_A_OWNER,
     TXV_ACCOUNT_A_PUBKEY_X,
@@ -304,26 +346,13 @@ enum TxVariable
     TXV_STORAGE_A_CANCELLED_ARRAY_2,
     TXV_STORAGE_A_FORWARD_ARRAY_2,
 
-    // TXV_STORAGE_A_ADDRESS_ARRAY_3,
-    // TXV_STORAGE_A_TOKENSID_ARRAY_3,
-    // TXV_STORAGE_A_TOKENBID_ARRAY_3,
-    // TXV_STORAGE_A_DATA_ARRAY_3,
-    // TXV_STORAGE_A_STORAGEID_ARRAY_3,
-    // TXV_STORAGE_A_GASFEE_ARRAY_3,
-    // TXV_STORAGE_A_CANCELLED_ARRAY_3,
-    // TXV_STORAGE_A_FORWARD_ARRAY_3,
-
-
     TXV_STORAGE_B_ADDRESS,
-    // DEG-347 Storage move - add variable and constraint
     TXV_STORAGE_B_TOKENSID,
     TXV_STORAGE_B_TOKENBID,
     TXV_STORAGE_B_DATA,
     TXV_STORAGE_B_STORAGEID,
-    // split trading fee and gas fee - add up gas
     TXV_STORAGE_B_GASFEE,
     TXV_STORAGE_B_CANCELLED,
-    // DEG-347 Storage move - add variable and constraint
     TXV_STORAGE_B_FORWARD,
 
     TXV_BALANCE_B_S_ADDRESS,
@@ -346,15 +375,6 @@ enum TxVariable
     TXV_STORAGE_B_GASFEE_ARRAY_0,
     TXV_STORAGE_B_CANCELLED_ARRAY_0,
     TXV_STORAGE_B_FORWARD_ARRAY_0,
-
-    // TXV_STORAGE_B_ADDRESS_ARRAY_1,
-    // TXV_STORAGE_B_TOKENSID_ARRAY_1,
-    // TXV_STORAGE_B_TOKENBID_ARRAY_1,
-    // TXV_STORAGE_B_DATA_ARRAY_1,
-    // TXV_STORAGE_B_STORAGEID_ARRAY_1,
-    // TXV_STORAGE_B_GASFEE_ARRAY_1,
-    // TXV_STORAGE_B_CANCELLED_ARRAY_1,
-    // TXV_STORAGE_B_FORWARD_ARRAY_1,
 
     //-----------UserC
     TXV_BALANCE_C_S_ADDRESS,
@@ -456,7 +476,6 @@ enum TxVariable
     TXV_BALANCE_O_C_BALANCE,
     TXV_BALANCE_O_D_BALANCE,
 
-    // split trading fee and gas fee
     TXV_BALANCE_A_FEE_BALANCE,
     TXV_BALANCE_B_FEE_BALANCE,
     TXV_BALANCE_C_FEE_BALANCE,
@@ -464,8 +483,6 @@ enum TxVariable
     TXV_BALANCE_E_FEE_BALANCE,
     TXV_BALANCE_F_FEE_BALANCE,
 
-    // DEG-127 split trading fee and gas fee
-    // add this address for updateFee
     TXV_BALANCE_A_FEE_Address,
     TXV_BALANCE_B_FEE_Address,
     TXV_BALANCE_C_FEE_Address,
@@ -524,7 +541,7 @@ class BaseTransactionCircuit : public GadgetT
     std::map<TxVariable, VariableT> uOutputs;
     std::map<TxVariable, VariableArrayT> aOutputs;
 
-    BaseTransactionCircuit( //
+    BaseTransactionCircuit(
       ProtoboardT &pb,
       const TransactionState &_state,
       const std::string &prefix)
@@ -532,17 +549,12 @@ class BaseTransactionCircuit : public GadgetT
     {
         LOG(LogDebug, "in BaseTransactionCircuit", "");
         aOutputs[TXV_STORAGE_A_ADDRESS] = VariableArrayT(NUM_BITS_STORAGE_ADDRESS, state.constants._0);
-        // DEG-347 Storage move - add variable and constraint
         uOutputs[TXV_STORAGE_A_TOKENSID] = state.accountA.storage.tokenSID;
         uOutputs[TXV_STORAGE_A_TOKENBID] = state.accountA.storage.tokenBID;
         uOutputs[TXV_STORAGE_A_DATA] = state.accountA.storage.data;
         uOutputs[TXV_STORAGE_A_STORAGEID] = state.accountA.storage.storageID;
-        // split trading fee and gas fee - add up gas
         uOutputs[TXV_STORAGE_A_GASFEE] = state.accountA.storage.gasFee;
-        // DEG-146:order cancel
-        // add new variable into storage leaf. used in updateStorage_A
         uOutputs[TXV_STORAGE_A_CANCELLED] = state.accountA.storage.cancelled;
-        // DEG-347 Storage move - add variable and constraint
         uOutputs[TXV_STORAGE_A_FORWARD] = state.accountA.storage.forward;
 
         aOutputs[TXV_BALANCE_A_S_ADDRESS] = VariableArrayT(NUM_BITS_TOKEN, state.constants._0);
@@ -550,9 +562,7 @@ class BaseTransactionCircuit : public GadgetT
 
         aOutputs[TXV_BALANCE_A_B_ADDRESS] = VariableArrayT(NUM_BITS_TOKEN, state.constants._0);
         uOutputs[TXV_BALANCE_A_B_BALANCE] = state.accountA.balanceB.balance;
-        // split trading fee and gas fee
         uOutputs[TXV_BALANCE_A_FEE_BALANCE] = state.accountA.balanceFee.balance;
-        // DEG-127 split trading fee and gas fee
         aOutputs[TXV_BALANCE_A_FEE_Address] = VariableArrayT(NUM_BITS_TOKEN, state.constants._0);
 
         // default account ID is 0 rather than 1
@@ -567,7 +577,7 @@ class BaseTransactionCircuit : public GadgetT
         uOutputs[TXV_ACCOUNT_A_DISABLE_APPKEY_WITHDRAW_TO_OTHER] = state.accountA.account.disableAppKeyWithdraw;
         uOutputs[TXV_ACCOUNT_A_DISABLE_APPKEY_TRANSFER_TO_OTHER] = state.accountA.account.disableAppKeyTransferToOther;
 
-        // Batch SpotTrade, account A have 5 orders, the first one had been handled before, now need to handle last 4
+        // Batch SpotTrade, account A have 4 orders, the first one had been handled before, now need to handle last 3
         aOutputs[TXV_STORAGE_A_ADDRESS_ARRAY_0] = (VariableArrayT(NUM_BITS_STORAGE_ADDRESS, state.constants._0));
         uOutputs[TXV_STORAGE_A_TOKENSID_ARRAY_0] = (state.accountA.storageArray[0].tokenSID);
         uOutputs[TXV_STORAGE_A_TOKENBID_ARRAY_0] = (state.accountA.storageArray[0].tokenBID);
@@ -595,27 +605,14 @@ class BaseTransactionCircuit : public GadgetT
         uOutputs[TXV_STORAGE_A_CANCELLED_ARRAY_2] = (state.accountA.storageArray[2].cancelled);
         uOutputs[TXV_STORAGE_A_FORWARD_ARRAY_2] = (state.accountA.storageArray[2].forward);
 
-        // aOutputs[TXV_STORAGE_A_ADDRESS_ARRAY_3] = (VariableArrayT(NUM_BITS_STORAGE_ADDRESS, state.constants._0));
-        // uOutputs[TXV_STORAGE_A_TOKENSID_ARRAY_3] = (state.accountA.storageArray[3].tokenSID);
-        // uOutputs[TXV_STORAGE_A_TOKENBID_ARRAY_3] = (state.accountA.storageArray[3].tokenBID);
-        // uOutputs[TXV_STORAGE_A_DATA_ARRAY_3] = (state.accountA.storageArray[3].data);
-        // uOutputs[TXV_STORAGE_A_STORAGEID_ARRAY_3] = (state.accountA.storageArray[3].storageID);
-        // uOutputs[TXV_STORAGE_A_GASFEE_ARRAY_3] = (state.accountA.storageArray[3].gasFee);
-        // uOutputs[TXV_STORAGE_A_CANCELLED_ARRAY_3] = (state.accountA.storageArray[3].cancelled);
-        // uOutputs[TXV_STORAGE_A_FORWARD_ARRAY_3] = (state.accountA.storageArray[3].forward);
-
-
         // default account ID is 0 rather than 1
         aOutputs[TXV_STORAGE_B_ADDRESS] = VariableArrayT(NUM_BITS_STORAGE_ADDRESS, state.constants._0);
-        // DEG-347 Storage move - add variable and constraint
         uOutputs[TXV_STORAGE_B_TOKENSID] = state.accountB.storage.tokenSID;
         uOutputs[TXV_STORAGE_B_TOKENBID] = state.accountB.storage.tokenBID;
         uOutputs[TXV_STORAGE_B_DATA] = state.accountB.storage.data;
         uOutputs[TXV_STORAGE_B_STORAGEID] = state.accountB.storage.storageID;
-        // split trading fee and gas fee - add up gas
         uOutputs[TXV_STORAGE_B_GASFEE] = state.accountB.storage.gasFee;
         uOutputs[TXV_STORAGE_B_CANCELLED] = state.accountB.storage.cancelled;
-        // DEG-347 Storage move - add variable and constraint
         uOutputs[TXV_STORAGE_B_FORWARD] = state.accountB.storage.forward;
 
         aOutputs[TXV_BALANCE_B_S_ADDRESS] = VariableArrayT(NUM_BITS_TOKEN, state.constants._0);
@@ -623,7 +620,6 @@ class BaseTransactionCircuit : public GadgetT
 
         aOutputs[TXV_BALANCE_B_B_ADDRESS] = VariableArrayT(NUM_BITS_TOKEN, state.constants._0);
         uOutputs[TXV_BALANCE_B_B_BALANCE] = state.accountB.balanceB.balance;
-        // split trading fee and gas fee
         uOutputs[TXV_BALANCE_B_FEE_BALANCE] = state.accountB.balanceFee.balance;
         aOutputs[TXV_BALANCE_B_FEE_Address] = VariableArrayT(NUM_BITS_TOKEN, state.constants._0);
 
@@ -633,7 +629,7 @@ class BaseTransactionCircuit : public GadgetT
         uOutputs[TXV_ACCOUNT_B_PUBKEY_Y] = state.accountB.account.publicKey.y;
         uOutputs[TXV_ACCOUNT_B_NONCE] = state.accountB.account.nonce;
 
-        // Batch SpotTrade, account B have 3 orders, the first one had been handled before, now need to handle last 2
+        // Batch SpotTrade, account B have 2 orders, the first one had been handled before, now need to handle last 1
         aOutputs[TXV_STORAGE_B_ADDRESS_ARRAY_0] = (VariableArrayT(NUM_BITS_STORAGE_ADDRESS, state.constants._0));
         uOutputs[TXV_STORAGE_B_TOKENSID_ARRAY_0] = (state.accountB.storageArray[0].tokenSID);
         uOutputs[TXV_STORAGE_B_TOKENBID_ARRAY_0] = (state.accountB.storageArray[0].tokenBID);
@@ -642,15 +638,6 @@ class BaseTransactionCircuit : public GadgetT
         uOutputs[TXV_STORAGE_B_GASFEE_ARRAY_0] = (state.accountB.storageArray[0].gasFee);
         uOutputs[TXV_STORAGE_B_CANCELLED_ARRAY_0] = (state.accountB.storageArray[0].cancelled);
         uOutputs[TXV_STORAGE_B_FORWARD_ARRAY_0] = (state.accountB.storageArray[0].forward);
-
-        // aOutputs[TXV_STORAGE_B_ADDRESS_ARRAY_1] = (VariableArrayT(NUM_BITS_STORAGE_ADDRESS, state.constants._0));
-        // uOutputs[TXV_STORAGE_B_TOKENSID_ARRAY_1] = (state.accountB.storageArray[1].tokenSID);
-        // uOutputs[TXV_STORAGE_B_TOKENBID_ARRAY_1] = (state.accountB.storageArray[1].tokenBID);
-        // uOutputs[TXV_STORAGE_B_DATA_ARRAY_1] = (state.accountB.storageArray[1].data);
-        // uOutputs[TXV_STORAGE_B_STORAGEID_ARRAY_1] = (state.accountB.storageArray[1].storageID);
-        // uOutputs[TXV_STORAGE_B_GASFEE_ARRAY_1] = (state.accountB.storageArray[1].gasFee);
-        // uOutputs[TXV_STORAGE_B_CANCELLED_ARRAY_1] = (state.accountB.storageArray[1].cancelled);
-        // uOutputs[TXV_STORAGE_B_FORWARD_ARRAY_1] = (state.accountB.storageArray[1].forward);
         
         //------------------UserC
         aOutputs[TXV_BALANCE_C_S_ADDRESS] = VariableArrayT(NUM_BITS_TOKEN, state.constants._0);
@@ -685,7 +672,6 @@ class BaseTransactionCircuit : public GadgetT
 
         aOutputs[TXV_BALANCE_D_B_ADDRESS] = VariableArrayT(NUM_BITS_TOKEN, state.constants._0);
         uOutputs[TXV_BALANCE_D_B_BALANCE] = state.accountD.balanceB.balance;
-        // split trading fee and gas fee
         uOutputs[TXV_BALANCE_D_FEE_BALANCE] = state.accountD.balanceFee.balance;
         aOutputs[TXV_BALANCE_D_FEE_Address] = VariableArrayT(NUM_BITS_TOKEN, state.constants._0);
 
@@ -712,7 +698,6 @@ class BaseTransactionCircuit : public GadgetT
 
         aOutputs[TXV_BALANCE_E_B_ADDRESS] = VariableArrayT(NUM_BITS_TOKEN, state.constants._0);
         uOutputs[TXV_BALANCE_E_B_BALANCE] = state.accountE.balanceB.balance;
-        // split trading fee and gas fee
         uOutputs[TXV_BALANCE_E_FEE_BALANCE] = state.accountE.balanceFee.balance;
         aOutputs[TXV_BALANCE_E_FEE_Address] = VariableArrayT(NUM_BITS_TOKEN, state.constants._0);
 
@@ -739,7 +724,6 @@ class BaseTransactionCircuit : public GadgetT
 
         aOutputs[TXV_BALANCE_F_B_ADDRESS] = VariableArrayT(NUM_BITS_TOKEN, state.constants._0);
         uOutputs[TXV_BALANCE_F_B_BALANCE] = state.accountF.balanceB.balance;
-        // split trading fee and gas fee
         uOutputs[TXV_BALANCE_F_FEE_BALANCE] = state.accountF.balanceFee.balance;
         aOutputs[TXV_BALANCE_F_FEE_Address] = VariableArrayT(NUM_BITS_TOKEN, state.constants._0);
 

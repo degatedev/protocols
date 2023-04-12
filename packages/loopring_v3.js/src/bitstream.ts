@@ -59,7 +59,6 @@ export class Bitstream {
     }
   }
 
-  // 1byte = 1
   public addNumberWithChar(x: number, numChar = 2) {
     return this.addBigNumberWithChar(new BigNumber(x), numChar);
   }

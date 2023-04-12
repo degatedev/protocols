@@ -161,6 +161,57 @@ class IsBatchSpotTradeGadget : public GadgetT
         }
 };
 
+class RequireValidNoopOrderGadget : public GadgetT 
+{
+    public:
+        IfThenRequireEqualGadget validDeltaFilledS;
+        IfThenRequireEqualGadget validDeltaFilledB;
+        IfThenRequireEqualGadget validAppointTradingFee;
+        IfThenRequireEqualGadget validGasFee;
+        IfThenRequireEqualGadget validAmountS;
+        IfThenRequireEqualGadget validAmountB;
+        RequireValidNoopOrderGadget(
+            ProtoboardT &pb,
+            const Constants &constants,
+            const VariableT &deltaFilledS,
+            const VariableT &deltaFilledB,
+            const VariableT &appointTradingFee,
+            const VariableT &gasFee,
+            const VariableT &amountS,
+            const VariableT &amountB,
+            const VariableT &isNoop,
+            const std::string &prefix)
+                : GadgetT(pb, prefix),
+                validDeltaFilledS(pb, isNoop, deltaFilledS, constants._0, FMT(prefix, ".validDeltaFilledS")),
+                validDeltaFilledB(pb, isNoop, deltaFilledB, constants._0, FMT(prefix, ".validDeltaFilledB")),
+                validAppointTradingFee(pb, isNoop, appointTradingFee, constants._0, FMT(prefix, ".validAppointTradingFee")),
+                validGasFee(pb, isNoop, gasFee, constants._0, FMT(prefix, ".validGasFee")),
+                validAmountS(pb, isNoop, amountS, constants._0, FMT(prefix, ".validAmountS")),
+                validAmountB(pb, isNoop, amountB, constants._0, FMT(prefix, ".validAmountB"))
+        {
+            
+        }
+
+        void generate_r1cs_witness()
+        {
+            validDeltaFilledS.generate_r1cs_witness();
+            validDeltaFilledB.generate_r1cs_witness();
+            validAppointTradingFee.generate_r1cs_witness();
+            validGasFee.generate_r1cs_witness();
+            validAmountS.generate_r1cs_witness();
+            validAmountB.generate_r1cs_witness();
+        }
+        void generate_r1cs_constraints()
+        {
+            validDeltaFilledS.generate_r1cs_constraints();
+            validDeltaFilledB.generate_r1cs_constraints();
+            validAppointTradingFee.generate_r1cs_constraints();
+            validGasFee.generate_r1cs_constraints();
+            validAmountS.generate_r1cs_constraints();
+            validAmountB.generate_r1cs_constraints();
+        }
+};
+
 class BatchOrderGadget : public GadgetT
 {
   public:
@@ -186,6 +237,8 @@ class BatchOrderGadget : public GadgetT
     FeeCalculatorGadget tradingFeeCalculator;
     DualVariableGadget appointTradingFee;
     GasFeeMatchingGadget gasFeeMatch;
+    RequireValidNoopOrderGadget validNoopOrder;
+
     SubGadget tokenBExchange;
 
     SelectOneTokenAmountGadget tokenSSelect;
@@ -222,13 +275,11 @@ class BatchOrderGadget : public GadgetT
       const Constants &_constants,
       const VariableT &timestamp,
       const VariableT &blockExchange,
-    //   const TransactionAccountState &account,
       const StorageGadget &storageGadget,
-    //   const VariableT &type,
       // split TradingFee and GasFee - ProtocolFeeBips as the max TradingFee
       const VariableT &maxFeeBips,
       const std::vector<VariableT> &_tokens,
-      const TransactionAccountState &account,
+      const BaseTransactionAccountState &account,
       const VariableT &isBatchSpotTradeTx,
       const std::string &prefix)
         : GadgetT(pb, prefix),
@@ -284,6 +335,19 @@ class BatchOrderGadget : public GadgetT
             appointTradingFee.packed,
             isNotNoop.result(), 
             FMT(prefix, ".gas fee match")),
+        validNoopOrder(
+            pb,
+            constants,
+            deltaFilledS.packed,
+            deltaFilledB.packed,
+            appointTradingFee.packed,
+            order.fee.packed,
+            order.amountS.packed,
+            order.amountB.packed,
+            isNoop.packed,
+            FMT(prefix, ".validNoopOrder")
+        ),
+
         tokenBExchange(pb, deltaFilledB.packed, appointTradingFee.packed, NUM_BITS_AMOUNT, FMT(prefix, ".tokenBExchange")),
         tokenSSelect(
             pb,
@@ -380,23 +444,17 @@ class BatchOrderGadget : public GadgetT
         autoMarketOrderCheck.generate_r1cs_witness(orderEntity.startOrder);
         tradeHistoryWithAutoMarket.generate_r1cs_witness();
 
-        LOG(LogDebug, "in BatchOrderGadget before order deltaFilledS", orderEntity.deltaFilledS);
         deltaFilledS.generate_r1cs_witness(pb, orderEntity.deltaFilledS);
-        LOG(LogDebug, "in BatchOrderGadget before order deltaFilledB", orderEntity.deltaFilledB);
         deltaFilledB.generate_r1cs_witness(pb, orderEntity.deltaFilledB);
 
-        LOG(LogDebug, "in BatchOrderGadget before order batchOrderMatching", "");
         batchOrderMatching.generate_r1cs_witness();
-        LOG(LogDebug, "in BatchOrderGadget before order tradingFeeCalculator", "");
         tradingFeeCalculator.generate_r1cs_witness();
-        LOG(LogDebug, "in BatchOrderGadget before order appointTradingFee", "");
         appointTradingFee.generate_r1cs_witness(pb, orderEntity.tradingFee);
-        LOG(LogDebug, "in BatchOrderGadget before order gasFeeMatch", "");
         gasFeeMatch.generate_r1cs_witness();
-        LOG(LogDebug, "in BatchOrderGadget before order tokenBExchange", "");
+        validNoopOrder.generate_r1cs_witness();
+
         tokenBExchange.generate_r1cs_witness();
 
-        LOG(LogDebug, "in BatchOrderGadget before order tokenSSelect", "");
         tokenSSelect.generate_r1cs_witness();
         tokenBSelect.generate_r1cs_witness();
         tokenOneAmount.generate_r1cs_witness();
@@ -406,7 +464,6 @@ class BatchOrderGadget : public GadgetT
         tokenThreeAmount.generate_r1cs_witness();
         tokenThreeSign.generate_r1cs_witness();
 
-        LOG(LogDebug, "in BatchOrderGadget before order tokenBExchangeSelect", "");
         tokenBExchangeSelect.generate_r1cs_witness();
         tokenOneExchangeAmount.generate_r1cs_witness();
         tokenOneExchangeSign.generate_r1cs_witness();
@@ -415,39 +472,14 @@ class BatchOrderGadget : public GadgetT
         tokenThreeExchangeAmount.generate_r1cs_witness();
         tokenThreeExchangeSign.generate_r1cs_witness();
 
-        LOG(LogDebug, "in BatchOrderGadget before order tokenFeeSelect", "");
         tokenFeeSelect.generate_r1cs_witness();
 
-        LOG(LogDebug, "in BatchOrderGadget before order tokenOneTradingFee", "");
         tokenOneTradingFee.generate_r1cs_witness();
         tokenTwoTradingFee.generate_r1cs_witness();
         tokenThreeTradingFee.generate_r1cs_witness();
 
-        LOG(LogDebug, "in BatchOrderGadget before order resolvedAuthorX", "");
         resolvedAuthorX.generate_r1cs_witness();
         resolvedAuthorY.generate_r1cs_witness();
-
-        LOG(LogDebug, "in BatchOrderGadget before tokenOneAmount", pb.val(tokenOneAmount.result()));
-        LOG(LogDebug, "in BatchOrderGadget before tokenTwoAmount", pb.val(tokenTwoAmount.result()));
-        LOG(LogDebug, "in BatchOrderGadget before tokenThreeAmount", pb.val(tokenThreeAmount.result()));
-
-        LOG(LogDebug, "in BatchOrderGadget before tokenOneSign", pb.val(tokenOneSign.result()));
-        LOG(LogDebug, "in BatchOrderGadget before tokenTwoSign", pb.val(tokenTwoSign.result()));
-        LOG(LogDebug, "in BatchOrderGadget before tokenThreeSign", pb.val(tokenThreeSign.result()));
-
-        LOG(LogDebug, "in BatchOrderGadget before tokenOneExchangeAmount", pb.val(tokenOneExchangeAmount.result()));
-        LOG(LogDebug, "in BatchOrderGadget before tokenTwoExchangeAmount", pb.val(tokenTwoExchangeAmount.result()));
-        LOG(LogDebug, "in BatchOrderGadget before tokenThreeExchangeAmount", pb.val(tokenThreeExchangeAmount.result()));
-
-        LOG(LogDebug, "in BatchOrderGadget before tokenOneExchangeSign", pb.val(tokenOneExchangeSign.result()));
-        LOG(LogDebug, "in BatchOrderGadget before tokenTwoExchangeSign", pb.val(tokenTwoExchangeSign.result()));
-        LOG(LogDebug, "in BatchOrderGadget before tokenThreeExchangeSign", pb.val(tokenThreeExchangeSign.result()));
-
-        LOG(LogDebug, "in BatchOrderGadget before tokenOneGasFeeCalculate", pb.val(tokenFeeSelect.getAmountX()));
-        LOG(LogDebug, "in BatchOrderGadget before tokenTwoGasFeeCalculate", pb.val(tokenFeeSelect.getAmountY()));
-        LOG(LogDebug, "in BatchOrderGadget before tokenThreeGasFeeCalculate", pb.val(tokenFeeSelect.getAmountZ()));
-        LOG(LogDebug, "in BatchOrderGadget before order.fFee.value()", pb.val(order.fFee.value()));
-        
     }
 
     void generate_r1cs_constraints()
@@ -471,6 +503,8 @@ class BatchOrderGadget : public GadgetT
         tradingFeeCalculator.generate_r1cs_constraints();
         appointTradingFee.generate_r1cs_constraints();
         gasFeeMatch.generate_r1cs_constraints();
+        validNoopOrder.generate_r1cs_constraints();
+
         tokenBExchange.generate_r1cs_constraints();
 
         tokenSSelect.generate_r1cs_constraints();
@@ -695,8 +729,6 @@ class BatchTokenAmountSumGadget : public GadgetT
                 reverseAmountsSelect[i].generate_r1cs_witness();
                 reverseAmounts[i].generate_r1cs_witness();
             }
-            LOG(LogDebug, "in BatchTokenAmountSumGadget forwardAmounts", pb.val(forwardAmounts.back().result()));
-            LOG(LogDebug, "in BatchTokenAmountSumGadget reverseAmounts", pb.val(reverseAmounts.back().result()));
         }
         void generate_r1cs_constraints() 
         {
@@ -742,11 +774,14 @@ class CalculateBalanceDifGadget : public GadgetT
         TernaryGadget balanceDif;
         ToBitsGadget balanceDifBits;
 
+        // The data is required to be equal. If it is an increase, the increased data is equal to the data after the float. 
+        // If it is a decrease, the decreased data is equal to the data after the float
         EqualGadget increaseAmountEqual;
         EqualGadget reduceAmountEqual;
         IfThenRequireGadget requireValidIncreaseAmount;
         IfThenRequireGadget requireValidReduceAmount;
 
+        // The change of user balance uses the float value, and the increase or decrease after the float transformation is calculated here
         TernaryGadget realIncreaseFloatAmount;
         TernaryGadget realReduceFloatAmount;
         CalculateBalanceDifGadget( //
@@ -765,8 +800,6 @@ class CalculateBalanceDifGadget : public GadgetT
 
                 increaseAmount(pb, constants, increase.result(), balanceAfter.back(), minBalance.result(), NUM_BITS_AMOUNT, FMT(prefix, ".increaseAmount")),
                 reduceAmount(pb, constants, reduce.result(), balanceBefore.back(), minBalance.result(), NUM_BITS_AMOUNT, FMT(prefix, ".reduceAmount")),
-                // increaseAmount(pb, increase.result(), balanceAfter.balance(), balanceBefore.balance(), NUM_BITS_AMOUNT, FMT(prefix, ".increaseAmount")),
-                // reduceAmount(pb, reduce.result(), balanceBefore.balance(), balanceAfter.balance(), NUM_BITS_AMOUNT, FMT(prefix, ".reduceAmount")),
                 
                 fIncreaseAmount(pb, constants, Float29Encoding, FMT(prefix, ".fIncreaseAmount")),
                 fReduceAmount(pb, constants, Float29Encoding, FMT(prefix, ".fReduceAmount")),
@@ -795,28 +828,17 @@ class CalculateBalanceDifGadget : public GadgetT
             reduce.generate_r1cs_witness();
             minBalance.generate_r1cs_witness();
             
-            std::cout << "in CalculateBalanceDifGadget before increaseAmount minBalance:" << pb.val(minBalance.result()) << std::endl;
-            LOG(LogDebug, "in CalculateBalanceDifGadget before reduce", pb.val(reduce.result()));
             increaseAmount.generate_r1cs_witness();
-            LOG(LogDebug, "in CalculateBalanceDifGadget increaseAmount", pb.val(increaseAmount.result()));
             reduceAmount.generate_r1cs_witness();
-            LOG(LogDebug, "in CalculateBalanceDifGadget reduceAmount", pb.val(reduceAmount.result()));
 
             fIncreaseAmount.generate_r1cs_witness(toFloat(pb.val(increaseAmount.result()), Float29Encoding));
-            LOG(LogDebug, "in CalculateBalanceDifGadget fIncreaseAmount", pb.val(fIncreaseAmount.getFArrayValue()));
-            LOG(LogDebug, "in CalculateBalanceDifGadget fIncreaseAmount value", pb.val(fIncreaseAmount.value()));
             fReduceAmount.generate_r1cs_witness(toFloat(pb.val(reduceAmount.result()), Float29Encoding));
-            LOG(LogDebug, "in CalculateBalanceDifGadget fReduceAmount", pb.val(fReduceAmount.getFArrayValue()));
-            LOG(LogDebug, "in CalculateBalanceDifGadget fReduceAmount value", pb.val(fReduceAmount.value()));
 
             reduceNegativeAmount.generate_r1cs_witness();
-            LOG(LogDebug, "in CalculateBalanceDifGadget reduceNegativeAmount", pb.val(reduceNegativeAmount.result()));
 
             balanceDif.generate_r1cs_witness();
-            LOG(LogDebug, "in CalculateBalanceDifGadget balanceDif", pb.val(balanceDif.result()));
 
             balanceDifBits.generate_r1cs_witness();
-            // std::cout << "in CalculateBalanceDifGadget balanceDifBits:" << pb.val(balanceDifBits.value()) << std::endl;
             increaseAmountEqual.generate_r1cs_witness();
             reduceAmountEqual.generate_r1cs_witness();
             requireValidIncreaseAmount.generate_r1cs_witness();
@@ -1054,9 +1076,7 @@ class BatchUserTokenAmountExchangeGadget: public GadgetT
                 pb, 
                 constants,
                 var_array({tokenType_is_zero.result(), tokenType_is_one.result(), tokenType_is_two.result()}), 
-                // subVector(constants.values, 0, 3),
                 {balanceThreeDif.getBalanceDif(), balanceTwoDif.getBalanceDif(), balanceOneDif.getBalanceDif()},
-                // threeVariable_to_vector(balanceThreeDif.getBalanceDif(), balanceTwoDif.getBalanceDif(), balanceOneDif.getBalanceDif()),
                 FMT(prefix, ".tokenType_is_zero")),
             requireValidTirdTokenDif(pb, verifyThirdTokenDif, thirdTokenDif.result(), constants._0, FMT(prefix, ".requireValidTirdTokenDif"))
         {
@@ -1109,13 +1129,13 @@ class BatchUserGadget: public GadgetT
         ToBitsGadget secondToken;
         ToBitsGadget thirdToken;
         DualVariableGadget accountID;
-        DualVariableGadget isNoop;
+        // DualVariableGadget isNoop;
 
         Constants constants;
         VariableT timestamp;
         VariableT blockExchange;
         VariableT maxTradingFeeBips;
-        TransactionAccountState account;
+        BaseTransactionAccountState account;
         VariableT type;
         VariableT isBatchSpotTradeTx;
         // EqualGadget isBatchSpotTradeTx;
@@ -1145,14 +1165,11 @@ class BatchUserGadget: public GadgetT
         std::vector<AddGadget> tokenTwoGasFeeAmount;
         std::vector<AddGadget> tokenThreeGasFeeAmount;
 
-        // std::unique_ptr<EqualGadget> firstToken_eq_thirdToken;
-        // std::unique_ptr<EqualGadget> secondToken_eq_thirdToken;
-        // std::unique_ptr<OrGadget> existSameToken;
-
+        // The user's banalceS, balanceB, and balanceFee are listed in the order of tokens
         std::unique_ptr<DynamicBalanceGadget> balanceOne;
         std::unique_ptr<DynamicBalanceGadget> balanceTwo;
         std::unique_ptr<DynamicBalanceGadget> balanceThree;
-
+        // Before balance is used to calculate the difference with the calculated balance
         std::unique_ptr<DynamicBalanceGadget> balanceOneBefore;
         std::unique_ptr<DynamicBalanceGadget> balanceTwoBefore;
         std::unique_ptr<DynamicBalanceGadget> balanceThreeBefore;
@@ -1176,6 +1193,7 @@ class BatchUserGadget: public GadgetT
         std::unique_ptr<CalculateBalanceDifGadget> balanceTwoDif;
         std::unique_ptr<CalculateBalanceDifGadget> balanceThreeDif;
 
+        // If the number of tokens increases, the decrease will be 0. If the number of tokens decreases, the increase will be 0
         std::unique_ptr<BalanceExchangeGadget> balanceOneRealExchange;
         std::unique_ptr<BalanceExchangeGadget> balanceTwoRealExchange;
         std::unique_ptr<BalanceExchangeGadget> balanceThreeRealExchange;
@@ -1197,7 +1215,7 @@ class BatchUserGadget: public GadgetT
             const VariableT &_maxTradingFeeBips,
             const std::vector<VariableT> &_tokens,
             const std::vector<StorageGadget> &_storageGadgets,
-            const TransactionAccountState &_account,
+            const BaseTransactionAccountState &_account,
             const VariableT &_type,
             const VariableT &_isBatchSpotTradeTx,
             const VariableT &verifyThirdTokenDif,
@@ -1214,7 +1232,6 @@ class BatchUserGadget: public GadgetT
                 secondToken(pb, tokens[1], NUM_BITS_TOKEN, FMT(prefix, ".secondToken")),
                 thirdToken(pb, tokens[2], NUM_BITS_TOKEN, FMT(prefix, ".thirdToken")),
                 accountID(pb, NUM_BITS_ACCOUNT, FMT(prefix, ".accountID")),
-                isNoop(pb, NUM_BITS_BIT, FMT(prefix, ".isNoop")),
 
                 constants(_constants),
                 blockExchange(_blockExchange),
@@ -1237,34 +1254,24 @@ class BatchUserGadget: public GadgetT
             std::vector<VariableT> tokenTwoSigns;
             std::vector<VariableT> tokenThreeSigns;
             for (unsigned int i = 0; i < orderSize; i++) 
-            {
-                LOG(LogDebug, "in BatchUserGadget i", std::to_string(i));
-                
-                // orders.emplace_back(pb, constants, timestamp, blockExchange, storageGadgets[i], type, maxTradingFeeBips, tokens, account, isBatchSpotTradeTx, prefix + std::string(".ordersize:") + std::to_string(orderSize) + std::string(".BatchUserGadget order_") + std::to_string(i));
+            {   
                 orders.emplace_back(pb, constants, timestamp, blockExchange, storageGadgets[i], maxTradingFeeBips, tokens, account, isBatchSpotTradeTx, prefix + std::string(".ordersize:") + std::to_string(orderSize) + std::string(".BatchUserGadget order_") + std::to_string(i));
 
-                LOG(LogDebug, "in BatchUserGadget before hashArray", "");
                 // set signature information
                 hashArray.emplace_back(orders[i].hash());
-                LOG(LogDebug, "in BatchUserGadget before hashArray", "");
                 requireSignatureArray.emplace_back(orders[i].requireSignature());
-                LOG(LogDebug, "in BatchUserGadget before publicXArray", "");
                 publicXArray.emplace_back(orders[i].getResolvedAuthorX());
                 publicYArray.emplace_back(orders[i].getResolvedAuthorY());
 
-                LOG(LogDebug, "in BatchUserGadget before tokenOneAmounts", "");
                 tokenOneAmounts.emplace_back(orders[i].getSelectTokenOneAmount());
                 tokenOneSigns.emplace_back(orders[i].getSelectTokenOneSign());
 
-                LOG(LogDebug, "in BatchUserGadget before tokenTwoAmounts", "");
                 tokenTwoAmounts.emplace_back(orders[i].getSelectTokenTwoAmount());
                 tokenTwoSigns.emplace_back(orders[i].getSelectTokenTwoSign());
 
-                LOG(LogDebug, "in BatchUserGadget before tokenThreeAmounts", "");
                 tokenThreeAmounts.emplace_back(orders[i].getSelectTokenThreeAmount());
                 tokenThreeSigns.emplace_back(orders[i].getSelectTokenThreeSign());
 
-                LOG(LogDebug, "in BatchUserGadget before tokenOneDiffrence", "");
                 tokenOneTradingFeeAmount.emplace_back(
                     pb,
                     (i == 0) ? constants._0 : tokenOneTradingFeeAmount.back().result(),
@@ -1282,12 +1289,10 @@ class BatchUserGadget: public GadgetT
                 tokenThreeTradingFeeAmount.emplace_back(
                     pb,
                     (i == 0) ? constants._0 : tokenThreeTradingFeeAmount.back().result(),
-                    // tokenThreeDiffrence.back().result(),
                     orders[i].getSelectTokenThreeTradingFee(),
                     NUM_BITS_AMOUNT,
                     std::string(".tokenThreeTradingFeeAmount_") + std::to_string(i));
 
-                LOG(LogDebug, "in BatchUserGadget before tokenOneGasFeeAmount", "");
                 // add up GasFee
                 tokenOneGasFeeAmount.emplace_back(
                     pb,
@@ -1307,13 +1312,8 @@ class BatchUserGadget: public GadgetT
                     orders[i].getSelectTokenThreeGasFee(),
                     NUM_BITS_AMOUNT,
                     std::string(".tokenThreeGasFeeAmount_") + std::to_string(i));
-                LOG(LogDebug, "in BatchUserGadget after tokenThreeGasFeeAmount", "");
             }
-            // firstToken_eq_thirdToken.reset(new EqualGadget(pb, firstToken.packed, thirdToken.packed, FMT(prefix, ".firstToken_eq_thirdToken")));
-            // secondToken_eq_thirdToken.reset(new EqualGadget(pb, secondToken.packed, thirdToken.packed, FMT(prefix, ".secondToken_eq_thirdToken")));
-            // existSameToken.reset(new OrGadget(pb, {firstToken_eq_thirdToken->result(), secondToken_eq_thirdToken->result()}, FMT(prefix, ".existSameToken")));
             
-            LOG(LogDebug, "in BatchUserGadget before tokenOneAmountsSum", "");
             // Execute the accumulation operation according to the sign. Sign = = 1 is added to forward, sign = = 2 is added to reverse, 
             // and sign = = 0 does not execute the accumulation
             tokenOneAmountsSum.reset(new BatchTokenAmountSumGadget(
@@ -1343,7 +1343,6 @@ class BatchUserGadget: public GadgetT
                 ".tokenThreeAmountsSum"
             ));
 
-            LOG(LogDebug, "in BatchUserGadget before balanceOneExchange", "");
             balanceOneExchange.reset(new BalanceExchangeGadget(
                 pb,
                 *balanceOne,
@@ -1363,21 +1362,19 @@ class BatchUserGadget: public GadgetT
                 tokenThreeAmountsSum->getReverseAmount(),
                 ".balanceThreeExchange"));
 
-            LOG(LogDebug, "in BatchUserGadget before balanceOneReduceTradingFee", "");
             balanceOneReduceTradingFee.reset(new BalanceReduceGadget(pb, *balanceOne, tokenOneTradingFeeAmount.back().result(), ".balanceOneReduceTradingFee"));
             balanceTwoReduceTradingFee.reset(new BalanceReduceGadget(pb, *balanceTwo, tokenTwoTradingFeeAmount.back().result(), ".balanceTwoReduceTradingFee"));
             balanceThreeReduceTradingFee.reset(new BalanceReduceGadget(pb, *balanceThree, tokenThreeTradingFeeAmount.back().result(), ".balanceThreeReduceTradingFee"));
 
-            LOG(LogDebug, "in BatchUserGadget before balanceOneReduceGasFee", "");
             balanceOneReduceGasFee.reset(new BalanceReduceGadget(pb, *balanceOne, tokenOneGasFeeAmount.back().result(), ".balanceOneReduceTradingFee"));
             balanceTwoReduceGasFee.reset(new BalanceReduceGadget(pb, *balanceTwo, tokenTwoGasFeeAmount.back().result(), ".balanceTwoReduceTradingFee"));
             balanceThreeReduceGasFee.reset(new BalanceReduceGadget(pb, *balanceThree, tokenThreeGasFeeAmount.back().result(), ".balanceThreeReduceTradingFee"));
 
-            LOG(LogDebug, "in BatchUserGadget before balanceOneDif", " ");
             balanceOneDif.reset(new CalculateBalanceDifGadget(pb, constants, *balanceOneBefore, *balanceOne, FMT(prefix, ".balanceOneDif")));
             balanceTwoDif.reset(new CalculateBalanceDifGadget(pb, constants, *balanceTwoBefore, *balanceTwo, FMT(prefix, ".balanceTwoDif")));
             balanceThreeDif.reset(new CalculateBalanceDifGadget(pb, constants, *balanceThreeBefore, *balanceThree, FMT(prefix, ".balanceThreeDif")));
 
+            // Calculate the real value. The increase or decrease of user balance must be the float value
             balanceOneRealExchange.reset(new BalanceExchangeGadget(
                 pb,
                 *balanceOneBefore,
@@ -1397,24 +1394,20 @@ class BatchUserGadget: public GadgetT
                 balanceThreeDif->getReduceAmount(),
                 ".balanceThreeRealExchange"));
 
-            LOG(LogDebug, "in BatchUserGadget before tokenType", "");
             tokenType.reset(new BatchUserTokenTypeGadget(pb, constants, tokens, orders[0], FMT(prefix, ".BatchUserTokenTypeGadget")));
 
-            LOG(LogDebug, "in BatchUserGadget before amountExchange", "");
             amountExchange.reset(new BatchUserTokenAmountExchangeGadget(
                 pb, constants, tokenType->getTokenType().packed, *balanceOneDif, 
                 *balanceTwoDif, *balanceThreeDif, verifyThirdTokenDif, FMT(prefix, ".amountExchange")));
-            LOG(LogDebug, "in BatchUserGadget after amountExchange", "");
         }
 
         void generate_r1cs_witness(const BatchSpotTradeUser &user)
         {
-            LOG(LogDebug, "in BatchUserGadget account.balanceS:", pb.val(account.balanceS.balance));
+            LOG(LogDebug, "in BatchUserGadget generate_r1cs_witness", "");
             firstToken.generate_r1cs_witness();
             secondToken.generate_r1cs_witness();
             thirdToken.generate_r1cs_witness();
             accountID.generate_r1cs_witness(pb, user.accountID);
-            isNoop.generate_r1cs_witness(pb, user.isNoop);
 
             balanceOne->generate_r1cs_witness();
             balanceTwo->generate_r1cs_witness();
@@ -1424,13 +1417,9 @@ class BatchUserGadget: public GadgetT
             balanceTwoBefore->generate_r1cs_witness();
             balanceThreeBefore->generate_r1cs_witness();
 
-            LOG(LogDebug, "in BatchUserGadget before balanceOneRealExchange balanceOne", pb.val(balanceOne->balance()));
-            LOG(LogDebug, "in BatchUserGadget before balanceOneRealExchange balanceOneBefore", pb.val(balanceOneBefore->balance()));
-
             for (size_t i = 0; i < user.orders.size(); i++) 
             {
                 LOG(LogDebug, "in BatchUserGadget generate_r1cs_witness i", std::to_string(i));
-                // orders.emplace_back(pb, constants, timestamp, blockExchange, account, type, maxTradingFeeBips, tokens, std::string(".BatchUserGadget order_") + std::to_string(i));
                 orders[i].generate_r1cs_witness(user.orders[i]);
 
                 tokenOneTradingFeeAmount[i].generate_r1cs_witness();
@@ -1442,9 +1431,6 @@ class BatchUserGadget: public GadgetT
                 tokenTwoGasFeeAmount[i].generate_r1cs_witness();
                 tokenThreeGasFeeAmount[i].generate_r1cs_witness();
             }
-            // firstToken_eq_thirdToken->generate_r1cs_witness();
-            // secondToken_eq_thirdToken->generate_r1cs_witness();
-            // existSameToken->generate_r1cs_witness();
 
             // Execute the accumulation operation according to the sign. Sign = = 1 is added to forward, sign = = 2 is added to reverse, 
             // and sign = = 0 does not execute the accumulation
@@ -1453,15 +1439,6 @@ class BatchUserGadget: public GadgetT
             tokenTwoAmountsSum->generate_r1cs_witness();
 
             tokenThreeAmountsSum->generate_r1cs_witness();
-
-            LOG(LogDebug, "in BatchUserGadget tokenOneAmountsSum forward", pb.val(tokenOneAmountsSum->getForwardAmount()));
-            LOG(LogDebug, "in BatchUserGadget tokenOneAmountsSum reverse", pb.val(tokenOneAmountsSum->getReverseAmount()));
-
-            LOG(LogDebug, "in BatchUserGadget tokenTwoAmountsSum forward", pb.val(tokenTwoAmountsSum->getForwardAmount()));
-            LOG(LogDebug, "in BatchUserGadget tokenTwoAmountsSum reverse", pb.val(tokenTwoAmountsSum->getReverseAmount()));
-
-            LOG(LogDebug, "in BatchUserGadget tokenThreeAmountsSum forward", pb.val(tokenThreeAmountsSum->getForwardAmount()));
-            LOG(LogDebug, "in BatchUserGadget tokenThreeAmountsSum reverse", pb.val(tokenThreeAmountsSum->getReverseAmount()));
 
             balanceOneExchange->generate_r1cs_witness();
             balanceTwoExchange->generate_r1cs_witness();
@@ -1473,9 +1450,6 @@ class BatchUserGadget: public GadgetT
 
             balanceThreeReduceTradingFee->generate_r1cs_witness();
 
-            LOG(LogDebug, "in BatchUserGadget balanceOneReduceGasFee tokenOneGasFeeAmount", pb.val(tokenOneGasFeeAmount.back().result()));
-            LOG(LogDebug, "in BatchUserGadget balanceOneReduceGasFee tokenTwoGasFeeAmount", pb.val(tokenTwoGasFeeAmount.back().result()));
-            LOG(LogDebug, "in BatchUserGadget balanceOneReduceGasFee tokenThreeGasFeeAmount", pb.val(tokenThreeGasFeeAmount.back().result()));
             balanceOneReduceGasFee->generate_r1cs_witness();
             balanceTwoReduceGasFee->generate_r1cs_witness();
             balanceThreeReduceGasFee->generate_r1cs_witness();
@@ -1484,10 +1458,6 @@ class BatchUserGadget: public GadgetT
             balanceTwoDif->generate_r1cs_witness();
             balanceThreeDif->generate_r1cs_witness();
 
-            LOG(LogDebug, "in BatchUserGadget balanceOneRealExchange balanceOne", pb.val(balanceOne->balance()));
-            LOG(LogDebug, "in BatchUserGadget balanceOneRealExchange balanceOneBefore", pb.val(balanceOneBefore->balance()));
-            LOG(LogDebug, "in BatchUserGadget balanceOneRealExchange balanceOneDif getIncreaseAmount", pb.val(balanceOneDif->getIncreaseAmount()));
-            LOG(LogDebug, "in BatchUserGadget balanceOneRealExchange balanceOneDif getReduceAmount", pb.val(balanceOneDif->getReduceAmount()));
             balanceOneRealExchange->generate_r1cs_witness();
             balanceTwoRealExchange->generate_r1cs_witness();
             balanceThreeRealExchange->generate_r1cs_witness();
@@ -1495,10 +1465,6 @@ class BatchUserGadget: public GadgetT
             tokenType->generate_r1cs_witness();
 
             amountExchange->generate_r1cs_witness();
-
-            LOG(LogDebug, "in BatchUserGadget tokenOneTradingFeeAmount", pb.val(tokenOneTradingFeeAmount.back().result()));
-            LOG(LogDebug, "in BatchUserGadget tokenTwoTradingFeeAmount", pb.val(tokenTwoTradingFeeAmount.back().result()));
-            LOG(LogDebug, "in BatchUserGadget tokenThreeTradingFeeAmount", pb.val(tokenThreeTradingFeeAmount.back().result()));
         }
         void generate_r1cs_constraints() 
         {
@@ -1507,7 +1473,6 @@ class BatchUserGadget: public GadgetT
             secondToken.generate_r1cs_constraints();
             thirdToken.generate_r1cs_constraints();
             accountID.generate_r1cs_constraints();
-            isNoop.generate_r1cs_constraints();
 
             balanceOne->generate_r1cs_constraints();
             balanceTwo->generate_r1cs_constraints();
@@ -1529,12 +1494,6 @@ class BatchUserGadget: public GadgetT
                 tokenTwoGasFeeAmount[i].generate_r1cs_constraints();
                 tokenThreeGasFeeAmount[i].generate_r1cs_constraints();
             }
-
-            // std::cout << "OrderGadget before firstToken_eq_thirdToken:" << pb.num_constraints() << std::endl;
-            // firstToken_eq_thirdToken->generate_r1cs_constraints();
-            // secondToken_eq_thirdToken->generate_r1cs_constraints();
-            // existSameToken->generate_r1cs_constraints();
-            // std::cout << "OrderGadget after existSameToken:" << pb.num_constraints() << std::endl;
 
             tokenOneAmountsSum->generate_r1cs_constraints();
             tokenTwoAmountsSum->generate_r1cs_constraints();
@@ -1597,36 +1556,26 @@ class BatchUserGadget: public GadgetT
 
         const VariableT &getTokenOneTradingFee() const
         {
-            // return tokenOneTradingFeeAmount.back().result();
-            // return tokenOneTradingFeeTogether->result();
             return tokenOneTradingFeeAmount.back().result();
         }
 
         const VariableT &getTokenTwoTradingFee() const
         {
-            // return tokenTwoTradingFeeAmount.back().result();
-            // return tokenTwoTradingFeeTogether->result();
             return tokenTwoTradingFeeAmount.back().result();
         }
 
         const VariableT &getTokenThreeTradingFee() const
         {
-            // return tokenThreeTradingFeeAmount.back().result();
-            // return tokenThreeTradingFeeTogether->result();
             return tokenThreeTradingFeeAmount.back().result();
         }
 
         const VariableT &getTokenOneGasFee() const
         {
-            // return tokenOneGasFeeAmount.back().result();
-            // return tokenOneGasFeeTogether->result();
             return tokenOneGasFeeAmount.back().result();
         }
 
         const VariableT &getTokenTwoGasFee() const
         {
-            // return tokenTwoGasFeeAmount.back().result();
-            // return tokenTwoGasFeeTogether->result();
             return tokenTwoGasFeeAmount.back().result();
         }
 

@@ -9,7 +9,7 @@ abstract contract ERC1271 {
     function isValidSignature(
         bytes32      _hash,
         bytes memory _signature)
-        public
+        external
         view
         virtual
         returns (bytes4 magicValueB32);

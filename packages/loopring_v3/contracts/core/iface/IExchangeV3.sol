@@ -6,7 +6,6 @@ pragma experimental ABIEncoderV2;
 import "../../lib/Claimable.sol";
 import "./ExchangeData.sol";
 
-
 /// @title IExchangeV3
 /// @dev Note that Claimable and RentrancyGuard are inherited here to
 ///      ensure all data members are declared on IExchangeV3 to make it
@@ -87,7 +86,7 @@ abstract contract IExchangeV3 is Claimable
     );
 
     event TransactionsApproved(
-        address[] owners, 
+        address[] owners,
         bytes32[] transactionHashes
     );
 
@@ -149,11 +148,6 @@ abstract contract IExchangeV3 is Claimable
         external
         virtual;
 
-    /// @dev refresh the blockVerifier contract which maybe changed in loopringV3 contract.
-    function refreshBlockVerifier()
-        external
-        virtual;
-
     /// @dev Gets the deposit contract used by the exchange.
     /// @return the deposit contract
     function getDepositContract()
@@ -163,7 +157,7 @@ abstract contract IExchangeV3 is Claimable
         returns (IDepositContract);
 
     // @dev Exchange owner set params for deposit.
-    // @param freeDepositMax Max slots for free deposit 
+    // @param freeDepositMax Max slots for free deposit
     // @param freeDepositRemained Remained free deposit
     // @param freeSlotPerBlock Free slot for every block
     // @param depositFee Deposit fee in ETH
@@ -691,6 +685,8 @@ abstract contract IExchangeV3 is Claimable
     /// @return syncedAt The timestamp the protocol fees were last updated
     /// @return protocolFeeBips The protocol fee
     /// @return previousProtocolFeeBips The previous protocol fee
+    /// @return executeTimeOfNextProtocolFeeBips The timestamp the next protocol fees will be updated
+    /// @return nextProtocolFeeBips The next protocol fee
     function getProtocolFeeValues()
         external
         virtual
@@ -698,7 +694,9 @@ abstract contract IExchangeV3 is Claimable
         returns (
             uint32 syncedAt,
             uint8 protocolFeeBips,
-            uint8 previousProtocolFeeBips
+            uint8 previousProtocolFeeBips,
+            uint32 executeTimeOfNextProtocolFeeBips,
+            uint32 nextProtocolFeeBips
         );
 
     /// @dev Gets the domain separator used in this exchange.
@@ -726,7 +724,7 @@ abstract contract IExchangeV3 is Claimable
         view
         returns (uint256);
 
-    /// @dev Gets token deposit balance 
+    /// @dev Gets token deposit balance
     /// @param tokenAddress The address of the token, use `0x0` for Ether.
     /// @return deposit balance of the token
     function getDepositBalance(

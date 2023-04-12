@@ -8,7 +8,6 @@ import "./IBlockVerifier.sol";
 import "./IDepositContract.sol";
 import "./ILoopringV3.sol";
 
-
 /// @title ExchangeData
 /// @dev All methods in this lib are internal, therefore, there is no need
 ///      to deploy this library independently.
@@ -25,7 +24,7 @@ library ExchangeData
         TRANSFER,
         SPOT_TRADE,
         ACCOUNT_UPDATE,
-        ORDER_CANCEL, 
+        ORDER_CANCEL,
         BATCH_SPOT_TRADE,
         APPKEY_UPDATE
     }
@@ -41,6 +40,9 @@ library ExchangeData
         uint32 syncedAt; // only valid before 2105 (85 years to go)
         uint8  protocolFeeBips;
         uint8  previousProtocolFeeBips;
+
+        uint32 executeTimeOfNextProtocolFeeBips;
+        uint8  nextProtocolFeeBips;
     }
 
     // General auxiliary data for each conditional transaction
@@ -111,6 +113,8 @@ library ExchangeData
         uint TX_DATA_AVAILABILITY_SIZE;
         uint MAX_AGE_DEPOSIT_UNTIL_WITHDRAWABLE_UPPERBOUND;
         uint MAX_FORCED_WITHDRAWAL_FEE;
+        uint MAX_PROTOCOL_FEE_BIPS;
+        uint DEFAULT_PROTOCOL_FEE_BIPS;
     }
 
     // This is the prime number that is used for the alt_bn128 elliptic curve, see EIP-196.
@@ -119,7 +123,6 @@ library ExchangeData
     uint public constant MAX_OPEN_FORCED_REQUESTS = 4096;
     uint public constant MAX_AGE_FORCED_REQUEST_UNTIL_WITHDRAW_MODE = 15 days;
     uint public constant TIMESTAMP_HALF_WINDOW_SIZE_IN_SECONDS = 7 days;
-    
     uint public constant BINARY_TREE_DEPTH_ACCOUNTS = 32;
     uint public constant MAX_NUM_ACCOUNTS = 2 ** BINARY_TREE_DEPTH_ACCOUNTS;
     // DEG token deep to 16
@@ -129,7 +132,6 @@ library ExchangeData
     uint public constant MAX_NUM_RESERVED_TOKENS = 32;
     uint public constant MAX_NUM_NORMAL_TOKENS = 2 ** BINARY_TREE_DEPTH_TOKENS - 32;
 
-
     uint public constant MIN_AGE_PROTOCOL_FEES_UNTIL_UPDATED = 7 days;
     uint public constant MIN_TIME_IN_SHUTDOWN = 30 days;
     // The amount of bytes each rollup transaction uses in the block data for data-availability.
@@ -138,12 +140,14 @@ library ExchangeData
     uint32 public constant ACCOUNTID_PROTOCOLFEE = 0;
 
     uint public constant TX_DATA_AVAILABILITY_SIZE = 83;
-    
 
     uint public constant TX_DATA_AVAILABILITY_SIZE_PART_1 = 80;
     uint public constant TX_DATA_AVAILABILITY_SIZE_PART_2 = 3;
 
     uint public constant MAX_FORCED_WITHDRAWAL_FEE = 0.25 ether;
+
+    uint8 public constant MAX_PROTOCOL_FEE_BIPS = 100;
+    uint8 public constant DEFAULT_PROTOCOL_FEE_BIPS = 18;
 
     struct AccountLeaf
     {
@@ -192,7 +196,7 @@ library ExchangeData
         // Time when the exchange has entered withdrawal mode
         uint withdrawalModeStartTime;
     }
-    
+
     // Represents the entire exchange state except the owner of the exchange.
     struct State
     {
@@ -218,7 +222,7 @@ library ExchangeData
         Token[] normalTokens;
 
         // A map from a tokenID to deposit balance
-        mapping(uint32 => uint248) tokenIdToDepositBalance;  
+        mapping(uint32 => uint248) tokenIdToDepositBalance;
 
         // A map from a token to its tokenID + 1
         mapping (address => uint32) tokenToTokenId;
@@ -242,7 +246,6 @@ library ExchangeData
 
         // A map from an account owner to a destination address to a tokenID to an amount to a storageID to a new recipient address
         mapping (address => mapping (address => mapping (uint32 => mapping (uint => mapping (uint32 => address))))) withdrawalRecipient;
-
 
         // Counter to keep track of how many of forced requests are open so we can limit the work that needs to be done by the owner
         uint32 numPendingForcedTransactions;

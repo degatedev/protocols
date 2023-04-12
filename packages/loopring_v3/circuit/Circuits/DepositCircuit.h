@@ -18,7 +18,6 @@ namespace Loopring
 class DepositCircuit : public BaseTransactionCircuit
 {
   public:
-    // DualVariableGadget typeTx;
     // Inputs
     DualVariableGadget owner;
     DualVariableGadget accountID;
@@ -43,7 +42,6 @@ class DepositCircuit : public BaseTransactionCircuit
       const std::string &prefix)
         : BaseTransactionCircuit(pb, state, prefix),
 
-          // typeTx(pb, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
           // Inputs
           owner(pb, NUM_BITS_ADDRESS, FMT(prefix, ".owner")),
           accountID(pb, NUM_BITS_ACCOUNT, FMT(prefix, ".accountID")),
@@ -90,7 +88,6 @@ class DepositCircuit : public BaseTransactionCircuit
     void generate_r1cs_witness(const Deposit &deposit)
     {
         LOG(LogDebug, "in DepositCircuit", "generate_r1cs_witness");
-        // typeTx.generate_r1cs_witness(pb, ethsnarks::FieldT(int(Loopring::TransactionType::Deposit)));
         // Inputs
         owner.generate_r1cs_witness(pb, deposit.owner);
         accountID.generate_r1cs_witness(pb, deposit.accountID);
@@ -113,7 +110,6 @@ class DepositCircuit : public BaseTransactionCircuit
     void generate_r1cs_constraints()
     {
         LOG(LogDebug, "in DepositCircuit", "generate_r1cs_constraints");
-        // typeTx.generate_r1cs_constraints(true);
         // Inputs
         owner.generate_r1cs_constraints(true);
         accountID.generate_r1cs_constraints(true);
@@ -136,7 +132,6 @@ class DepositCircuit : public BaseTransactionCircuit
     const VariableArrayT getPublicData() const
     {
         return flattenReverse({
-          // typeTx.bits, 
           type.bits,
           owner.bits, accountID.bits, tokenID.bits, amount.bits});
     }

@@ -9,14 +9,9 @@ namespace Loopring
     static const unsigned int TREE_DEPTH_ACCOUNTS = 16;
     // The number of tokens is expanded from 8 layers to 16 layers. 
     // The value here represents the number of layers of the tree, which is a 4-fork number
-    // static const unsigned int TREE_DEPTH_TOKENS = 8;
     static const unsigned int TREE_DEPTH_TOKENS = 16;
 
-    // After the number of tokens is expanded from layer 8 to layer 16, the maximum value of tokenid in calldata will become larger, 
-    // so the original 68bytes cannot put down the existing data,
-    // The maximum transaction will contain two tokenid values, so it will increase by 4 bytes. 
-    // Due to the introduction of aggregation transaction, it is necessary to add another 2bytes, and finally 74bytes
-    // static const unsigned int TX_DATA_AVAILABILITY_SIZE = 68;
+    // BatchSpotTrade need 83bytes
     static const unsigned int TX_DATA_AVAILABILITY_SIZE = 83;
 
     static const unsigned int NUM_BITS_MAX_VALUE = 254;
@@ -31,15 +26,10 @@ namespace Loopring
     static const unsigned int NUM_BITS_AMOUNT_WITHDRAW = 248;
     static const unsigned int NUM_BITS_STORAGE_ADDRESS = TREE_DEPTH_STORAGE * 2;
     static const unsigned int NUM_BITS_ACCOUNT = TREE_DEPTH_ACCOUNTS * 2;
-    // DEG-265 auto market
-    // // DEG-170 auto market - config add
-    // static const unsigned int NUM_BITS_AUTOMARKET_ADDRESS = TREE_DEPTH_AUTOMARKET * 2;
-    // static const unsigned int NUM_BITS_AUTOMARKET_STORAGE_ADDRESS = TREE_DEPTH_AUTOMARKET_STORAGE * 2;
+
     static const unsigned int NUM_BITS_AUTOMARKET_LEVEL = 8;
     static const unsigned int NUM_BITS_TOKEN = TREE_DEPTH_TOKENS * 2;
     static const unsigned int NUM_BITS_STORAGEID = 32;
-    // DEG-265 auto market
-    // static const unsigned int NUM_BITS_AUTOMARKET_STORAGE_LEVEL = 8;
     static const unsigned int NUM_BITS_TIMESTAMP = 32;
     static const unsigned int NUM_BITS_NONCE = 32;
     static const unsigned int NUM_BITS_BIPS = 12; // ceil(log2(2**NUM_BITS_BIPS_DA * FEE_MULTIPLIER))
@@ -48,7 +38,6 @@ namespace Loopring
     static const unsigned int NUM_BITS_TYPE = 8;
     static const unsigned int NUM_STORAGE_SLOTS = 16384; // 2**NUM_BITS_STORAGE_ADDRESS
     static const unsigned int NUM_MARKETS_PER_BLOCK = 16;
-    // static const unsigned int NUM_BITS_TX_TYPE = 8;
     static const unsigned int NUM_BITS_TX_TYPE = 3;
     static const unsigned int NUM_BITS_TX_TYPE_FOR_SELECT = 5;
     static const unsigned int NUM_BITS_BATCH_SPOTRADE_TOKEN_TYPE = 2;

@@ -494,7 +494,7 @@ contract("Exchange", (accounts: string[]) => {
           from: ownerA,
           value: new BN(0)
         }),
-        "INSUFFICIENT_FEE"
+        "INSUFFICIENT_WITHDRAW_FEE"
       );
       // Not enough ETH sent
       await expectThrow(
@@ -502,7 +502,7 @@ contract("Exchange", (accounts: string[]) => {
           from: ownerA,
           value: withdrawalFee.sub(one)
         }),
-        "INSUFFICIENT_FEE"
+        "INSUFFICIENT_WITHDRAW_FEE"
       );
 
       // Do the request

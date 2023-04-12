@@ -29,7 +29,6 @@ class RequireFillRateGadget : public GadgetT
     UnsafeMulGadget fillAmountS_mul_amountB_mul_1000;
     UnsafeMulGadget fillAmountB_mul_amountS;
     UnsafeMulGadget fillAmountB_mul_amountS_mul_1001;
-    // RequireLeqGadget validRate;
     IfThenRequireLeqGadget validRate;
 
     IsNonZero isNonZeroFillAmountS;
@@ -39,7 +38,6 @@ class RequireFillRateGadget : public GadgetT
     NotGadget isZeroFillAmountB;
     AndGadget fillsZero;
     OrGadget fillsValid;
-    // RequireEqualGadget requireFillsValid;
     IfThenRequireEqualGadget requireFillsValid;
 
     RequireFillRateGadget(
@@ -133,17 +131,13 @@ class RequireFillRateGadget : public GadgetT
 class RequireValidOrderGadget : public GadgetT
 {
   public:
-    // RequireLtGadget requireValidUntil;
     IfThenRequireLtGadget requireValidUntil;
-    // DEG-146 order cancel
-    // RequireEqualGadget notCancelled;
     IfThenRequireEqualGadget notCancelled;
 
     RequireValidOrderGadget(
       ProtoboardT &pb,
       const Constants &constants,
       const VariableT &timestamp,
-      // DEG-146 order cancel
       const VariableT &cancelled,
       const OrderGadget &order,
       const VariableT &verify,
@@ -158,7 +152,6 @@ class RequireValidOrderGadget : public GadgetT
             order.validUntil.packed,
             NUM_BITS_TIMESTAMP,
             FMT(prefix, ".requireValidUntil")),
-          // DEG-146 order cancel
           notCancelled(pb, verify, cancelled, constants._0, FMT(prefix, ".notCancelled"))
     {
     }
@@ -166,14 +159,12 @@ class RequireValidOrderGadget : public GadgetT
     void generate_r1cs_witness()
     {
         requireValidUntil.generate_r1cs_witness();
-        // DEG-146 order cancel
         notCancelled.generate_r1cs_witness();
     }
 
     void generate_r1cs_constraints()
     {
         requireValidUntil.generate_r1cs_constraints();
-        // DEG-146 order cancel
         notCancelled.generate_r1cs_constraints();
     }
 };
@@ -183,30 +174,16 @@ class RequireValidOrderGadget : public GadgetT
 class FeeCalculatorGadget : public GadgetT
 {
   public:
-    // split trading fee and gas fee
-    // MulDivGadget protocolFee;
     MulDivGadget fee;
 
     FeeCalculatorGadget(
       ProtoboardT &pb,
       const Constants &constants,
       const VariableT &amountB,
-      // const VariableT &protocolFeeBips,
       const VariableT &feeBips,
       const std::string &prefix)
         : GadgetT(pb, prefix),
 
-          // split trading fee and gas fee
-          // protocolFee(
-          //   pb,
-          //   constants,
-          //   amountB,
-          //   protocolFeeBips,
-          //   constants._100000,
-          //   NUM_BITS_AMOUNT,
-          //   NUM_BITS_PROTOCOL_FEE_BIPS,
-          //   17 /*=ceil(log2(100000))*/,
-          //   FMT(prefix, ".protocolFee")),
           fee(
             pb,
             constants,
@@ -222,15 +199,11 @@ class FeeCalculatorGadget : public GadgetT
 
     void generate_r1cs_witness()
     {
-        // split trading fee and gas fee
-        // protocolFee.generate_r1cs_witness();
         fee.generate_r1cs_witness();
     }
 
     void generate_r1cs_constraints()
     {
-        // split trading fee and gas fee
-        // protocolFee.generate_r1cs_constraints();
         fee.generate_r1cs_constraints();
     }
 
@@ -247,7 +220,6 @@ class RequireFillLimitGadget : public GadgetT
     TernaryGadget fillAmount;
     TernaryGadget fillLimit;
     AddGadget filledAfter;
-    // RequireLeqGadget filledAfter_leq_fillLimit;
     IfThenRequireLeqGadget filledAfter_leq_fillLimit;
 
     RequireFillLimitGadget(
@@ -428,7 +400,6 @@ class OrderMatchingGadget : public GadgetT
       const VariableT &ownerB,
       const VariableT &filledA,
       const VariableT &filledB,
-      // DEG-146 order cancel
       const VariableT &cancelledA,
       const VariableT &cancelledB,
       const VariableT &fillS_A,
@@ -459,7 +430,6 @@ class OrderMatchingGadget : public GadgetT
           validateTakerB(pb, constants, ownerA, orderB.taker, FMT(prefix, ".validateTakerB")),
 
           // Check if the orders in the settlement are correctly filled
-          // DEG-146 order cancel
           requireValidA(pb, constants, timestamp, cancelledA, orderA, verify, FMT(prefix, ".checkValidA")),
           requireValidB(pb, constants, timestamp, cancelledB, orderB, verify, FMT(prefix, ".checkValidB"))
     {
@@ -468,9 +438,7 @@ class OrderMatchingGadget : public GadgetT
     void generate_r1cs_witness()
     {
         // Check if the fills are valid for the orders
-        LOG(LogDebug, "in OrderMatchingGadget before requireOrderFillsA", "");
         requireOrderFillsA.generate_r1cs_witness();
-        LOG(LogDebug, "in OrderMatchingGadget before requireOrderFillsB", "");
         requireOrderFillsB.generate_r1cs_witness();
 
         // Check if tokenS/tokenB match
@@ -484,7 +452,6 @@ class OrderMatchingGadget : public GadgetT
         // Check if the orders in the settlement are correctly filled
         requireValidA.generate_r1cs_witness();
         requireValidB.generate_r1cs_witness();
-        LOG(LogDebug, "in OrderMatchingGadget end", "");
     }
 
     void generate_r1cs_constraints()
@@ -516,11 +483,7 @@ class OrderMatchingGadget : public GadgetT
         return requireOrderFillsB.getFilledAfter();
     }
 };
-// TODO Why does NOOP not need these tests? Theoretically, if it is NOOP, it should fill in the default data, 
-//      which is the same as the performance of spottradecircuit in other transactions
-// Answer: because a new storage will be allocated to ordinary transactions, the data will be in the status of 0, 
-//    but the aggregated transaction is not. The storage allocation of the aggregated transaction is in the operator. 
-//    It is not known which storageid is empty, so storageid = 0 will be allocated. This location has a high probability of value
+
 //1: check whether it is NOOP. If it is NOOP, these tests are not required
 //2: order filled test: can you eat so many orders
 //3: detect talker, which must be 0
@@ -531,11 +494,7 @@ class BatchOrderMatchingGadget: public GadgetT
     // Verify the order fills
     RequireOrderFillsGadget requireOrderFills;
 
-    // // Check if tokenS/tokenB match
-    // RequireEqualGadget orderA_tokenS_eq_orderB_token;
-
     // Aggregation transaction cannot determine who the taker is, so the taker of aggregation transaction must be empty
-    // RequireEqualGadget validTaker;
     IfThenRequireEqualGadget validTaker;
 
     // Check if the orders are valid
@@ -569,9 +528,6 @@ class BatchOrderMatchingGadget: public GadgetT
         // Check if the fills are valid for the orders
         requireOrderFills.generate_r1cs_witness();
 
-        // // Check if tokenS/tokenB match
-        // orderA_tokenS_eq_orderB_tokenB.generate_r1cs_witness();
-
         // Check if the takers match
         validTaker.generate_r1cs_witness();
 
@@ -583,9 +539,6 @@ class BatchOrderMatchingGadget: public GadgetT
     {
         // Check if the fills are valid for the orders
         requireOrderFills.generate_r1cs_constraints();
-
-        // // Check if tokenS/tokenB match
-        // orderA_tokenS_eq_orderB_tokenB.generate_r1cs_constraints();
 
         // Check if the takers match
         validTaker.generate_r1cs_constraints();
@@ -599,16 +552,6 @@ class BatchOrderMatchingGadget: public GadgetT
     {
         return requireOrderFills.getFilledAfter();
     }
-
-    // const VariableT &getFilledAfter_A() const
-    // {
-    //     return requireOrderFillsA.getFilledAfter();
-    // }
-
-    // const VariableT &getFilledAfter_B() const
-    // {
-    //     return requireOrderFillsB.getFilledAfter();
-    // }
 };
 
 // split trading fee and gas fee - add up gas
@@ -618,7 +561,6 @@ class GasFeeMatchingGadget: public GadgetT
   public:
     // Sum first
     AddGadget feeSum;
-    // RequireLeqGadget feeSum_leq_max;
     IfThenRequireLeqGadget feeSum_leq_max;
     IfThenRequireLeqGadget appointTradingFee_leq_calculate;
     GasFeeMatchingGadget(

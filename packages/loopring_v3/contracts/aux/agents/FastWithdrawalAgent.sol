@@ -70,7 +70,7 @@ contract FastWithdrawalAgent is ReentrancyGuard, IAgent
 
     // This method needs to be called by any liquidity provider
     function executeFastWithdrawals(Withdrawal[] calldata withdrawals)
-        public
+        external
         nonReentrant
         payable
     {

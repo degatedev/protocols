@@ -20,6 +20,7 @@ namespace Loopring
 class OrderGadget : public GadgetT
 {
   public:
+    VariableT blockExchangeForHash;
     // Inputs
     DualVariableGadget storageID;
     DualVariableGadget accountID;
@@ -27,7 +28,6 @@ class OrderGadget : public GadgetT
     DualVariableGadget tokenB;
     DualVariableGadget amountS;
     DualVariableGadget amountB;
-    // split trading fee and gas fee
     DualVariableGadget feeTokenID;
     DualVariableGadget fee;
     DualVariableGadget maxFee;
@@ -35,11 +35,8 @@ class OrderGadget : public GadgetT
     ToBitsGadget disableAppKey;
 
     DualVariableGadget validUntil;
-    // split TradingFee and GasFee - ProtocolFeeBips as the max TradingFee
-    // DualVariableGadget maxFeeBips;
     DualVariableGadget fillAmountBorS;
 
-    // split trading fee and gas fee
     FloatGadget fFee;
     RequireAccuracyGadget requireAccuracyFee;
 
@@ -50,15 +47,9 @@ class OrderGadget : public GadgetT
     DualVariableGadget feeBipsMultiplierFlag;
     DualVariableGadget feeBipsData;
 
-    // DualVariableGadget deltaFilledS;
-    // DualVariableGadget deltaFilledB;
-    // DualVariableGadget isNoop;
-
     // Checks
     RequireLeqGadget feeBips_leq_maxFeeBips;
-    // split trading fee and gas fee
     RequireLeqGadget fee_leq_maxFee;
-    // RequireNotEqualGadget tokenS_neq_tokenB;
     IfThenRequireNotEqualGadget tokenS_neq_tokenB;
     IfThenRequireNotEqualGadget amountS_notZero;
     IfThenRequireNotEqualGadget amountB_notZero;
@@ -67,11 +58,8 @@ class OrderGadget : public GadgetT
     UnsafeMulGadget decodedFeeBips;
     RequireEqualGadget feeBipsEqualsDecodedFeeBips;
     
-    // Poseidon_15 hash;
-    // DEG-265 auto market
-    // AutoMarket
+    // AutoMarket: type == 6 or 7, normal order type == 0
     DualVariableGadget type;
-    // DualVariableGadget autoMarketID;
     DualVariableGadget level;
     DualVariableGadget gridOffset;
     DualVariableGadget orderOffset;
@@ -80,20 +68,16 @@ class OrderGadget : public GadgetT
     // check appKey author
     IfThenRequireEqualGadget ifUseAppKey_then_require_enable_switch;
 
-    // Signature
-    Poseidon_17 hash;
-
     OrderGadget( //
       ProtoboardT &pb,
       const Constants &constants,
       const VariableT &blockExchange,
-      // split TradingFee and GasFee - ProtocolFeeBips as the max TradingFee
       const VariableT &maxFeeBips,
       const VariableT &isNormalOrder,
       const VariableT &_disableAppKey,
       const std::string &prefix)
         : GadgetT(pb, prefix),
-
+          blockExchangeForHash(blockExchange),
           // Inputs
           storageID(pb, NUM_BITS_STORAGEID, FMT(prefix, ".storageID")),
           accountID(pb, NUM_BITS_ACCOUNT, FMT(prefix, ".accountID")),
@@ -102,9 +86,6 @@ class OrderGadget : public GadgetT
           amountS(pb, NUM_BITS_AMOUNT, FMT(prefix, ".amountS")),
           amountB(pb, NUM_BITS_AMOUNT, FMT(prefix, ".amountB")),
           validUntil(pb, NUM_BITS_TIMESTAMP, FMT(prefix, ".validUntil")),
-          // split TradingFee and GasFee - ProtocolFeeBips as the max TradingFee
-          // maxFeeBips(pb, NUM_BITS_BIPS, FMT(prefix, ".maxFeeBips")),
-          // split trading fee and gas fee
           feeTokenID(pb, NUM_BITS_TOKEN, FMT(prefix, ".feeTokenID")),
           fee(pb, NUM_BITS_AMOUNT, FMT(prefix, ".fee")),
           maxFee(pb, NUM_BITS_AMOUNT, FMT(prefix, ".maxFee")),
@@ -117,15 +98,8 @@ class OrderGadget : public GadgetT
 
           feeBipsMultiplierFlag(pb, 1, FMT(prefix, ".feeBipsMultiplierFlag")),
           feeBipsData(pb, NUM_BITS_BIPS_DA, FMT(prefix, ".feeBipsData")),
-          
-          // deltaFilledS(pb, NUM_BITS_AMOUNT, FMT(prefix, ".deltaFilledS")),
-          // deltaFilledB(pb, NUM_BITS_AMOUNT, FMT(prefix, ".deltaFilledB")),
-          // isNoop(pb, NUM_BITS_BIT, FMT(prefix, ".isNoop")),
 
-          // AutoMarket
           type(pb, NUM_BITS_TYPE, FMT(prefix, ".type")),
-          // autoMarketID(pb, NUM_BITS_AUTOMARKETID, FMT(prefix, ".autoMarketID")),
-          // autoMarketLevel(pb, NUM_BITS_TYPE, FMT(prefix, ".autoMarketLevel")),
           level(pb, NUM_BITS_AUTOMARKET_LEVEL, FMT(prefix, ".level")),
           gridOffset(pb, NUM_BITS_AMOUNT, FMT(prefix, ".gridOffset")),
           orderOffset(pb, NUM_BITS_AMOUNT, FMT(prefix, ".orderOffset")),
@@ -135,13 +109,10 @@ class OrderGadget : public GadgetT
           feeBips_leq_maxFeeBips(
             pb,
             feeBips.packed,
-            // split TradingFee and GasFee - ProtocolFeeBips as the max TradingFee
             maxFeeBips,
             NUM_BITS_BIPS,
             FMT(prefix, ".feeBips <= maxFeeBips")),
-          // TODO need check logic, batch spot trade cancel this condition
           tokenS_neq_tokenB(pb, isNormalOrder, tokenS.packed, tokenB.packed, FMT(prefix, ".tokenS != tokenB")),
-          // TODO need check logic, can not be zero change to not equal 0
           amountS_notZero(pb, isNormalOrder, amountS.packed, constants._0, FMT(prefix, ".amountS != 0")),
           amountB_notZero(pb, isNormalOrder, amountB.packed, constants._0, FMT(prefix, ".amountB != 0")),
           // Fee checks
@@ -180,36 +151,8 @@ class OrderGadget : public GadgetT
             useAppKey.packed,
             disableAppKey.packed,
             constants._0,
-            FMT(prefix, ".ifUseAppKey_then_require_enable_switch")),
+            FMT(prefix, ".ifUseAppKey_then_require_enable_switch"))
           
-          // Signature
-          hash(
-            pb,
-            var_array(
-              {blockExchange,
-               storageID.packed,
-               accountID.packed,
-               tokenS.packed,
-               tokenB.packed,
-               amountS.packed,
-               amountB.packed,
-               validUntil.packed,
-               // split TradingFee and GasFee - ProtocolFeeBips as the max TradingFee
-               //  maxFeeBips.packed,
-               fillAmountBorS.packed,
-               taker,
-                // split trading fee and gas fee
-               feeTokenID.packed,
-               maxFee.packed,
-               type.packed,
-              //  autoMarketID.packed
-               gridOffset.packed,
-               orderOffset.packed,
-               maxLevel.packed,
-               useAppKey.packed
-               }),
-            FMT(this->annotation_prefix, ".hash"))
-    //  fee.packed, The signature does not contain the specific number of fee, only maxfee is required
     {
     }
 
@@ -224,12 +167,9 @@ class OrderGadget : public GadgetT
         amountS.generate_r1cs_witness(pb, order.amountS);
         amountB.generate_r1cs_witness(pb, order.amountB);
         validUntil.generate_r1cs_witness(pb, order.validUntil);
-        // split TradingFee and GasFee - ProtocolFeeBips as the max TradingFee
-        // maxFeeBips.generate_r1cs_witness(pb, order.maxFeeBips);
         fillAmountBorS.generate_r1cs_witness(pb, order.fillAmountBorS);
         pb.val(taker) = order.taker;
 
-        LOG(LogDebug, "in OrderGadgets", "feeBips");
         feeBips.generate_r1cs_witness(pb, order.feeBips);
 
         // Use the fee multiplier if necessary
@@ -245,68 +185,35 @@ class OrderGadget : public GadgetT
             feeBipsData.generate_r1cs_witness(pb, order.feeBips);
         }
 
-        // std::cout << "in OrderGadgets before deltaFilledS" << std::endl;
-        // deltaFilledS.generate_r1cs_witness(pb, order.deltaFilledS);
-        // deltaFilledB.generate_r1cs_witness(pb, order.deltaFilledB);
-        // std::cout << "in OrderGadgets before noop" << std::endl;
-        // isNoop.generate_r1cs_witness(pb, order.isNoop);
-
         // Checks
-        LOG(LogDebug, "in OrderGadgets", "feeBips_leq_maxFeeBips");
         feeBips_leq_maxFeeBips.generate_r1cs_witness();
-        LOG(LogDebug, "in OrderGadgets", "tokenS_neq_tokenB");
         tokenS_neq_tokenB.generate_r1cs_witness();
-        LOG(LogDebug, "in OrderGadgets", "amountS_notZero");
         amountS_notZero.generate_r1cs_witness();
-        LOG(LogDebug, "in OrderGadgets", "amountB_notZero");
         amountB_notZero.generate_r1cs_witness();
-        LOG(LogDebug, "in OrderGadgets", "feeMultiplier");
         // Fee checks
         feeMultiplier.generate_r1cs_witness();
-        LOG(LogDebug, "in OrderGadgets", "decodedFeeBips");
         decodedFeeBips.generate_r1cs_witness();
-        LOG(LogDebug, "in OrderGadgets", "feeBipsEqualsDecodedFeeBips");
         feeBipsEqualsDecodedFeeBips.generate_r1cs_witness();
 
         // split trading fee and gas fee
-        LOG(LogDebug, "in OrderGadgets", "feeTokenID");
         feeTokenID.generate_r1cs_witness(pb, order.feeTokenID);
         fee.generate_r1cs_witness(pb, order.fee);
-        LOG(LogDebug, "in OrderGadgets", "maxFee");
         maxFee.generate_r1cs_witness(pb, order.maxFee);
-        LOG(LogDebug, "in OrderGadgets", "fee_leq_maxFee");
         fee_leq_maxFee.generate_r1cs_witness();
-        LOG(LogDebug, "in OrderGadgets", "fFee");
         fFee.generate_r1cs_witness(toFloat(order.fee, Float16Encoding));
-        LOG(LogDebug, "in OrderGadgets", "requireAccuracyFee");
         requireAccuracyFee.generate_r1cs_witness();
 
-        LOG(LogDebug, "in OrderGadgets", "useAppKey");
         useAppKey.generate_r1cs_witness(pb, order.useAppKey);
-        LOG(LogDebug, "in OrderGadgets", "disableAppKey");
         disableAppKey.generate_r1cs_witness();
 
-
-        // AutoMarket
-        LOG(LogDebug, "in OrderGadgets", "type");
         type.generate_r1cs_witness(pb, order.type);
-        LOG(LogDebug, "in OrderGadgets", "level");
-        // std::cout << "in OrderGadgets: before autoMarketID" << std::endl;
-        // autoMarketID.generate_r1cs_witness(pb, order.autoMarketID);
         level.generate_r1cs_witness(pb, order.level);
-        LOG(LogDebug, "in OrderGadgets", "gridOffset");
         gridOffset.generate_r1cs_witness(pb, order.gridOffset);
-        LOG(LogDebug, "in OrderGadgets", "orderOffset");
         orderOffset.generate_r1cs_witness(pb, order.orderOffset);
-        LOG(LogDebug, "in OrderGadgets", "maxLevel");
         maxLevel.generate_r1cs_witness(pb, order.maxLevel);
-        LOG(LogDebug, "in OrderGadgets", "ifUseAppKey_then_require_enable_switch");
 
         ifUseAppKey_then_require_enable_switch.generate_r1cs_witness();
-        LOG(LogDebug, "in OrderGadgets", "hash");
 
-        // Signature
-        hash.generate_r1cs_witness();
     }
 
     void generate_r1cs_constraints()
@@ -320,18 +227,12 @@ class OrderGadget : public GadgetT
         amountS.generate_r1cs_constraints(true);
         amountB.generate_r1cs_constraints(true);
         validUntil.generate_r1cs_constraints(true);
-        // split TradingFee and GasFee - ProtocolFeeBips as the max TradingFee
-        // maxFeeBips.generate_r1cs_constraints(true);
         fillAmountBorS.generate_r1cs_constraints(true);
 
         feeBips.generate_r1cs_constraints(true);
 
         feeBipsMultiplierFlag.generate_r1cs_constraints(true);
         feeBipsData.generate_r1cs_constraints(true);
-
-        // deltaFilledS.generate_r1cs_constraints(true);
-        // deltaFilledB.generate_r1cs_constraints(true);
-        // isNoop.generate_r1cs_constraints(true);
 
         // Checks
         feeBips_leq_maxFeeBips.generate_r1cs_constraints();
@@ -354,9 +255,7 @@ class OrderGadget : public GadgetT
         useAppKey.generate_r1cs_constraints(true);
         disableAppKey.generate_r1cs_constraints();
 
-        // AutoMarket
         type.generate_r1cs_constraints(true);
-        // autoMarketID.generate_r1cs_constraints(true);
         level.generate_r1cs_constraints(true);
         gridOffset.generate_r1cs_constraints(true);
         orderOffset.generate_r1cs_constraints(true);
@@ -364,8 +263,6 @@ class OrderGadget : public GadgetT
 
         ifUseAppKey_then_require_enable_switch.generate_r1cs_constraints();
 
-        // Signature
-        hash.generate_r1cs_constraints();
     }
 };
 
@@ -384,10 +281,7 @@ class PreOrderCompleteCheckGadget : public GadgetT
     TernaryGadget isNewOrder;
     TernaryGadget firstOrderFillAmount;
 
-    // AndGadget needCheck;
-
     IfThenRequireAccuracyGadget requireAccuracyAmount;
-    // IfThenRequireEqualGadget preOrderCompleted;
 
     PreOrderCompleteCheckGadget(
       ProtoboardT &pb,
@@ -397,7 +291,6 @@ class PreOrderCompleteCheckGadget : public GadgetT
       const VariableT &firstOrderAmountB,
       const VariableT &firstOrderAmountS,
       const VariableT &startOrderFillAmountBorS,
-      // const AutoMarketStorageReaderGadget &autoMarketStorage,
       const StorageReaderGadget &storage,
       const std::string &prefix)
         : GadgetT(pb, prefix),
@@ -425,24 +318,15 @@ class PreOrderCompleteCheckGadget : public GadgetT
     void generate_r1cs_witness() 
     {
       forwardStatusNotMatch.generate_r1cs_witness();
-      LOG(LogDebug, "in PreOrderCompleteCheckGadget after forwardStatusNotMatch", pb.val(forwardStatusNotMatch.result()));
       isNewOrder.generate_r1cs_witness();
-      LOG(LogDebug, "in PreOrderCompleteCheckGadget after isNewOrder", pb.val(isNewOrder.result()));
       firstOrderFillAmount.generate_r1cs_witness();
-      LOG(LogDebug, "in PreOrderCompleteCheckGadget after firstOrderFillAmount", pb.val(firstOrderFillAmount.result()));
-      // needCheck.generate_r1cs_witness();
-      // preOrderCompleted.generate_r1cs_witness();
-      LOG(LogDebug, "in PreOrderCompleteCheckGadget before requireAccuracyAmount", "");
       requireAccuracyAmount.generate_r1cs_witness();
-      LOG(LogDebug, "in PreOrderCompleteCheckGadget after requireAccuracyAmount", "");
     }
     void generate_r1cs_constraints() 
     {
       forwardStatusNotMatch.generate_r1cs_constraints();
       isNewOrder.generate_r1cs_constraints();
       firstOrderFillAmount.generate_r1cs_constraints();
-      // needCheck.generate_r1cs_constraints();
-      // preOrderCompleted.generate_r1cs_constraints();
       requireAccuracyAmount.generate_r1cs_constraints();
     }
 
@@ -475,7 +359,6 @@ class NextForwardGadget : public GadgetT
     {
       notForward.generate_r1cs_witness();
       nextForward.generate_r1cs_witness();
-      LOG(LogDebug, "in NextForwardGadget nextForward", pb.val(nextForward.result()));
     }
 
     void generate_r1cs_constraints() 
@@ -495,8 +378,6 @@ class NextForwardGadget : public GadgetT
 class ForwardOrderAmountCheckGadget : public GadgetT 
 {
   public:
-    // EqualGadget amountSEqual;
-    // EqualGadget amountBEqual;
     BothAccuracyGadget amountSEqual;
     BothAccuracyGadget amountBEqual;
     AndGadget forwardOrderAmountOK;
@@ -539,10 +420,8 @@ class ForwardOrderAmountCheckGadget : public GadgetT
 class ReserveOrderFilleAmountSAmountCheckGadget : public GadgetT 
 {
   public:
-    // EqualGadget orderAmountB_eq_firstOrderAmountS;
     BothAccuracyGadget orderAmountB_eq_firstOrderAmountS;
-    UnsafeSubGadget calculateReverseAmountS;
-    // EqualGadget orderAmountS_eq_calculateReverseAmountS;
+    IfThenSubGadget calculateReverseAmountS;
     BothAccuracyGadget orderAmountS_eq_calculateReverseAmountS;
     AndGadget amountOK;
     IfThenRequireLeqGadget requireValidOrderOffset;
@@ -553,12 +432,13 @@ class ReserveOrderFilleAmountSAmountCheckGadget : public GadgetT
       const VariableT &firstOrderAmountB,
       const OrderGadget &orderGadget,
       const VariableT &orderOffset,
+      const VariableT &isSellAndReserve,
       const std::string &prefix
     ) : GadgetT(pb, prefix),
         orderAmountB_eq_firstOrderAmountS(pb, firstOrderAmountS, orderGadget.amountB.packed, AutoMarketAmountAccuracy, NUM_BITS_AMOUNT, FMT(prefix, ".orderAmountB_eq_firstOrderAmountS")),
-        calculateReverseAmountS(pb, firstOrderAmountB, orderOffset, FMT(prefix, ".calculateReverseAmountS")),
+        calculateReverseAmountS(pb, constants, isSellAndReserve, firstOrderAmountB, orderOffset, NUM_BITS_AMOUNT, FMT(prefix, ".calculateReverseAmountS")),
         orderAmountS_eq_calculateReverseAmountS(pb, calculateReverseAmountS.result(), orderGadget.amountS.packed, AutoMarketAmountAccuracy, NUM_BITS_AMOUNT, FMT(prefix, ".orderAmountS_eq_calculateReverseAmountS")),
-        amountOK(pb, {orderAmountB_eq_firstOrderAmountS.result(), orderAmountS_eq_calculateReverseAmountS.result()}, FMT(prefix, ".amountOK")),
+        amountOK(pb, {isSellAndReserve, orderAmountB_eq_firstOrderAmountS.result(), orderAmountS_eq_calculateReverseAmountS.result()}, FMT(prefix, ".amountOK")),
         requireValidOrderOffset(pb, constants, amountOK.result(), orderOffset, firstOrderAmountB, NUM_BITS_AMOUNT, FMT(prefix, ".requireValidOrderOffset"))
     {
 
@@ -566,15 +446,10 @@ class ReserveOrderFilleAmountSAmountCheckGadget : public GadgetT
 
     void generate_r1cs_witness() 
     {
-      LOG(LogDebug, "in ReserveOrderFilleAmountSAmountCheckGadget", "orderAmountB_eq_firstOrderAmountS");
       orderAmountB_eq_firstOrderAmountS.generate_r1cs_witness();
-      LOG(LogDebug, "in ReserveOrderFilleAmountSAmountCheckGadget", "calculateReverseAmountS");
       calculateReverseAmountS.generate_r1cs_witness();
-      LOG(LogDebug, "in ReserveOrderFilleAmountSAmountCheckGadget", "orderAmountS_eq_calculateReverseAmountS");
       orderAmountS_eq_calculateReverseAmountS.generate_r1cs_witness();
-      LOG(LogDebug, "in ReserveOrderFilleAmountSAmountCheckGadget", "amountOK");
       amountOK.generate_r1cs_witness();
-      LOG(LogDebug, "in ReserveOrderFilleAmountSAmountCheckGadget", "end");
       requireValidOrderOffset.generate_r1cs_witness();
     }
     void generate_r1cs_constraints() 
@@ -596,10 +471,9 @@ class ReserveOrderFilleAmountSAmountCheckGadget : public GadgetT
 class ReserveOrderFilleAmountBAmountCheckGadget : public GadgetT 
 {
   public:
-    // EqualGadget orderAmountS_eq_firstOrderAmountB;
     BothAccuracyGadget orderAmountS_eq_firstOrderAmountB;
+    // Add not need check out of rang, if out of rang, then crash
     AddGadget calculateReverseAmountB;
-    // EqualGadget orderAmountB_eq_calculateReverseAmountB;
     BothAccuracyGadget orderAmountB_eq_calculateReverseAmountB;
     AndGadget amountOK;
     ReserveOrderFilleAmountBAmountCheckGadget(
@@ -608,12 +482,13 @@ class ReserveOrderFilleAmountBAmountCheckGadget : public GadgetT
       const VariableT &firstOrderAmountB,
       const OrderGadget &orderGadget,
       const VariableT &orderOffset,
+      const VariableT &isBuyAndReserve,
       const std::string &prefix
     ) : GadgetT(pb, prefix),
         orderAmountS_eq_firstOrderAmountB(pb, firstOrderAmountB, orderGadget.amountS.packed, AutoMarketAmountAccuracy, NUM_BITS_AMOUNT, FMT(prefix, ".orderAmountS_eq_firstOrderAmountB")),
         calculateReverseAmountB(pb, firstOrderAmountS, orderOffset, NUM_BITS_AMOUNT, FMT(prefix, ".calculateReverseAmountB")),
         orderAmountB_eq_calculateReverseAmountB(pb, calculateReverseAmountB.result(), orderGadget.amountB.packed, AutoMarketAmountAccuracy, NUM_BITS_AMOUNT, FMT(prefix, ".orderAmountB_eq_calculateReverseAmountB")),
-        amountOK(pb, {orderAmountS_eq_firstOrderAmountB.result(), orderAmountB_eq_calculateReverseAmountB.result()}, FMT(prefix, ".amountOK"))
+        amountOK(pb, {isBuyAndReserve, orderAmountS_eq_firstOrderAmountB.result(), orderAmountB_eq_calculateReverseAmountB.result()}, FMT(prefix, ".amountOK"))
     {
 
     }
@@ -621,13 +496,9 @@ class ReserveOrderFilleAmountBAmountCheckGadget : public GadgetT
     void generate_r1cs_witness() 
     {
       orderAmountS_eq_firstOrderAmountB.generate_r1cs_witness();
-      LOG(LogDebug, "in ReserveOrderFilleAmountBAmountCheckGadget after orderAmountS_eq_firstOrderAmountB", pb.val(orderAmountS_eq_firstOrderAmountB.result()));
       calculateReverseAmountB.generate_r1cs_witness();
-      LOG(LogDebug, "in ReserveOrderFilleAmountBAmountCheckGadget after calculateReverseAmountB", pb.val(calculateReverseAmountB.result()));
       orderAmountB_eq_calculateReverseAmountB.generate_r1cs_witness();
-      LOG(LogDebug, "in ReserveOrderFilleAmountBAmountCheckGadget after orderAmountB_eq_calculateReverseAmountB", pb.val(orderAmountB_eq_calculateReverseAmountB.result()));
       amountOK.generate_r1cs_witness();
-      LOG(LogDebug, "in ReserveOrderFilleAmountBAmountCheckGadget after amountOK", pb.val(amountOK.result()));
     }
     void generate_r1cs_constraints() 
     {
@@ -652,14 +523,10 @@ class FirstOrderGadget : public GadgetT
     EqualGadget isFixedAmountB;
 
     // calculation from both sides to the middle belongs to reverse push. 
-    // The value added or subtracted is not directly multiplied by level with gridoffset, but MAXLEVEL - level
-    // SubGadget gridOffsetMultiple;
     SafeMulGadget amountOffset;
     // Calculate the amount. Either amount is fixed or amount B is fixed. If amount B is fixed, then amounts = startorderamounts - amount offset
-    // IfThenAddGadget firstOrderAmountS;
     IfThenSubGadget firstOrderAmountS;
     // Calculate the quantity of amountb. Either amounts is fixed or amountb is fixed. If amounts is fixed, then amountb = startorderamountb + amountoffset
-    // IfThenSubGadget firstOrderAmountB;
     IfThenAddGadget firstOrderAmountB;
     
     FirstOrderGadget(
@@ -668,12 +535,9 @@ class FirstOrderGadget : public GadgetT
       const OrderGadget &orderGadget,
       const VariableT &startOrderAmountS,
       const VariableT &startOrderAmountB,
-      // const AutoMarketReaderGadget &autoMarketConfig,
       const std::string &prefix
     ) : GadgetT(pb, prefix),
-        // gridOffsetMultiple(pb, orderGadget.maxLevel.packed, orderGadget.level.packed, NUM_BITS_AUTOMARKET_LEVEL, FMT(prefix, ".gridOffsetMultiple")),
         amountOffset(pb, orderGadget.gridOffset.packed, orderGadget.level.packed, NUM_BITS_AMOUNT, FMT(prefix, ".amountOffset")),
-        // amountOffset(pb, orderGadget.gridOffset.packed, gridOffsetMultiple.result(), NUM_BITS_AMOUNT, FMT(prefix, ".amountOffset")),
         // type = 6: fixed amounts
         // type = 7: fixed amountb
         isFixedAmountS(pb, orderGadget.type.packed, constants._6, FMT(prefix, ".isFixedAmountS")),
@@ -688,26 +552,14 @@ class FirstOrderGadget : public GadgetT
 
     void generate_r1cs_witness() 
     {
-      // gridOffsetMultiple.generate_r1cs_witness();
-      LOG(LogDebug, "in FirstOrderGadget", "amountOffset");
       amountOffset.generate_r1cs_witness();
-      LOG(LogDebug, "in FirstOrderGadget", "isFixedAmountS");
       isFixedAmountS.generate_r1cs_witness();
-      LOG(LogDebug, "in FirstOrderGadget", "isFixedAmountB");
       isFixedAmountB.generate_r1cs_witness();
-      LOG(LogDebug, "in FirstOrderGadget isFixedAmountB", pb.val(isFixedAmountB.result()));
-      LOG(LogDebug, "in FirstOrderGadget amountOffset", pb.val(amountOffset.result()));
-      LOG(LogDebug, "in FirstOrderGadget", "firstOrderAmountS");
       firstOrderAmountS.generate_r1cs_witness();
-      LOG(LogDebug, "in FirstOrderGadget firstOrderAmountS", pb.val(firstOrderAmountS.result()));
-      LOG(LogDebug, "in FirstOrderGadget", "firstOrderAmountB");
       firstOrderAmountB.generate_r1cs_witness();
-      LOG(LogDebug, "in FirstOrderGadget firstOrderAmountB", pb.val(firstOrderAmountB.result()));
-      LOG(LogDebug, "in FirstOrderGadget", "end");
     }
     void generate_r1cs_constraints() 
     {
-      // gridOffsetMultiple.generate_r1cs_constraints();
       amountOffset.generate_r1cs_constraints();
       isFixedAmountS.generate_r1cs_constraints();
       isFixedAmountB.generate_r1cs_constraints();
@@ -806,12 +658,25 @@ class GridOrderForwardCheckGadget : public GadgetT
       isSell_and_isForward.generate_r1cs_constraints();
       requireSellOrderFillAmountBorSValid.generate_r1cs_constraints();
     }
+
+    const VariableT &getIsBuy() const
+    {
+        return isBuy.result();
+    }
+
+    const VariableT &getIsSell() const
+    {
+        return isSell.result();
+    }
+
 };
 
 // Reverse bill data verification, type = 7
 class GridOrderReserveBuyCheckGadget : public GadgetT 
 {
   public:
+    EqualGadget isBuy;
+    AndGadget isBuy_and_isReserve;
     EqualGadget orderFillAmoutB;
     AndGadget fillAmountB_and_reserve_order;
 
@@ -820,8 +685,6 @@ class GridOrderReserveBuyCheckGadget : public GadgetT
     IfThenRequireGadget requireValidReverseFillAmountBAmount;
 
     // If it is a purchase order and a reverse order, the fillamountbors of the order must be 0
-    EqualGadget isBuy;
-    AndGadget isBuy_and_isReserve;
     IfThenRequireEqualGadget requireOrderFillAmountBorSValid;
     GridOrderReserveBuyCheckGadget(
       ProtoboardT &pb,
@@ -834,17 +697,17 @@ class GridOrderReserveBuyCheckGadget : public GadgetT
       const VariableT &orderType,
       const std::string &prefix
     ) : GadgetT(pb, prefix), 
+      isBuy(pb, orderType, constants._7, FMT(prefix, ".isBuy")),
+      isBuy_and_isReserve(pb, {isBuy.result(), isReverse}, FMT(prefix, ".isBuy_and_isReserve")),
       // The order is in the fixed currency of amountb, and amountb can buy all the orders after they are finished
       orderFillAmoutB(pb, startOrderFillAmountBorS, constants._1, FMT(prefix, ".orderFillAmoutB")),
       // It is also a reverse order. The initial order is a fixed amount B. at present, it appears in the reverse order with type = 7
       fillAmountB_and_reserve_order(pb, {orderFillAmoutB.result(), isReverse}, FMT(prefix, ".fillAmountB_and_reserve_order")),
 
-      reserveOrderFilleAmountBAmountCheck(pb, firstOrderGadget.getAmountS(), firstOrderGadget.getAmountB(), orderGadget, orderGadget.orderOffset.packed, FMT(prefix, ".reserveOrderFilleAmountBAmountCheck")),
+      reserveOrderFilleAmountBAmountCheck(pb, firstOrderGadget.getAmountS(), firstOrderGadget.getAmountB(), orderGadget, orderGadget.orderOffset.packed, isBuy_and_isReserve.result(), FMT(prefix, ".reserveOrderFilleAmountBAmountCheck")),
       needCheckReverseFillAmountBAmount(pb, {fillAmountB_and_reserve_order.result(), isAutoMarketOrder}, FMT(prefix, ".needCheckReverseFillAmountBAmount")),
       requireValidReverseFillAmountBAmount(pb, needCheckReverseFillAmountBAmount.result(), reserveOrderFilleAmountBAmountCheck.reserveAmountOK(), FMT(prefix, ".requireValidReverseFillAmountBAmount")),
 
-      isBuy(pb, orderType, constants._7, FMT(prefix, ".isBuy")),
-      isBuy_and_isReserve(pb, {isBuy.result(), isReverse}, FMT(prefix, ".isBuy_and_isReserve")),
       requireOrderFillAmountBorSValid(pb, isBuy_and_isReserve.result(), orderGadget.fillAmountBorS.packed, constants._0, FMT(prefix, ".requireOrderFillAmountBorSValid"))
     {
 
@@ -852,6 +715,9 @@ class GridOrderReserveBuyCheckGadget : public GadgetT
 
     void generate_r1cs_witness() 
     {
+      isBuy.generate_r1cs_witness();
+      isBuy_and_isReserve.generate_r1cs_witness();
+
       orderFillAmoutB.generate_r1cs_witness();
       fillAmountB_and_reserve_order.generate_r1cs_witness();
 
@@ -859,13 +725,14 @@ class GridOrderReserveBuyCheckGadget : public GadgetT
       needCheckReverseFillAmountBAmount.generate_r1cs_witness();
       requireValidReverseFillAmountBAmount.generate_r1cs_witness();
 
-      isBuy.generate_r1cs_witness();
-      isBuy_and_isReserve.generate_r1cs_witness();
       requireOrderFillAmountBorSValid.generate_r1cs_witness();
     }
 
     void generate_r1cs_constraints() 
     {
+      isBuy.generate_r1cs_constraints();
+      isBuy_and_isReserve.generate_r1cs_constraints();
+
       orderFillAmoutB.generate_r1cs_constraints();
       fillAmountB_and_reserve_order.generate_r1cs_constraints();
 
@@ -873,8 +740,6 @@ class GridOrderReserveBuyCheckGadget : public GadgetT
       needCheckReverseFillAmountBAmount.generate_r1cs_constraints();
       requireValidReverseFillAmountBAmount.generate_r1cs_constraints();
 
-      isBuy.generate_r1cs_constraints();
-      isBuy_and_isReserve.generate_r1cs_constraints();
       requireOrderFillAmountBorSValid.generate_r1cs_constraints();
     }
 
@@ -883,6 +748,9 @@ class GridOrderReserveBuyCheckGadget : public GadgetT
 class GridOrderReserveSellCheckGadget : public GadgetT 
 {
   public:
+    EqualGadget isSell;
+    AndGadget isSell_and_isReserve;
+
     EqualGadget orderFillAmoutS;
     AndGadget fillAmountS_and_reserve_order;
 
@@ -891,8 +759,6 @@ class GridOrderReserveSellCheckGadget : public GadgetT
     IfThenRequireGadget requireValidReverseFillAmountSAmount;
 
     // If it is a sales order and a reverse order, the fillamountbors of the order must be 1
-    EqualGadget isSell;
-    AndGadget isSell_and_isReserve;
     IfThenRequireEqualGadget requireOrderFillAmountBorSValid;
     GridOrderReserveSellCheckGadget(
       ProtoboardT &pb,
@@ -905,17 +771,17 @@ class GridOrderReserveSellCheckGadget : public GadgetT
       const VariableT &orderType,
       const std::string &prefix
     ) : GadgetT(pb, prefix), 
+      isSell(pb, orderType, constants._6, FMT(prefix, ".isSell")),
+      isSell_and_isReserve(pb, {isSell.result(), isReverse}, FMT(prefix, ".isSell_and_isReserve")),
       // The order is in the fixed currency of amounts, and all amounts are sold after the order is finished
       orderFillAmoutS(pb, startOrderFillAmountBorS, constants._0, FMT(prefix, ".orderFillAmoutS")),
       // It is also a reverse order. The initial order is a fixed amount. At present, it appears in the reverse order with type = 6
       fillAmountS_and_reserve_order(pb, {orderFillAmoutS.result(), isReverse}, FMT(prefix, ".fillAmountS_and_reserve_order")),
 
-      reserveOrderFilleAmountSAmountCheck(pb, constants, firstOrderGadget.getAmountS(), firstOrderGadget.getAmountB(), orderGadget, orderGadget.orderOffset.packed, FMT(prefix, ".reserveOrderFilleAmountSAmountCheck")),
+      reserveOrderFilleAmountSAmountCheck(pb, constants, firstOrderGadget.getAmountS(), firstOrderGadget.getAmountB(), orderGadget, orderGadget.orderOffset.packed, isSell_and_isReserve.result(), FMT(prefix, ".reserveOrderFilleAmountSAmountCheck")),
       needCheckReverseFillAmountSAmount(pb, {fillAmountS_and_reserve_order.result(), isAutoMarketOrder}, FMT(prefix, ".needCheckReverseFillAmountSAmount")),
       requireValidReverseFillAmountSAmount(pb, needCheckReverseFillAmountSAmount.result(), reserveOrderFilleAmountSAmountCheck.reserveAmountOK(), FMT(prefix, ".requireValidReverseFillAmountSAmount")),
 
-      isSell(pb, orderType, constants._6, FMT(prefix, ".isSell")),
-      isSell_and_isReserve(pb, {isSell.result(), isReverse}, FMT(prefix, ".isSell_and_isReserve")),
       requireOrderFillAmountBorSValid(pb, isSell_and_isReserve.result(), orderGadget.fillAmountBorS.packed, constants._1, FMT(prefix, ".requireOrderFillAmountBorSValid"))
     {
 
@@ -923,29 +789,23 @@ class GridOrderReserveSellCheckGadget : public GadgetT
 
     void generate_r1cs_witness() 
     {
-      LOG(LogDebug, "in GridOrderReserveSellCheckGadget", "orderFillAmoutS");
+      isSell.generate_r1cs_witness();
+      isSell_and_isReserve.generate_r1cs_witness();
       orderFillAmoutS.generate_r1cs_witness();
-      LOG(LogDebug, "in GridOrderReserveSellCheckGadget", "fillAmountS_and_reserve_order");
       fillAmountS_and_reserve_order.generate_r1cs_witness();
 
-      LOG(LogDebug, "in GridOrderReserveSellCheckGadget", "reserveOrderFilleAmountSAmountCheck");
       reserveOrderFilleAmountSAmountCheck.generate_r1cs_witness();
-      LOG(LogDebug, "in GridOrderReserveSellCheckGadget", "needCheckReverseFillAmountSAmount");
       needCheckReverseFillAmountSAmount.generate_r1cs_witness();
-      LOG(LogDebug, "in GridOrderReserveSellCheckGadget", "requireValidReverseFillAmountSAmount");
       requireValidReverseFillAmountSAmount.generate_r1cs_witness();
-      LOG(LogDebug, "in GridOrderReserveSellCheckGadget", "isSell");
 
-      isSell.generate_r1cs_witness();
-      LOG(LogDebug, "in GridOrderReserveSellCheckGadget", "isSell_and_isReserve");
-      isSell_and_isReserve.generate_r1cs_witness();
-      LOG(LogDebug, "in GridOrderReserveSellCheckGadget", "requireOrderFillAmountBorSValid");
       requireOrderFillAmountBorSValid.generate_r1cs_witness();
-      LOG(LogDebug, "in GridOrderReserveSellCheckGadget", "end");
     }
 
     void generate_r1cs_constraints() 
     {
+      isSell.generate_r1cs_constraints();
+      isSell_and_isReserve.generate_r1cs_constraints();
+
       orderFillAmoutS.generate_r1cs_constraints();
       fillAmountS_and_reserve_order.generate_r1cs_constraints();
 
@@ -953,8 +813,6 @@ class GridOrderReserveSellCheckGadget : public GadgetT
       needCheckReverseFillAmountSAmount.generate_r1cs_constraints();
       requireValidReverseFillAmountSAmount.generate_r1cs_constraints();
 
-      isSell.generate_r1cs_constraints();
-      isSell_and_isReserve.generate_r1cs_constraints();
       requireOrderFillAmountBorSValid.generate_r1cs_constraints();
     }
 
@@ -988,10 +846,8 @@ class GridOrderCheckGadget : public GadgetT
       const VariableT &startOrderFillAmountBorS,
       const VariableT &orderType,
       const OrderGadget &orderGadget,
-      // const AutoMarketReaderGadget &autoMarketConfig,
       const std::string &prefix
     ) : GadgetT(pb, prefix),
-        // firstOrderGadget(pb, constants, orderGadget, autoMarketConfig, FMT(prefix, ".firstOrderGadget")),
         firstOrderGadget(pb, constants, orderGadget, startOrderAmountS, startOrderAmountB, FMT(prefix, ".firstOrderGadget")),
 
         forwardCheck(pb, constants, isAutoMarketOrder, isForward, orderGadget, firstOrderGadget, orderType, FMT(prefix, ".forwardCheck")),
@@ -1006,14 +862,9 @@ class GridOrderCheckGadget : public GadgetT
     {
       LOG(LogDebug, "in GridOrderCheckGadget", "generate_r1cs_witness");
       firstOrderGadget.generate_r1cs_witness();
-      LOG(LogDebug, "in GridOrderCheckGadget", "forwardCheck");
       forwardCheck.generate_r1cs_witness();
-      LOG(LogDebug, "in GridOrderCheckGadget", "reserveBuyCheck");
       reserveBuyCheck.generate_r1cs_witness();
-      LOG(LogDebug, "in GridOrderCheckGadget", "reserveSellCheck");
       reserveSellCheck.generate_r1cs_witness();
-      LOG(LogDebug, "in GridOrderCheckGadget after firstOrderGadget amountS", pb.val(firstOrderGadget.getAmountS()));
-      LOG(LogDebug, "in GridOrderCheckGadget after firstOrderGadget amountB", pb.val(firstOrderGadget.getAmountB()));
     }
     void generate_r1cs_constraints() 
     {
@@ -1033,6 +884,69 @@ class GridOrderCheckGadget : public GadgetT
         return firstOrderGadget.getAmountB();
     }
 
+    const VariableT &getIsBuy() const
+    {
+        return forwardCheck.getIsBuy();
+    }
+
+    const VariableT &getIsSell() const
+    {
+        return forwardCheck.getIsSell();
+    }
+
+};
+
+class FillAmountBorSCheckGadget  : public GadgetT 
+{
+  public:
+    EqualGadget fillAmountB;
+    EqualGadget fillAmountS;
+    AndGadget validBuy;
+    AndGadget validSell;
+
+    OrGadget validFillAmountBorS;
+    IfThenRequireGadget requireValidFillAmountBorS;
+    FillAmountBorSCheckGadget(
+      ProtoboardT &pb,
+      const Constants &constants,
+      const VariableT &isBuy,
+      const VariableT &isSell,
+      const VariableT &startOrderFillAmountBorS,
+      const VariableT &isAutoMarketOrder,
+      const std::string &prefix
+    ) : GadgetT(pb, prefix),
+      fillAmountB(pb, startOrderFillAmountBorS, constants._1, FMT(prefix, ".fillAmountB")),
+      fillAmountS(pb, startOrderFillAmountBorS, constants._0, FMT(prefix, ".fillAmountS")),
+
+      validBuy(pb, {isBuy, fillAmountB.result()}, FMT(prefix, ".validBuy")),
+      validSell(pb, {isSell, fillAmountS.result()}, FMT(prefix, ".validSell")),
+
+      validFillAmountBorS(pb, {validBuy.result(), validSell.result()}, FMT(prefix, ".validFillAmountBorS")),
+
+      requireValidFillAmountBorS(pb, isAutoMarketOrder, validFillAmountBorS.result(), FMT(prefix, ".requireValidFillAmountBorS"))
+    {
+
+    }
+
+    void generate_r1cs_witness() 
+    {
+      fillAmountB.generate_r1cs_witness();
+      fillAmountS.generate_r1cs_witness();
+      validBuy.generate_r1cs_witness();
+      validSell.generate_r1cs_witness();
+      validFillAmountBorS.generate_r1cs_witness();
+      requireValidFillAmountBorS.generate_r1cs_witness();
+    }
+
+    void generate_r1cs_constraints() 
+    {
+      fillAmountB.generate_r1cs_constraints();
+      fillAmountS.generate_r1cs_constraints();
+      validBuy.generate_r1cs_constraints();
+      validSell.generate_r1cs_constraints();
+      validFillAmountBorS.generate_r1cs_constraints();
+      requireValidFillAmountBorS.generate_r1cs_constraints();
+    }
 };
 
 // check auto market order
@@ -1072,7 +986,6 @@ class AutoMarketOrderCheck : public GadgetT
     VariableT taker;
 
     DualVariableGadget orderType;
-    // DualVariableGadget autoMarketID;
     DualVariableGadget gridOffset;
     DualVariableGadget orderOffset;
     DualVariableGadget maxLevel;
@@ -1112,20 +1025,21 @@ class AutoMarketOrderCheck : public GadgetT
     GridOrderCheckGadget gridOrderCheck;
     PreOrderCompleteCheckGadget preOrderCompleteCheck;
     NextForwardGadget nextForward;
-
-    // LeqGadget autoMarketConfigValidUntil;
-    // IfThenRequireGadget requireValidUntil;
-
-    // NotGadget autoMarketNotCancelled;
-    // IfThenRequireGadget requireAutoMarketNotCancelled;
+    FillAmountBorSCheckGadget fillAmountBorSCheck;
 
     RequireLeqGadget requireLevelValid;
 
-    // Poseidon_16 hash;
-    Poseidon_17 hash;
+    // hash field select
+    TernaryGadget hashStorageID;
+    TernaryGadget hashTokenS;
+    TernaryGadget hashTokenB;
+    TernaryGadget hashAmountS;
+    TernaryGadget hashAmountB;
+    TernaryGadget hashFillAmountBorS;
 
-    // If it is an automarket, use the hash here. If not, use the hash under order
-    TernaryGadget verifyHash;
+    // Poseidon_16 hash;
+    // If it is an automarket, use the hash field here. If not, use the hash field under order
+    Poseidon_17 hash;
 
     AutoMarketOrderCheck(
       ProtoboardT &pb,
@@ -1133,8 +1047,6 @@ class AutoMarketOrderCheck : public GadgetT
       const VariableT &timestamp,
       const VariableT &blockExchange,
       const OrderGadget &orderGadget,
-      // const AutoMarketReaderGadget &autoMarketConfig,
-      // const AutoMarketStorageReaderGadget &autoMarketStorage,
       const StorageReaderGadget &storage,
       const std::string &prefix)
         : GadgetT(pb, prefix),
@@ -1167,7 +1079,6 @@ class AutoMarketOrderCheck : public GadgetT
           // Level, that is, use the calculated storageid instead of the one provided by order
           // If it is not an automarket, you can directly return the storageid of the order
           autoMarketStorageID(pb, storageID.packed, orderGadget.level.packed, NUM_BITS_STORAGEID, FMT(prefix, ".autoMarketStorageID")),
-          // storageIDForUpdate(pb, isAutoMarketOrder.result(), autoMarketStorageID.result(), orderGadget.storageID.packed, FMT(prefix, ".autoMarketStorageID")),
 
           tokenSIDForStorageUpdate(pb, isAutoMarketOrder.result(), tokenS.packed, orderGadget.tokenS.packed, FMT(prefix, ".tokenSIDForStorageUpdate")),
           tokenBIDForStorageUpdate(pb, isAutoMarketOrder.result(), tokenB.packed, orderGadget.tokenB.packed, FMT(prefix, ".tokenBIDForStorageUpdate")),
@@ -1177,7 +1088,6 @@ class AutoMarketOrderCheck : public GadgetT
           accountIDEqual(pb, isAutoMarketOrder.result(), accountID.packed, orderGadget.accountID.packed, FMT(prefix, ".accountIDEqual")),
           feeTokenIDEqual(pb, isAutoMarketOrder.result(), feeTokenID.packed, orderGadget.feeTokenID.packed, FMT(prefix, ".feeTokenIDEqual")),
           maxFeeEqual(pb, isAutoMarketOrder.result(), maxFee.packed, orderGadget.maxFee.packed, FMT(prefix, ".maxFeeEqual")),
-          // uiReferIDEqual(pb, isAutoMarketOrder.result(), uiReferID.packed, orderGadget.uiReferID.packed, FMT(prefix, ".uiReferIDEqual")),
           validUntilEqual(pb, isAutoMarketOrder.result(), validUntil.packed, orderGadget.validUntil.packed, FMT(prefix, ".validUntilEqual")),
           takerEqual(pb, isAutoMarketOrder.result(), taker, orderGadget.taker, FMT(prefix, ".takerEqual")),
           orderTypeEqual(pb, isAutoMarketOrder.result(), orderType.packed, orderGadget.type.packed, FMT(prefix, ".orderTypeEqual")),
@@ -1185,9 +1095,6 @@ class AutoMarketOrderCheck : public GadgetT
           orderOffsetEqual(pb, isAutoMarketOrder.result(), orderOffset.packed, orderGadget.orderOffset.packed, FMT(prefix, ".orderOffsetEqual")),
           maxLevelEqual(pb, isAutoMarketOrder.result(), maxLevel.packed, orderGadget.maxLevel.packed, FMT(prefix, ".maxLevelEqual")),
           useAppKeyEqual(pb, isAutoMarketOrder.result(), useAppKey.packed, orderGadget.useAppKey.packed, FMT(prefix, ".useAppKeyEqual")),
-          // autoMarketIDEqual(pb, isAutoMarketOrder.result(), autoMarketID.packed, orderGadget.autoMarketID.packed, FMT(prefix, ".autoMarketIDEqual")),
-
-          // tokenStorageID_eq_autoMarketStorageID(pb, isAutoMarketOrder.result(), orderGadget.storageID.packed, autoMarketStorage.getTokenStorageID(), FMT(prefix, ".tokenStorageID_eq_autoMarketStorageID")),
 
           tokenSSEqual(pb, tokenS.packed, orderGadget.tokenS.packed, FMT(prefix, ".tokenSSEqual")),
           tokenBBEqual(pb, tokenB.packed, orderGadget.tokenB.packed, FMT(prefix, ".tokenBBEqual")),
@@ -1200,51 +1107,43 @@ class AutoMarketOrderCheck : public GadgetT
           tokenIdValid(pb, {isForward.result(), isReverse.result()}, FMT(prefix, ".tokenIdValid")),
           requireTokenIDValid(pb, isAutoMarketOrder.result(), tokenIdValid.result(), FMT(prefix, ".requireTokenIDValid")),
 
-          // gridOrderCheck(pb, constants, isAutoMarketOrder.result(), isForward.result(), isReverse.result(), fillAmountBorS.packed, orderGadget, autoMarketConfig, FMT(prefix, ".gridOrderCheck")),
           gridOrderCheck(pb, constants, amountS.packed, amountB.packed, isAutoMarketOrder.result(), isForward.result(), isReverse.result(), fillAmountBorS.packed, orderType.packed, orderGadget, FMT(prefix, ".gridOrderCheck")),
           
-          // preOrderCompleteCheck(pb, constants, isAutoMarketOrder.result(), isForward.result(), amountB.packed, amountS.packed, fillAmountBorS.packed, autoMarketStorage, FMT(prefix, ".preOrderCompleteCheck")),
-          // preOrderCompleteCheck(pb, constants, isAutoMarketOrder.result(), isForward.result(), gridOrderCheck.getFirstOrderAmountB(), gridOrderCheck.getFirstOrderAmountS(), fillAmountBorS.packed, autoMarketStorage, FMT(prefix, ".preOrderCompleteCheck")),
           preOrderCompleteCheck(pb, constants, isAutoMarketOrder.result(), isForward.result(), gridOrderCheck.getFirstOrderAmountB(), gridOrderCheck.getFirstOrderAmountS(), fillAmountBorS.packed, storage, FMT(prefix, ".preOrderCompleteCheck")),
-          // nextForward(pb, autoMarketStorage.getForward(), isAutoMarketOrder.result(), preOrderCompleteCheck.getIsNewOrder(), FMT(prefix, ".nextForward")),
           nextForward(pb, storage.getForward(), preOrderCompleteCheck.getIsNewOrder(), FMT(prefix, ".nextForward")),
-          
-          // autoMarketConfigValidUntil(
-          //   pb,
-          //   timestamp,
-          //   autoMarketConfig.getValidUntil(),
-          //   NUM_BITS_TIMESTAMP,
-          //   FMT(prefix, ".autoMarketConfigValidUntil")),
-          // requireValidUntil(pb, isAutoMarketOrder.result(), autoMarketConfigValidUntil.lt(), FMT(prefix, ".requireValidUntil")),
 
-          // autoMarketNotCancelled(pb, autoMarketConfig.getCancelled(), FMT(prefix, ".autoMarketNotCancelled")),
-          // requireAutoMarketNotCancelled(pb, isAutoMarketOrder.result(), autoMarketNotCancelled.result(), FMT(prefix, ".requireNotCancelled")),
+          fillAmountBorSCheck(pb, constants, gridOrderCheck.getIsBuy(), gridOrderCheck.getIsSell(), fillAmountBorS.packed, isAutoMarketOrder.result(), FMT(prefix, ".fillAmountBorSCheck")),
 
           requireLevelValid(pb, orderGadget.level.packed, maxLevel.packed, NUM_BITS_AUTOMARKET_LEVEL, FMT(prefix, ".requireLevelValid")),
 
+          hashStorageID(pb, isAutoMarketOrder.result(), storageID.packed, orderGadget.storageID.packed, FMT(prefix, ".hashTokenS")),
+          hashTokenS(pb, isAutoMarketOrder.result(), tokenS.packed, orderGadget.tokenS.packed, FMT(prefix, ".hashTokenS")),
+          hashTokenB(pb, isAutoMarketOrder.result(), tokenB.packed, orderGadget.tokenB.packed, FMT(prefix, ".hashTokenB")),
+          hashAmountS(pb, isAutoMarketOrder.result(), amountS.packed, orderGadget.amountS.packed, FMT(prefix, ".hashAmountS")),
+          hashAmountB(pb, isAutoMarketOrder.result(), amountB.packed, orderGadget.amountB.packed, FMT(prefix, ".hashAmountB")),
+          hashFillAmountBorS(pb, isAutoMarketOrder.result(), fillAmountBorS.packed, orderGadget.fillAmountBorS.packed, FMT(prefix, ".hashFillAmountBorS")),
           hash(
             pb,
             var_array(
-              {blockExchange,
-               storageID.packed,
-               accountID.packed,
-               tokenS.packed,
-               tokenB.packed,
-               amountS.packed,
-               amountB.packed,
-               validUntil.packed,
-               fillAmountBorS.packed,
-               taker,
-               feeTokenID.packed,
-               maxFee.packed,
-               orderType.packed,
-               gridOffset.packed,
-               orderOffset.packed,
-               maxLevel.packed,
-               useAppKey.packed
+              {orderGadget.blockExchangeForHash,
+               hashStorageID.result(),
+               orderGadget.accountID.packed,
+               hashTokenS.result(),
+               hashTokenB.result(),
+               hashAmountS.result(),
+               hashAmountB.result(),
+               orderGadget.validUntil.packed,
+               hashFillAmountBorS.result(),
+               orderGadget.taker,
+               orderGadget.feeTokenID.packed,
+               orderGadget.maxFee.packed,
+               orderGadget.type.packed,
+               orderGadget.gridOffset.packed,
+               orderGadget.orderOffset.packed,
+               orderGadget.maxLevel.packed,
+               orderGadget.useAppKey.packed
                }),
-            FMT(this->annotation_prefix, ".hash")),
-          verifyHash(pb, isAutoMarketOrder.result(), hash.result(), orderGadget.hash.result(), FMT(prefix, ".verifyHash"))
+            FMT(this->annotation_prefix, ".hash"))
     {
       
     }
@@ -1304,11 +1203,17 @@ class AutoMarketOrderCheck : public GadgetT
       gridOrderCheck.generate_r1cs_witness();
       preOrderCompleteCheck.generate_r1cs_witness();
       nextForward.generate_r1cs_witness();
+      fillAmountBorSCheck.generate_r1cs_witness();
 
       requireLevelValid.generate_r1cs_witness();
 
+      hashStorageID.generate_r1cs_witness();
+      hashTokenS.generate_r1cs_witness();
+      hashTokenB.generate_r1cs_witness();
+      hashAmountS.generate_r1cs_witness();
+      hashAmountB.generate_r1cs_witness();
+      hashFillAmountBorS.generate_r1cs_witness();
       hash.generate_r1cs_witness();
-      verifyHash.generate_r1cs_witness();
     }
     void generate_r1cs_constraints() 
     {
@@ -1364,22 +1269,18 @@ class AutoMarketOrderCheck : public GadgetT
       gridOrderCheck.generate_r1cs_constraints();
       preOrderCompleteCheck.generate_r1cs_constraints();
       nextForward.generate_r1cs_constraints();
+      fillAmountBorSCheck.generate_r1cs_constraints();
 
       requireLevelValid.generate_r1cs_constraints();
 
+      hashStorageID.generate_r1cs_constraints();
+      hashTokenS.generate_r1cs_constraints();
+      hashTokenB.generate_r1cs_constraints();
+      hashAmountS.generate_r1cs_constraints();
+      hashAmountB.generate_r1cs_constraints();
+      hashFillAmountBorS.generate_r1cs_constraints();
       hash.generate_r1cs_constraints();
-      verifyHash.generate_r1cs_constraints();
     }
-
-    // const VariableT &getAutoMarketIDForStorageUpdate() const
-    // {
-    //     return autoMarketIDForStorageUpdate.result();
-    // }
-
-    // const VariableT &getStorageIDForStorageUpdate() const
-    // {
-    //     return storageIDForUpdate.result();
-    // }
 
     const VariableT &getNewForwardForStorageUpdate() const
     {
@@ -1388,7 +1289,7 @@ class AutoMarketOrderCheck : public GadgetT
 
     const VariableT &getVerifyHash() const
     {
-        return verifyHash.result();
+        return hash.result();
     }
 
     const VariableT &isNewOrder() const

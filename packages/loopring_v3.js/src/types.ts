@@ -389,8 +389,6 @@ export class StorageLeaf implements Storage {
   tokenBID: number;
   forward: number;
 
-  // #trading fegas feegas
-  // # DEG-146:order cancel
   constructor() {
     this.data = new BN(0);
     this.storageID = 0;

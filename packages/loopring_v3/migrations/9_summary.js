@@ -1,14 +1,7 @@
-const LRCToken = artifacts.require("./test/tokens/LRC.sol");
-const GTOToken = artifacts.require("./test/tokens/GTO.sol");
-const WETHToken = artifacts.require("./test/tokens/WETH.sol");
-
 const ProtocolFeeVault = artifacts.require("ProtocolFeeVault");
-// const UserStakingPool = artifacts.require("UserStakingPool");
-const UniswapTokenSeller = artifacts.require("UniswapTokenSeller");
+
 const BatchVerifier = artifacts.require("BatchVerifier");
 const BlockVerifier = artifacts.require("BlockVerifier");
-// const AgentRegistry = artifacts.require("AgentRegistry");
-const FastWithdrawalAgent = artifacts.require("FastWithdrawalAgent");
 
 const ExchangeAdmins = artifacts.require("ExchangeAdmins");
 const ExchangeBalances = artifacts.require("ExchangeBalances");
@@ -25,16 +18,11 @@ const LoopringV3 = artifacts.require("LoopringV3");
 
 module.exports = function(deployer, network, accounts) {
   console.log(">>> deployed to network: " + network);
-  console.log("- LRCToken:", LRCToken.address);
-  console.log("- GTOToken:", GTOToken.address);
-  console.log("- WETHToken:", WETHToken.address);
+
   console.log("- ProtocolFeeVault:", ProtocolFeeVault.address);
-  // console.log("- UserStakingPool:", UserStakingPool.address);
-  // console.log("- UniswapTokenSeller:", UniswapTokenSeller.address);
+
   console.log("- BatchVerifier:", BatchVerifier.address);
   console.log("- BlockVerifier:", BlockVerifier.address);
-  // console.log("- AgentRegistry:", AgentRegistry.address);
-  console.log("- FastWithdrawalAgent:", FastWithdrawalAgent.address);
 
   console.log("- LoopringV3:", LoopringV3.address);
   console.log("- ExchangeAdmins:", ExchangeAdmins.address);

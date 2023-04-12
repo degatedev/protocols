@@ -361,9 +361,6 @@ class SignatureVerifier : public GadgetT
 
     void generate_r1cs_witness(Signature sig)
     {
-        std::cout << "in SignatureVerifier: sig_R.x" << sig.R.x << std::endl;
-        std::cout << "in SignatureVerifier: sig_R.y" << sig.R.y << std::endl;
-        std::cout << "in SignatureVerifier: sig.s" << sig.s << std::endl;
         pb.val(sig_R.x) = sig.R.x;
         pb.val(sig_R.y) = sig.R.y;
         sig_s.fill_with_bits_of_field_element(pb, sig.s);

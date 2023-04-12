@@ -85,16 +85,19 @@ module.exports = {
         return getWalletProvider("rinkeby");
       },
       gasPrice: 2000000000,
-      gas: 6700000
-      // skipDryRun: true,
-      // networkCheckTimeout: 999999,
+      gas: 6700000,
+      skipDryRun: true,
+      networkCheckTimeout: 999999
     },
     goerli: {
       network_id: "5",
       provider: function() {
         return getWalletProvider("goerli");
       },
-      gasPrice: 1000000000
+      gasPrice: 2000000000,
+      gas: 6700000,
+      skipDryRun: true,
+      networkCheckTimeout: 999999
     },
     arbitrum: {
       provider: function() {

@@ -213,6 +213,11 @@ library ExchangeBlocks
                 "AUXILIARYDATA_INVALID_LENGTH"
             );
 
+            require(
+                header.numConditionalTransactions == (header.depositSize + header.accountUpdateSize + header.withdrawSize),
+                "invalid number of conditional transactions"
+            );
+
             // Run over all conditional transactions
             uint minTxIndex = 0;
             bytes memory txData = new bytes(ExchangeData.TX_DATA_AVAILABILITY_SIZE);
@@ -308,12 +313,24 @@ library ExchangeBlocks
         returns (bool)
     {
         ExchangeData.ProtocolFeeData memory data = S.protocolFeeData;
-        if (block.timestamp > data.syncedAt + ExchangeData.MIN_AGE_PROTOCOL_FEES_UNTIL_UPDATED) {
+
+        uint8 protocolFeeBipsInLoopring = S.loopring.getProtocolFeeValues();
+        if (data.nextProtocolFeeBips != protocolFeeBipsInLoopring ) {
+            data.executeTimeOfNextProtocolFeeBips = uint32(block.timestamp + ExchangeData.MIN_AGE_PROTOCOL_FEES_UNTIL_UPDATED);
+            data.nextProtocolFeeBips = protocolFeeBipsInLoopring;
+
+            // Update the data in storage
+            S.protocolFeeData = data;
+        }
+
+        if ((data.executeTimeOfNextProtocolFeeBips !=0) && (block.timestamp > data.executeTimeOfNextProtocolFeeBips)) {
             // Store the current protocol fees in the previous protocol fees
             data.previousProtocolFeeBips = data.protocolFeeBips;
             // Get the latest protocol fees for this exchange
-            data.protocolFeeBips = S.loopring.getProtocolFeeValues();
+            data.protocolFeeBips = data.nextProtocolFeeBips;
             data.syncedAt = uint32(block.timestamp);
+
+            data.executeTimeOfNextProtocolFeeBips = 0;
 
             if (data.protocolFeeBips != data.previousProtocolFeeBips ) {
                 emit ProtocolFeesUpdated(
@@ -325,6 +342,7 @@ library ExchangeBlocks
             // Update the data in storage
             S.protocolFeeData = data;
         }
+
         // The given fee values are valid if they are the current or previous protocol fee values
         return (protocolFeeBips == data.protocolFeeBips) ||
             (protocolFeeBips == data.previousProtocolFeeBips );

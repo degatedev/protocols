@@ -315,7 +315,7 @@ contract("Exchange", (accounts: string[]) => {
   describe("DepositWithdraw", function() {
     this.timeout(0);
     
-    //
+    // order cancelled but to batch test
     it("BatchSpotTradeThree Test", async () => {
 
       await createExchange();
@@ -334,11 +334,11 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[0],
           // maxFeeBips: 50,
-          feeBips: 50, //protocolTakerFeeBips
+          feeBips: 0,
           fillAmountBorS: true,
-          feeTokenID: 2, //
-          fee: new BN("12300000000000"), //
-          maxFee: new BN("12300000000000"), //
+          feeTokenID: 2,
+          fee: new BN("12300000000000"),
+          maxFee: new BN("12300000000000"),
           deltaFilledS: new BN("1000000000000000000"),
           deltaFilledB: new BN("1000000000000000000"),
         };
@@ -349,11 +349,11 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("1", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[1],
           // maxFeeBips: 0,
-          feeBips: 0, //protocolMakerFeeBips
+          feeBips: 0,
           fillAmountBorS: false,
-          feeTokenID: 3, //
-          fee: new BN("21000000000000"), //
-          maxFee: new BN("21000000000000"), //
+          feeTokenID: 0,
+          fee: new BN("21000000000000"),
+          maxFee: new BN("21000000000000"),
           deltaFilledS: new BN("1000000000000000000"),
           deltaFilledB: new BN("1000000000000000000"),
         };
@@ -365,11 +365,11 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("2", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[0],
           // maxFeeBips: 50,
-          feeBips: 50, //protocolTakerFeeBips
+          feeBips: 0,
           fillAmountBorS: true,
-          feeTokenID: 3, //
-          fee: new BN("22300000000000"), //
-          maxFee: new BN("22300000000000"), //
+          feeTokenID: 3,
+          fee: new BN("20000000000000"),
+          maxFee: new BN("22300000000000"),
           deltaFilledS: new BN("2000000000000000000"),
           deltaFilledB: new BN("2000000000000000000"),
         };
@@ -380,11 +380,11 @@ contract("Exchange", (accounts: string[]) => {
           amountB: new BN(web3.utils.toWei("2", "ether")),
           owner: exchangeTestUtil.testContext.orderOwners[1],
           // maxFeeBips: 0,
-          feeBips: 0, //protocolMakerFeeBips
+          feeBips: 0,
           fillAmountBorS: false,
-          feeTokenID: 3, //
-          fee: new BN("31000000000000"), //
-          maxFee: new BN("31000000000000"), //
+          feeTokenID: 0,
+          fee: new BN("30000000000000"),
+          maxFee: new BN("31000000000000"),
           deltaFilledS: new BN("2000000000000000000"),
           deltaFilledB: new BN("2000000000000000000"),
         };

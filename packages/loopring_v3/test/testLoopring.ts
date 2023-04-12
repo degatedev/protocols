@@ -24,7 +24,7 @@ contract("Loopring", (accounts: string[]) => {
   const checkProtocolFees = async (feeBips: number) => {
     const protocolFeeBips = await loopring.protocolFeeBips();
 
-    assert.equal(protocolFeeBips, feeBips, "unexpected taker fee bips");
+    assert.equal(protocolFeeBips, feeBips, "unexpected fee bips");
 
     const protocolFees = await loopring.getProtocolFeeValues();
     assert(protocolFees.eq(protocolFeeBips), "Wrong protocol fees");
@@ -36,15 +36,16 @@ contract("Loopring", (accounts: string[]) => {
       const newProtocolFeeVault = exchangeTestUtil.testContext.orderOwners[2];
       assert(newProtocolFeeVault !== protocolFeeVaultBefore);
 
-      await loopring.updateSettings(
-        newProtocolFeeVault,
-        exchangeTestUtil.testContext.orderOwners[2],
-        new BN(web3.utils.toWei("0.01", "ether")),
-        { from: exchangeTestUtil.testContext.deployer }
-      );
+      await loopring.updateSettings(newProtocolFeeVault, new BN(web3.utils.toWei("0.01", "ether")), {
+        from: exchangeTestUtil.testContext.deployer
+      });
 
       const protocolFeeVaultAfter = await loopring.protocolFeeVault();
       assert(newProtocolFeeVault === protocolFeeVaultAfter, "new protocolFeeVault should be set");
+    });
+
+    it("should be able to get default protocol fee", async () => {
+      await checkProtocolFees(exchangeTestUtil.DEFAULT_PROTOCOL_FEE_BIPS.toNumber());
     });
 
     it("should be able to update protocol fee settings", async () => {
@@ -55,13 +56,24 @@ contract("Loopring", (accounts: string[]) => {
       await checkProtocolFees(feeBips);
     });
 
+    it("should not be able to set too big protocol fee", async () => {
+      console.log("MAX_PROTOCOL_FEE_BIPS", exchangeTestUtil.MAX_PROTOCOL_FEE_BIPS.toString(10));
+
+      await expectThrow(
+        loopring.updateProtocolFeeSettings(
+          exchangeTestUtil.MAX_PROTOCOL_FEE_BIPS.add(new BN(1)), // invalid fee
+          { from: exchangeTestUtil.testContext.deployer }
+        ),
+        "INVALID_PROTOCOL_FEE_BIPS"
+      );
+    });
+
     it("should not be able to set too big withdraw fee", async () => {
       console.log("MAX_FORCED_WITHDRAWAL_FEE", exchangeTestUtil.MAX_FORCED_WITHDRAWAL_FEE.toString(10));
 
       await expectThrow(
         loopring.updateSettings(
           exchangeTestUtil.testContext.orderOwners[1], // fee vault
-          exchangeTestUtil.testContext.orderOwners[2], // block verifier
           exchangeTestUtil.MAX_FORCED_WITHDRAWAL_FEE.add(new BN(1)), // invalid fee
           { from: exchangeTestUtil.testContext.deployer }
         ),
@@ -75,7 +87,6 @@ contract("Loopring", (accounts: string[]) => {
       await expectThrow(
         loopring.updateSettings(
           exchangeTestUtil.testContext.orderOwners[1], // fee vault
-          exchangeTestUtil.testContext.orderOwners[2], // block verifier
           new BN(web3.utils.toWei("0.01", "ether")),
           { from: exchangeTestUtil.testContext.orderOwners[0] }
         ),

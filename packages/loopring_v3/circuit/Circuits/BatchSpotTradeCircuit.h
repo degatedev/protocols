@@ -15,13 +15,19 @@ using namespace ethsnarks;
 
 namespace Loopring
 {
+// A batch of orders of a batch of users are collectively matched.
+// It provides a batch of users and a batch of orders of users. The circuit ensures that the expenditure and income of each order of users comply with the order price limit, 
+// and at the same time, it ensures the cumulative balance of revenue and expenditure of all users in all currencies at the outermost layer. 
+// For a single order of a single user, don't need to know which order has been matched with, but only need to know whether the matching result of collective orders is correct. 
+// In order to improve the aggregation efficiency and aggregate the number of orders of users, the supported token types will be adjusted differently. 
+// Currently, 6 users are supported. The number of orders supported by each user is 4, 2, 1, 1, 1, 1. The first user supports the change of the number of three tokens,
+// The last five users only support two tokens. Specifically, the combination of those two tokens is distinguished by using TokenType(00, 01, 10).
 class BatchSpotTradeCircuit : public BaseTransactionCircuit
 {
   public:
     Constants constants;
     TransactionState state;
     DualVariableGadget typeTx;
-    // ToBitsGadget tokenTypePad;
     DualVariableGadget bindTokenID;
     VariableT blockExchange;
     VariableT maxTradingFeeBips;
@@ -33,6 +39,10 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
     std::unique_ptr<ValidTokensGadget> validTokens;
 
     std::vector<BatchUserGadget> users;
+
+    // userA and userB must have order, first order must not noop
+    std::unique_ptr<IfThenRequireEqualGadget> requireUserAOrderNotNoop;
+    std::unique_ptr<IfThenRequireEqualGadget> requireUserBOrderNotNoop;
 
     // forward: amount buy
     // reverse: amount sell
@@ -57,18 +67,6 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
     std::unique_ptr<SubGadget> firstTokenFeeSum;
     std::unique_ptr<SubGadget> secondTokenFeeSum;
     std::unique_ptr<SubGadget> thirdTokenFeeSum;
-    // // TradingFee
-    // std::vector<AddGadget> tokenOneTradingFee;
-    // std::vector<AddGadget> tokenTwoTradingFee;
-    // std::vector<AddGadget> tokenThreeTradingFee;
-    // // GasFee
-    // std::vector<AddGadget> tokenOneGasFee;
-    // std::vector<AddGadget> tokenTwoGasFee;
-    // std::vector<AddGadget> tokenThreeGasFee;
-
-    // std::unique_ptr<AddGadget> firstTokenFeeSum;
-    // std::unique_ptr<AddGadget> secondTokenFeeSum;
-    // std::unique_ptr<AddGadget> thirdTokenFeeSum;
 
     // forward sum must == reverse sum
     // require forwardOneAmounts.back().result() == reverseOneAmounts.back().result()
@@ -142,6 +140,8 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
     std::vector<TernaryGadget> userFStorageGasFee;
     std::vector<TernaryGadget> userFStorageForward;
 
+    // The operator balance change needs to be calculated to calculate the posting and posting of the user's real balance change
+    // The operator's revenue is the total outgoing minus incoming
     std::unique_ptr<DynamicBalanceGadget> balanceC_O;
     std::unique_ptr<DynamicBalanceGadget> balanceB_O;
     std::unique_ptr<DynamicBalanceGadget> balanceA_O;
@@ -158,7 +158,6 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         constants(_state.constants),
         state(_state),
         typeTx(pb, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
-        // tokenTypePad(pb, constants._0, NUM_BITS_BATCH_SPOTRADE_TOKEN_TYPE_PAD, FMT(prefix, ".tokenTypePad")),
         bindTokenID(pb, NUM_BITS_BIND_TOKEN_ID_SIZE, FMT(prefix, ".bindTokenID")),
         blockExchange(_state.exchange),
         maxTradingFeeBips(_state.protocolFeeBips),
@@ -173,7 +172,6 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         }
         validTokens.reset(new ValidTokensGadget(pb, constants, tokens, bindTokenID.packed, isBatchSpotTradeTx.result(), FMT(prefix, ".validTokens")));
 
-        // selectTokenForPublicData.reset(new SelectTokenForPublicDataGadget(pb, tokens, bindTokenID.packed, FMT(prefix, ".selectTokenForPublicData")));
         for (unsigned int i = 0; i < BATCH_SPOT_TRADE_MAX_USER; i++) 
         {
             LOG(LogDebug, "in BatchSpotTradeCircuit i", std::to_string(i));
@@ -212,12 +210,10 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
                 users.emplace_back(pb, constants, state.timestamp, blockExchange, maxTradingFeeBips, tokens, storageGadgets, state.accountF, state.type, isBatchSpotTradeTx.result(), constants._1, ORDER_SIZE_USER_F, prefix + std::string("user_") + std::to_string(i));
             }
 
-            LOG(LogDebug, "in BatchUserGadget before forwardOneAmounts", "");
             forwardOneAmounts.emplace_back(pb, (i == 0) ? constants._0 : forwardOneAmounts.back().result(), users.back().getTokenOneForwardAmount(), NUM_BITS_AMOUNT, std::string(".forwardOneAmounts_") + std::to_string(i));
             forwardTwoAmounts.emplace_back(pb, (i == 0) ? constants._0 : forwardTwoAmounts.back().result(), users.back().getTokenTwoForwardAmount(), NUM_BITS_AMOUNT, std::string(".forwardTwoAmounts_") + std::to_string(i));
             forwardThreeAmounts.emplace_back(pb, (i == 0) ? constants._0 : forwardThreeAmounts.back().result(), users.back().getTokenThreeForwardAmount(), NUM_BITS_AMOUNT, std::string(".forwardThreeAmounts_") + std::to_string(i));
             
-            LOG(LogDebug, "in BatchUserGadget before reverseOneAmounts", "");
             reverseOneAmounts.emplace_back(pb, (i == 0) ? constants._0 : reverseOneAmounts.back().result(), users.back().getTokenOneReverseAmount(), NUM_BITS_AMOUNT, std::string(".reverseOneAmounts_") + std::to_string(i));
             reverseTwoAmounts.emplace_back(pb, (i == 0) ? constants._0 : reverseTwoAmounts.back().result(), users.back().getTokenTwoReverseAmount(), NUM_BITS_AMOUNT, std::string(".reverseTwoAmounts_") + std::to_string(i));
             reverseThreeAmounts.emplace_back(pb, (i == 0) ? constants._0 : reverseThreeAmounts.back().result(), users.back().getTokenThreeReverseAmount(), NUM_BITS_AMOUNT, std::string(".reverseThreeAmounts_") + std::to_string(i));
@@ -229,21 +225,11 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
             tokenOneFloatReverse.emplace_back(pb, (i == 0) ? constants._0 : tokenOneFloatReverse.back().result(), users.back().getTokenOneFloatReduce(), NUM_BITS_AMOUNT, std::string(".tokenOneFloatReduce_") + std::to_string(i));
             tokenTwoFloatReverse.emplace_back(pb, (i == 0) ? constants._0 : tokenTwoFloatReverse.back().result(), users.back().getTokenTwoFloatReduce(), NUM_BITS_AMOUNT, std::string(".tokenTwoFloatReduce_") + std::to_string(i));
             tokenThreeFloatReverse.emplace_back(pb, (i == 0) ? constants._0 : tokenThreeFloatReverse.back().result(), users.back().getTokenThreeFloatReduce(), NUM_BITS_AMOUNT, std::string(".tokenThreeFloatReduce_") + std::to_string(i));
-            // LOG(LogDebug, "in BatchUserGadget before tokenOneTradingFee", "");
-            // tokenOneTradingFee.emplace_back(pb, (i == 0) ? constants._0 : tokenOneTradingFee.back().result(), users.back().getTokenOneTradingFee(), NUM_BITS_AMOUNT, std::string(".tokenOneTradingFee_") + std::to_string(i));
-            // tokenTwoTradingFee.emplace_back(pb, (i == 0) ? constants._0 : tokenTwoTradingFee.back().result(), users.back().getTokenTwoTradingFee(), NUM_BITS_AMOUNT, std::string(".tokenTwoTradingFee_") + std::to_string(i));
-            // tokenThreeTradingFee.emplace_back(pb, (i == 0) ? constants._0 : tokenThreeTradingFee.back().result(), users.back().getTokenThreeTradingFee(), NUM_BITS_AMOUNT, std::string(".tokenThreeTradingFee_") + std::to_string(i));
-            
-            // LOG(LogDebug, "in BatchUserGadget before tokenOneGasFee", "");
-            // tokenOneGasFee.emplace_back(pb, (i == 0) ? constants._0 : tokenOneGasFee.back().result(), users.back().getTokenOneGasFee(), NUM_BITS_AMOUNT, std::string(".tokenOneGasFee_") + std::to_string(i));
-            // tokenTwoGasFee.emplace_back(pb, (i == 0) ? constants._0 : tokenTwoGasFee.back().result(), users.back().getTokenTwoGasFee(), NUM_BITS_AMOUNT, std::string(".tokenTwoGasFee_") + std::to_string(i));
-            // tokenThreeGasFee.emplace_back(pb, (i == 0) ? constants._0 : tokenThreeGasFee.back().result(), users.back().getTokenThreeGasFee(), NUM_BITS_AMOUNT, std::string(".tokenThreeGasFee_") + std::to_string(i));
         }
+
+        requireUserAOrderNotNoop.reset(new IfThenRequireEqualGadget(pb, isBatchSpotTradeTx.result(), users[0].orders[0].isNoop.packed, constants._0, FMT(prefix, ".requireUserAOrderNotNoop")));
+        requireUserBOrderNotNoop.reset(new IfThenRequireEqualGadget(pb, isBatchSpotTradeTx.result(), users[1].orders[0].isNoop.packed, constants._0, FMT(prefix, ".requireUserBOrderNotNoop")));
         
-        // LOG(LogDebug, "in BatchUserGadget before firstTokenFeeSum", "");
-        // firstTokenFeeSum.reset(new AddGadget(pb, tokenOneTradingFee.back().result(), tokenOneGasFee.back().result(), NUM_BITS_AMOUNT, FMT(prefix, ".firstTokenFeeSum")));
-        // secondTokenFeeSum.reset(new AddGadget(pb, tokenTwoTradingFee.back().result(), tokenTwoGasFee.back().result(), NUM_BITS_AMOUNT, FMT(prefix, ".secondTokenFeeSum")));
-        // thirdTokenFeeSum.reset(new AddGadget(pb, tokenThreeTradingFee.back().result(), tokenThreeGasFee.back().result(), NUM_BITS_AMOUNT, FMT(prefix, ".thirdTokenFeeSum")));
         firstTokenFeeSum.reset(new SubGadget(pb, tokenOneFloatReverse.back().result(), tokenOneFloatForward.back().result(), NUM_BITS_AMOUNT, FMT(prefix, ".firstTokenFeeSum")));
         secondTokenFeeSum.reset(new SubGadget(pb, tokenTwoFloatReverse.back().result(), tokenTwoFloatForward.back().result(), NUM_BITS_AMOUNT, FMT(prefix, ".secondTokenFeeSum")));
         thirdTokenFeeSum.reset(new SubGadget(pb, tokenThreeFloatReverse.back().result(), tokenThreeFloatForward.back().result(), NUM_BITS_AMOUNT, FMT(prefix, ".thirdTokenFeeSum")));
@@ -618,9 +604,7 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         setUserBData(users[1]);
         setUserCData(users[2]);
         setUserDData(users[3]);
-        LOG(LogDebug, "in BatchUserGadget before setUserEData", "");
         setUserEData(users[4]);
-        LOG(LogDebug, "in BatchUserGadget before setUserFData", "");
         setUserFData(users[5]);
         LOG(LogDebug, "in BatchUserGadget before setOpetratorData", "");
         setOpetratorData(users[0]);
@@ -631,7 +615,6 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
     {
         LOG(LogDebug, "in BatchSpotTradeCircuit", "generate_r1cs_witness");
         typeTx.generate_r1cs_witness(pb, ethsnarks::FieldT(int(Loopring::TransactionType::BatchSpotTrade)));
-        // tokenTypePad.generate_r1cs_witness();
         bindTokenID.generate_r1cs_witness(pb, batchSpotTrade.bindTokenID);
         isBatchSpotTradeTx.generate_r1cs_witness();
         for (size_t i = 0; i < 3; i++) 
@@ -639,26 +622,20 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
             tokensDual[i].generate_r1cs_witness(pb, batchSpotTrade.tokens[i]);
         }
         validTokens->generate_r1cs_witness();
-        // selectTokenForPublicData->generate_r1cs_witness();
 
         balanceC_O->generate_r1cs_witness();
         balanceB_O->generate_r1cs_witness();
         balanceA_O->generate_r1cs_witness();
 
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness balanceC_O before:", pb.val(balanceC_O->balance()));
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness balanceB_O before:", pb.val(balanceB_O->balance()));
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness balanceA_O before:", pb.val(balanceA_O->balance()));
         for (size_t i = 0; i < BATCH_SPOT_TRADE_MAX_USER; i++) 
         {
             LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness i:", std::to_string(i));
             users[i].generate_r1cs_witness(batchSpotTrade.users[i]);
             
-            LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before forwardOneAmounts", "");
             forwardOneAmounts[i].generate_r1cs_witness();
             forwardTwoAmounts[i].generate_r1cs_witness();
             forwardThreeAmounts[i].generate_r1cs_witness();
 
-            LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before reverseOneAmounts", "");
             reverseOneAmounts[i].generate_r1cs_witness();
             reverseTwoAmounts[i].generate_r1cs_witness();
             reverseThreeAmounts[i].generate_r1cs_witness();
@@ -670,39 +647,17 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
             tokenOneFloatReverse[i].generate_r1cs_witness();
             tokenTwoFloatReverse[i].generate_r1cs_witness();
             tokenThreeFloatReverse[i].generate_r1cs_witness();
-            // LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before tokenOneTradingFee", "");
-            // tokenOneTradingFee[i].generate_r1cs_witness();
-            // tokenTwoTradingFee[i].generate_r1cs_witness();
-            // tokenThreeTradingFee[i].generate_r1cs_witness();
-
-            // LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before tokenOneGasFee", "");
-            // tokenOneGasFee[i].generate_r1cs_witness();
-            // tokenTwoGasFee[i].generate_r1cs_witness();
-            // tokenThreeGasFee[i].generate_r1cs_witness();
         }
+
+        requireUserAOrderNotNoop->generate_r1cs_witness();
+        requireUserBOrderNotNoop->generate_r1cs_witness();
             
         LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before firstTokenFeeSum", "");
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before firstTokenFeeSum forwardOneAmounts", pb.val(forwardOneAmounts.back().result()));
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before firstTokenFeeSum reverseOneAmounts", pb.val(reverseOneAmounts.back().result()));
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before firstTokenFeeSum forwardTwoAmounts", pb.val(forwardTwoAmounts.back().result()));
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before firstTokenFeeSum reverseTwoAmounts", pb.val(reverseTwoAmounts.back().result()));
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before firstTokenFeeSum forwardThreeAmounts", pb.val(forwardThreeAmounts.back().result()));
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before firstTokenFeeSum reverseThreeAmounts", pb.val(reverseThreeAmounts.back().result()));
-
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before firstTokenFeeSum tokenOneFloatReverse", pb.val(tokenOneFloatReverse.back().result()));
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before firstTokenFeeSum tokenOneFloatForward", pb.val(tokenOneFloatForward.back().result()));
-
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before firstTokenFeeSum tokenTwoFloatReverse", pb.val(tokenTwoFloatReverse.back().result()));
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before firstTokenFeeSum tokenTwoFloatForward", pb.val(tokenTwoFloatForward.back().result()));
-
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before firstTokenFeeSum tokenThreeFloatReverse", pb.val(tokenThreeFloatReverse.back().result()));
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before firstTokenFeeSum tokenThreeFloatForward", pb.val(tokenThreeFloatForward.back().result()));
         
         firstTokenFeeSum->generate_r1cs_witness();
         secondTokenFeeSum->generate_r1cs_witness();
         thirdTokenFeeSum->generate_r1cs_witness();
 
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness before balanceC_O_Increase", "");
         balanceC_O_Increase->generate_r1cs_witness();
         balanceB_O_Increase->generate_r1cs_witness();
         balanceA_O_Increase->generate_r1cs_witness();
@@ -799,18 +754,11 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         tokenOneMatch->generate_r1cs_witness();
         tokenTwoMatch->generate_r1cs_witness();
         tokenThreeMatch->generate_r1cs_witness();
-
-
-        printBits("[ZKS]BatchSpotTrade Public Data: 0x", getPublicData().get_bits(pb), false);
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness users[1].getBatchSpotTradeTokenType():", pb.val(users[1].getBatchSpotTradeTokenType().packed));
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness users[2].getBatchSpotTradeTokenType():", pb.val(users[2].getBatchSpotTradeTokenType().packed));
-        LOG(LogDebug, "in BatchSpotTradeCircuit generate_r1cs_witness users[3].getBatchSpotTradeTokenType():", pb.val(users[3].getBatchSpotTradeTokenType().packed));
     }
     void generate_r1cs_constraints()
     {
         LOG(LogDebug, "in BatchSpotTradeCircuit", "generate_r1cs_constraints");
         typeTx.generate_r1cs_constraints(true);
-        // tokenTypePad.generate_r1cs_constraints();
         bindTokenID.generate_r1cs_constraints(true);
         isBatchSpotTradeTx.generate_r1cs_constraints();
         for (size_t i = 0; i < 3; i++) 
@@ -818,7 +766,6 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
             tokensDual[i].generate_r1cs_constraints();
         }
         validTokens->generate_r1cs_constraints();
-        // selectTokenForPublicData->generate_r1cs_constraints();
 
         balanceC_O->generate_r1cs_constraints();
         balanceB_O->generate_r1cs_constraints();
@@ -844,14 +791,10 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
             tokenOneFloatReverse[i].generate_r1cs_constraints();
             tokenTwoFloatReverse[i].generate_r1cs_constraints();
             tokenThreeFloatReverse[i].generate_r1cs_constraints();
-            // tokenOneTradingFee[i].generate_r1cs_constraints();
-            // tokenTwoTradingFee[i].generate_r1cs_constraints();
-            // tokenThreeTradingFee[i].generate_r1cs_constraints();
-
-            // tokenOneGasFee[i].generate_r1cs_constraints();
-            // tokenTwoGasFee[i].generate_r1cs_constraints();
-            // tokenThreeGasFee[i].generate_r1cs_constraints();
         }
+
+        requireUserAOrderNotNoop->generate_r1cs_constraints();
+        requireUserBOrderNotNoop->generate_r1cs_constraints();
 
         firstTokenFeeSum->generate_r1cs_constraints();
         secondTokenFeeSum->generate_r1cs_constraints();
@@ -960,30 +903,11 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         setArrayOutput(TXV_STORAGE_A_ADDRESS, subArray(user.orders[0].order.storageID.bits, 0, NUM_BITS_STORAGE_ADDRESS));
         setOutput(TXV_STORAGE_A_TOKENSID, user.orders[0].autoMarketOrderCheck.getTokenSIDForStorageUpdate());
         setOutput(TXV_STORAGE_A_TOKENBID, user.orders[0].autoMarketOrderCheck.getTokenBIDForStorageUpdate());
-        // setOutput(TXV_STORAGE_A_TOKENSID, user.orders[0].order.tokenS.packed);
-        // setOutput(TXV_STORAGE_A_TOKENBID, user.orders[0].order.tokenB.packed);
         setOutput(TXV_STORAGE_A_DATA, user.orders[0].batchOrderMatching.getFilledAfter());
         setOutput(TXV_STORAGE_A_STORAGEID, user.orders[0].order.storageID.packed);
         setOutput(TXV_STORAGE_A_CANCELLED, user.orders[0].tradeHistory.getCancelled());
-        // split trading fee and gas fee - add up gas
         setOutput(TXV_STORAGE_A_GASFEE, user.orders[0].gasFeeMatch.getFeeSum());
-        // DEG-347 Storage move
         setOutput(TXV_STORAGE_A_FORWARD, user.orders[0].autoMarketOrderCheck.getNewForwardForStorageUpdate());
-
-        // for (size_t i = 1; i < ORDER_SIZE_USER_A; i++) 
-        // {
-        //     std::cout << "in BatchSpotTradeCircuit setUserAData before TXV_STORAGE_A_ADDRESS_ARRAY" << std::endl;
-        //     setArrayOutputArray(TXV_STORAGE_A_ADDRESS_ARRAY, i - 1, subArray(user.orders[i].order.storageID.bits, 0, NUM_BITS_STORAGE_ADDRESS));
-        //     std::cout << "in BatchSpotTradeCircuit setUserAData storageID：" << pb.val(user.orders[i].order.storageID.packed) << std::endl;
-        //     setOutputArray(TXV_STORAGE_A_TOKENSID_ARRAY, i - 1, user.orders[i].autoMarketOrderCheck.getTokenSIDForStorageUpdate());
-        //     std::cout << "in BatchSpotTradeCircuit setUserAData tokenSID" << pb.val(user.orders[i].autoMarketOrderCheck.getTokenSIDForStorageUpdate()) << std::endl;
-        //     setOutputArray(TXV_STORAGE_A_TOKENBID_ARRAY, i - 1, user.orders[i].autoMarketOrderCheck.getTokenBIDForStorageUpdate());
-        //     std::cout << "in BatchSpotTradeCircuit setUserAData tokenBID" << pb.val(user.orders[i].autoMarketOrderCheck.getTokenBIDForStorageUpdate()) << std::endl;
-        //     setOutputArray(TXV_STORAGE_A_DATA_ARRAY, i - 1, user.orders[i].batchOrderMatching.getFilledAfter());
-        //     setOutputArray(TXV_STORAGE_A_STORAGEID_ARRAY, i - 1, user.orders[i].order.storageID.packed);
-        //     setOutputArray(TXV_STORAGE_A_GASFEE_ARRAY, i - 1, user.orders[i].gasFeeMatch.getFeeSum());
-        //     setOutputArray(TXV_STORAGE_A_FORWARD_ARRAY, i - 1, user.orders[i].autoMarketOrderCheck.getNewForwardForStorageUpdate());
-        // }
 
         setArrayOutput(TXV_STORAGE_A_ADDRESS_ARRAY_0, userAStorageAddress[0].result());
         setOutput(TXV_STORAGE_A_TOKENSID_ARRAY_0, userAStorageTokenSID[0].result());
@@ -1012,54 +936,6 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         setOutput(TXV_STORAGE_A_GASFEE_ARRAY_2, userAStorageGasFee[2].result());
         setOutput(TXV_STORAGE_A_FORWARD_ARRAY_2, userAStorageForward[2].result());
 
-        // setArrayOutput(TXV_STORAGE_A_ADDRESS_ARRAY_3, userAStorageAddress[3].result());
-        // setOutput(TXV_STORAGE_A_TOKENSID_ARRAY_3, userAStorageTokenSID[3].result());
-        // setOutput(TXV_STORAGE_A_TOKENBID_ARRAY_3, userAStorageTokenBID[3].result());
-        // setOutput(TXV_STORAGE_A_DATA_ARRAY_3, userAStorageData[3].result());
-        // setOutput(TXV_STORAGE_A_STORAGEID_ARRAY_3, userAStorageStorageID[3].result());
-        // setOutput(TXV_STORAGE_A_GASFEE_ARRAY_3, userAStorageGasFee[3].result());
-        // setOutput(TXV_STORAGE_A_FORWARD_ARRAY_3, userAStorageForward[3].result());
-
-        // setArrayOutput(TXV_STORAGE_A_ADDRESS_ARRAY_4, userAStorageAddress[4].result());
-        // setOutput(TXV_STORAGE_A_TOKENSID_ARRAY_4, userAStorageTokenSID[4].result());
-        // setOutput(TXV_STORAGE_A_TOKENBID_ARRAY_4, userAStorageTokenBID[4].result());
-        // setOutput(TXV_STORAGE_A_DATA_ARRAY_4, userAStorageData[4].result());
-        // setOutput(TXV_STORAGE_A_STORAGEID_ARRAY_4, userAStorageStorageID[4].result());
-        // setOutput(TXV_STORAGE_A_GASFEE_ARRAY_4, userAStorageGasFee[4].result());
-        // setOutput(TXV_STORAGE_A_FORWARD_ARRAY_4, userAStorageForward[4].result());
-
-        // setArrayOutput(TXV_STORAGE_A_ADDRESS_ARRAY_5, userAStorageAddress[5].result());
-        // setOutput(TXV_STORAGE_A_TOKENSID_ARRAY_5, userAStorageTokenSID[5].result());
-        // setOutput(TXV_STORAGE_A_TOKENBID_ARRAY_5, userAStorageTokenBID[5].result());
-        // setOutput(TXV_STORAGE_A_DATA_ARRAY_5, userAStorageData[5].result());
-        // setOutput(TXV_STORAGE_A_STORAGEID_ARRAY_5, userAStorageStorageID[5].result());
-        // setOutput(TXV_STORAGE_A_GASFEE_ARRAY_5, userAStorageGasFee[5].result());
-        // setOutput(TXV_STORAGE_A_FORWARD_ARRAY_5, userAStorageForward[5].result());
-
-        // setArrayOutput(TXV_STORAGE_A_ADDRESS_ARRAY_6, userAStorageAddress[6].result());
-        // setOutput(TXV_STORAGE_A_TOKENSID_ARRAY_6, userAStorageTokenSID[6].result());
-        // setOutput(TXV_STORAGE_A_TOKENBID_ARRAY_6, userAStorageTokenBID[6].result());
-        // setOutput(TXV_STORAGE_A_DATA_ARRAY_6, userAStorageData[6].result());
-        // setOutput(TXV_STORAGE_A_STORAGEID_ARRAY_6, userAStorageStorageID[6].result());
-        // setOutput(TXV_STORAGE_A_GASFEE_ARRAY_6, userAStorageGasFee[6].result());
-        // setOutput(TXV_STORAGE_A_FORWARD_ARRAY_6, userAStorageForward[6].result());
-
-        // setArrayOutput(TXV_STORAGE_A_ADDRESS_ARRAY_7, userAStorageAddress[7].result());
-        // setOutput(TXV_STORAGE_A_TOKENSID_ARRAY_7, userAStorageTokenSID[7].result());
-        // setOutput(TXV_STORAGE_A_TOKENBID_ARRAY_7, userAStorageTokenBID[7].result());
-        // setOutput(TXV_STORAGE_A_DATA_ARRAY_7, userAStorageData[7].result());
-        // setOutput(TXV_STORAGE_A_STORAGEID_ARRAY_7, userAStorageStorageID[7].result());
-        // setOutput(TXV_STORAGE_A_GASFEE_ARRAY_7, userAStorageGasFee[7].result());
-        // setOutput(TXV_STORAGE_A_FORWARD_ARRAY_7, userAStorageForward[7].result());
-
-        // setArrayOutput(TXV_STORAGE_A_ADDRESS_ARRAY_8, userAStorageAddress[8].result());
-        // setOutput(TXV_STORAGE_A_TOKENSID_ARRAY_8, userAStorageTokenSID[8].result());
-        // setOutput(TXV_STORAGE_A_TOKENBID_ARRAY_8, userAStorageTokenBID[8].result());
-        // setOutput(TXV_STORAGE_A_DATA_ARRAY_8, userAStorageData[8].result());
-        // setOutput(TXV_STORAGE_A_STORAGEID_ARRAY_8, userAStorageStorageID[8].result());
-        // setOutput(TXV_STORAGE_A_GASFEE_ARRAY_8, userAStorageGasFee[8].result());
-        // setOutput(TXV_STORAGE_A_FORWARD_ARRAY_8, userAStorageForward[8].result());
-
         setOutput(TXV_BALANCE_A_S_BALANCE, user.balanceOneBefore->balance());
         setOutput(TXV_BALANCE_A_B_BALANCE, user.balanceTwoBefore->balance());
 
@@ -1082,23 +958,8 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         setOutput(TXV_STORAGE_B_DATA, user.orders[0].batchOrderMatching.getFilledAfter());
         setOutput(TXV_STORAGE_B_STORAGEID, user.orders[0].order.storageID.packed);
         setOutput(TXV_STORAGE_B_CANCELLED, user.orders[0].tradeHistory.getCancelled());
-        // split trading fee and gas fee - add up gas
         setOutput(TXV_STORAGE_B_GASFEE, user.orders[0].gasFeeMatch.getFeeSum());
-        // DEG-347 Storage move
         setOutput(TXV_STORAGE_B_FORWARD, user.orders[0].autoMarketOrderCheck.getNewForwardForStorageUpdate());
-
-        // for (size_t i = 1; i < ORDER_SIZE_USER_B; i++) 
-        // {
-        //     std::cout << "in BatchSpotTradeCircuit setUserBData before TXV_STORAGE_B_ADDRESS_ARRAY" << std::endl;
-        //     setArrayOutputArray(TXV_STORAGE_B_ADDRESS_ARRAY, i - 1, subArray(user.orders[i].order.storageID.bits, 0, NUM_BITS_STORAGE_ADDRESS));
-        //     std::cout << "in BatchSpotTradeCircuit setUserBData storageID：" << pb.val(user.orders[i].order.storageID.packed) << std::endl;
-        //     setOutputArray(TXV_STORAGE_B_TOKENSID_ARRAY, i - 1, user.orders[i].autoMarketOrderCheck.getTokenSIDForStorageUpdate());
-        //     setOutputArray(TXV_STORAGE_B_TOKENBID_ARRAY, i - 1, user.orders[i].autoMarketOrderCheck.getTokenBIDForStorageUpdate());
-        //     setOutputArray(TXV_STORAGE_B_DATA_ARRAY, i - 1, user.orders[i].batchOrderMatching.getFilledAfter());
-        //     setOutputArray(TXV_STORAGE_B_STORAGEID_ARRAY, i - 1, user.orders[i].order.storageID.packed);
-        //     setOutputArray(TXV_STORAGE_B_GASFEE_ARRAY, i - 1, user.orders[i].gasFeeMatch.getFeeSum());
-        //     setOutputArray(TXV_STORAGE_B_FORWARD_ARRAY, i - 1, user.orders[i].autoMarketOrderCheck.getNewForwardForStorageUpdate());
-        // }
 
         setArrayOutput(TXV_STORAGE_B_ADDRESS_ARRAY_0, userBStorageAddress[0].result());
         setOutput(TXV_STORAGE_B_TOKENSID_ARRAY_0, userBStorageTokenSID[0].result());
@@ -1108,22 +969,6 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         setOutput(TXV_STORAGE_B_CANCELLED_ARRAY_0, userBStorageCancelled[0].result());
         setOutput(TXV_STORAGE_B_GASFEE_ARRAY_0, userBStorageGasFee[0].result());
         setOutput(TXV_STORAGE_B_FORWARD_ARRAY_0, userBStorageForward[0].result());
-
-        // setArrayOutput(TXV_STORAGE_B_ADDRESS_ARRAY_1, userBStorageAddress[1].result());
-        // setOutput(TXV_STORAGE_B_TOKENSID_ARRAY_1, userBStorageTokenSID[1].result());
-        // setOutput(TXV_STORAGE_B_TOKENBID_ARRAY_1, userBStorageTokenBID[1].result());
-        // setOutput(TXV_STORAGE_B_DATA_ARRAY_1, userBStorageData[1].result());
-        // setOutput(TXV_STORAGE_B_STORAGEID_ARRAY_1, userBStorageStorageID[1].result());
-        // setOutput(TXV_STORAGE_B_GASFEE_ARRAY_1, userBStorageGasFee[1].result());
-        // setOutput(TXV_STORAGE_B_FORWARD_ARRAY_1, userBStorageForward[1].result());
-
-        // setArrayOutput(TXV_STORAGE_B_ADDRESS_ARRAY_2, userBStorageAddress[2].result());
-        // setOutput(TXV_STORAGE_B_TOKENSID_ARRAY_2, userBStorageTokenSID[2].result());
-        // setOutput(TXV_STORAGE_B_TOKENBID_ARRAY_2, userBStorageTokenBID[2].result());
-        // setOutput(TXV_STORAGE_B_DATA_ARRAY_2, userBStorageData[2].result());
-        // setOutput(TXV_STORAGE_B_STORAGEID_ARRAY_2, userBStorageStorageID[2].result());
-        // setOutput(TXV_STORAGE_B_GASFEE_ARRAY_2, userBStorageGasFee[2].result());
-        // setOutput(TXV_STORAGE_B_FORWARD_ARRAY_2, userBStorageForward[2].result());
 
         setOutput(TXV_BALANCE_B_S_BALANCE, user.balanceOneBefore->balance());
         setOutput(TXV_BALANCE_B_B_BALANCE, user.balanceTwoBefore->balance());
@@ -1139,17 +984,6 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         setArrayOutput(TXV_BALANCE_C_S_ADDRESS, user.firstToken.bits);
         setArrayOutput(TXV_BALANCE_C_B_ADDRESS, user.secondToken.bits);
 
-        // for (size_t i = 0; i < ORDER_SIZE_USER_C; i++) 
-        // {
-        //     setArrayOutputArray(TXV_STORAGE_C_ADDRESS_ARRAY, i, subArray(user.orders[i].order.storageID.bits, 0, NUM_BITS_STORAGE_ADDRESS));
-        //     setOutputArray(TXV_STORAGE_C_TOKENSID_ARRAY, i, user.orders[i].autoMarketOrderCheck.getTokenSIDForStorageUpdate());
-        //     setOutputArray(TXV_STORAGE_C_TOKENBID_ARRAY, i, user.orders[i].autoMarketOrderCheck.getTokenBIDForStorageUpdate());
-        //     setOutputArray(TXV_STORAGE_C_DATA_ARRAY, i, user.orders[i].batchOrderMatching.getFilledAfter());
-        //     setOutputArray(TXV_STORAGE_C_STORAGEID_ARRAY, i, user.orders[i].order.storageID.packed);
-        //     setOutputArray(TXV_STORAGE_C_GASFEE_ARRAY, i, user.orders[i].gasFeeMatch.getFeeSum());
-        //     setOutputArray(TXV_STORAGE_C_FORWARD_ARRAY, i, user.orders[i].autoMarketOrderCheck.getNewForwardForStorageUpdate());
-        // }
-
         setArrayOutput(TXV_STORAGE_C_ADDRESS_ARRAY_0, userCStorageAddress[0].result());
         setOutput(TXV_STORAGE_C_TOKENSID_ARRAY_0, userCStorageTokenSID[0].result());
         setOutput(TXV_STORAGE_C_TOKENBID_ARRAY_0, userCStorageTokenBID[0].result());
@@ -1158,22 +992,6 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         setOutput(TXV_STORAGE_C_CANCELLED_ARRAY_0, userCStorageCancelled[0].result());
         setOutput(TXV_STORAGE_C_GASFEE_ARRAY_0, userCStorageGasFee[0].result());
         setOutput(TXV_STORAGE_C_FORWARD_ARRAY_0, userCStorageForward[0].result());
-
-        // setArrayOutput(TXV_STORAGE_C_ADDRESS_ARRAY_1, userCStorageAddress[1].result());
-        // setOutput(TXV_STORAGE_C_TOKENSID_ARRAY_1, userCStorageTokenSID[1].result());
-        // setOutput(TXV_STORAGE_C_TOKENBID_ARRAY_1, userCStorageTokenBID[1].result());
-        // setOutput(TXV_STORAGE_C_DATA_ARRAY_1, userCStorageData[1].result());
-        // setOutput(TXV_STORAGE_C_STORAGEID_ARRAY_1, userCStorageStorageID[1].result());
-        // setOutput(TXV_STORAGE_C_GASFEE_ARRAY_1, userCStorageGasFee[1].result());
-        // setOutput(TXV_STORAGE_C_FORWARD_ARRAY_1, userCStorageForward[1].result());
-
-        // setArrayOutput(TXV_STORAGE_C_ADDRESS_ARRAY_2, userCStorageAddress[2].result());
-        // setOutput(TXV_STORAGE_C_TOKENSID_ARRAY_2, userCStorageTokenSID[2].result());
-        // setOutput(TXV_STORAGE_C_TOKENBID_ARRAY_2, userCStorageTokenBID[2].result());
-        // setOutput(TXV_STORAGE_C_DATA_ARRAY_2, userCStorageData[2].result());
-        // setOutput(TXV_STORAGE_C_STORAGEID_ARRAY_2, userCStorageStorageID[2].result());
-        // setOutput(TXV_STORAGE_C_GASFEE_ARRAY_2, userCStorageGasFee[2].result());
-        // setOutput(TXV_STORAGE_C_FORWARD_ARRAY_2, userCStorageForward[2].result());
 
         setOutput(TXV_BALANCE_C_S_BALANCE, user.balanceOneBefore->balance());
         setOutput(TXV_BALANCE_C_B_BALANCE, user.balanceTwoBefore->balance());
@@ -1189,18 +1007,6 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         setArrayOutput(TXV_BALANCE_D_S_ADDRESS, user.firstToken.bits);
         setArrayOutput(TXV_BALANCE_D_B_ADDRESS, user.secondToken.bits);
 
-        // for (size_t i = 0; i < ORDER_SIZE_USER_D; i++) 
-        // {
-        //     setArrayOutputArray(TXV_STORAGE_D_ADDRESS_ARRAY, i, subArray(user.orders[i].order.storageID.bits, 0, NUM_BITS_STORAGE_ADDRESS));
-        //     setOutputArray(TXV_STORAGE_D_TOKENSID_ARRAY, i, user.orders[i].autoMarketOrderCheck.getTokenSIDForStorageUpdate());
-        //     setOutputArray(TXV_STORAGE_D_TOKENBID_ARRAY, i, user.orders[i].autoMarketOrderCheck.getTokenBIDForStorageUpdate());
-        //     setOutputArray(TXV_STORAGE_D_DATA_ARRAY, i, user.orders[i].batchOrderMatching.getFilledAfter());
-        //     setOutputArray(TXV_STORAGE_D_STORAGEID_ARRAY, i, user.orders[i].order.storageID.packed);
-        //     setOutputArray(TXV_STORAGE_D_GASFEE_ARRAY, i, user.orders[i].gasFeeMatch.getFeeSum());
-        //     setOutputArray(TXV_STORAGE_D_FORWARD_ARRAY, i, user.orders[i].autoMarketOrderCheck.getNewForwardForStorageUpdate());
-        // }
-
-
         setArrayOutput(TXV_STORAGE_D_ADDRESS_ARRAY_0, userDStorageAddress[0].result());
         setOutput(TXV_STORAGE_D_TOKENSID_ARRAY_0, userDStorageTokenSID[0].result());
         setOutput(TXV_STORAGE_D_TOKENBID_ARRAY_0, userDStorageTokenBID[0].result());
@@ -1209,22 +1015,6 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         setOutput(TXV_STORAGE_D_CANCELLED_ARRAY_0, userDStorageCancelled[0].result());
         setOutput(TXV_STORAGE_D_GASFEE_ARRAY_0, userDStorageGasFee[0].result());
         setOutput(TXV_STORAGE_D_FORWARD_ARRAY_0, userDStorageForward[0].result());
-
-        // setArrayOutput(TXV_STORAGE_D_ADDRESS_ARRAY_1, userDStorageAddress[1].result());
-        // setOutput(TXV_STORAGE_D_TOKENSID_ARRAY_1, userDStorageTokenSID[1].result());
-        // setOutput(TXV_STORAGE_D_TOKENBID_ARRAY_1, userDStorageTokenBID[1].result());
-        // setOutput(TXV_STORAGE_D_DATA_ARRAY_1, userDStorageData[1].result());
-        // setOutput(TXV_STORAGE_D_STORAGEID_ARRAY_1, userDStorageStorageID[1].result());
-        // setOutput(TXV_STORAGE_D_GASFEE_ARRAY_1, userDStorageGasFee[1].result());
-        // setOutput(TXV_STORAGE_D_FORWARD_ARRAY_1, userDStorageForward[1].result());
-
-        // setArrayOutput(TXV_STORAGE_D_ADDRESS_ARRAY_2, userDStorageAddress[2].result());
-        // setOutput(TXV_STORAGE_D_TOKENSID_ARRAY_2, userDStorageTokenSID[2].result());
-        // setOutput(TXV_STORAGE_D_TOKENBID_ARRAY_2, userDStorageTokenBID[2].result());
-        // setOutput(TXV_STORAGE_D_DATA_ARRAY_2, userDStorageData[2].result());
-        // setOutput(TXV_STORAGE_D_STORAGEID_ARRAY_2, userDStorageStorageID[2].result());
-        // setOutput(TXV_STORAGE_D_GASFEE_ARRAY_2, userDStorageGasFee[2].result());
-        // setOutput(TXV_STORAGE_D_FORWARD_ARRAY_2, userDStorageForward[2].result());
 
         setOutput(TXV_BALANCE_D_S_BALANCE, user.balanceOneBefore->balance());
         setOutput(TXV_BALANCE_D_B_BALANCE, user.balanceTwoBefore->balance());
@@ -1240,32 +1030,20 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         setArrayOutput(TXV_BALANCE_E_S_ADDRESS, user.firstToken.bits);
         setArrayOutput(TXV_BALANCE_E_B_ADDRESS, user.secondToken.bits);
 
-        LOG(LogDebug, "in BatchSpotTradeCircuit setUserEData before TXV_STORAGE_E_ADDRESS_ARRAY_0", "");
         setArrayOutput(TXV_STORAGE_E_ADDRESS_ARRAY_0, userEStorageAddress[0].result());
-        LOG(LogDebug, "in BatchSpotTradeCircuit setUserEData before TXV_STORAGE_E_TOKENSID_ARRAY_0", "");
         setOutput(TXV_STORAGE_E_TOKENSID_ARRAY_0, userEStorageTokenSID[0].result());
-        LOG(LogDebug, "in BatchSpotTradeCircuit setUserEData before TXV_STORAGE_E_TOKENBID_ARRAY_0", "");
         setOutput(TXV_STORAGE_E_TOKENBID_ARRAY_0, userEStorageTokenBID[0].result());
-        LOG(LogDebug, "in BatchSpotTradeCircuit setUserEData before TXV_STORAGE_E_DATA_ARRAY_0", "");
         setOutput(TXV_STORAGE_E_DATA_ARRAY_0, userEStorageData[0].result());
-        LOG(LogDebug, "in BatchSpotTradeCircuit setUserEData before TXV_STORAGE_E_STORAGEID_ARRAY_0", "");
         setOutput(TXV_STORAGE_E_STORAGEID_ARRAY_0, userEStorageStorageID[0].result());
-        LOG(LogDebug, "in BatchSpotTradeCircuit setUserEData before TXV_STORAGE_E_CANCELLED_ARRAY_0", "");
         setOutput(TXV_STORAGE_E_CANCELLED_ARRAY_0, userEStorageCancelled[0].result());
-        LOG(LogDebug, "in BatchSpotTradeCircuit setUserEData before TXV_STORAGE_E_GASFEE_ARRAY_0", "");
         setOutput(TXV_STORAGE_E_GASFEE_ARRAY_0, userEStorageGasFee[0].result());
-        LOG(LogDebug, "in BatchSpotTradeCircuit setUserEData before TXV_STORAGE_E_FORWARD_ARRAY_0", "");
         setOutput(TXV_STORAGE_E_FORWARD_ARRAY_0, userEStorageForward[0].result());
-        LOG(LogDebug, "in BatchSpotTradeCircuit setUserEData before TXV_BALANCE_E_S_BALANCE", "");
 
         setOutput(TXV_BALANCE_E_S_BALANCE, user.balanceOneBefore->balance());
         setOutput(TXV_BALANCE_E_B_BALANCE, user.balanceTwoBefore->balance());
-        LOG(LogDebug, "in BatchSpotTradeCircuit setUserEData before TXV_BALANCE_E_FEE_Address", "");
 
         setArrayOutput(TXV_BALANCE_E_FEE_Address, user.thirdToken.bits);
-        LOG(LogDebug, "in BatchSpotTradeCircuit setUserEData before TXV_BALANCE_E_FEE_BALANCE", "");
         setOutput(TXV_BALANCE_E_FEE_BALANCE, user.balanceThreeBefore->balance());
-        LOG(LogDebug, "in BatchSpotTradeCircuit setUserEData before TXV_ACCOUNT_E_ADDRESS", "");
 
         setArrayOutput(TXV_ACCOUNT_E_ADDRESS, user.accountID.bits);
     }
@@ -1298,13 +1076,6 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         setArrayOutput(TXV_BALANCE_O_B_Address, user.secondToken.bits);
         setArrayOutput(TXV_BALANCE_O_A_Address, user.thirdToken.bits);
 
-        // setOutput(TXV_BALANCE_O_A_BALANCE, tokenOneGasFee.back().result());
-        // setOutput(TXV_BALANCE_O_B_BALANCE, tokenTwoGasFee.back().result());
-        // setOutput(TXV_BALANCE_O_C_BALANCE, tokenThreeGasFee.back().result());
-        
-        // setOutput(TXV_BALANCE_O_A_BALANCE, firstTokenFeeSum->result());
-        // setOutput(TXV_BALANCE_O_B_BALANCE, secondTokenFeeSum->result());
-        // setOutput(TXV_BALANCE_O_C_BALANCE, thirdTokenFeeSum->result());
         setOutput(TXV_BALANCE_O_C_BALANCE, balanceC_O->balance());
         setOutput(TXV_BALANCE_O_B_BALANCE, balanceB_O->balance());
         setOutput(TXV_BALANCE_O_A_BALANCE, balanceA_O->balance());
@@ -1313,10 +1084,6 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
 
     void setSignature() {
         LOG(LogDebug, "in BatchSpotTradeCircuit", "setSignature");
-        // setArrayOutput(TXV_HASH_A_ARRAY, userHashArray[0]);
-        // setArrayOutput(TXV_HASH_B_ARRAY, userHashArray[1]);
-        // setArrayOutput(TXV_HASH_C_ARRAY, userHashArray[2]);
-        // setArrayOutput(TXV_HASH_D_ARRAY, userHashArray[3]);
         setOutput(TXV_HASH_A, users[0].hashArray[0]);
         setOutput(TXV_HASH_B, users[1].hashArray[0]);
         setArrayOutput(TXV_HASH_A_ARRAY, subArray(users[0].hashArray, 1, ORDER_SIZE_USER_A - 1));
@@ -1325,7 +1092,6 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         setArrayOutput(TXV_HASH_D_ARRAY, users[3].hashArray);
         setArrayOutput(TXV_HASH_E_ARRAY, users[4].hashArray);
         setArrayOutput(TXV_HASH_F_ARRAY, users[5].hashArray);
-
 
         setOutput(TXV_PUBKEY_X_A, users[0].publicXArray[0]);
         setOutput(TXV_PUBKEY_Y_A, users[0].publicYArray[0]);
@@ -1359,21 +1125,8 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         setArrayOutput(TXV_SIGNATURE_REQUIRED_F_ARRAY, users[5].requireSignatureArray);
     }
 
-    // void setProtocolData(BatchUserGadget &user) 
-    // {
-    //     setArrayOutput(TXV_BALANCE_P_A_Address, user.firstToken.bits);
-    //     setArrayOutput(TXV_BALANCE_P_B_Address, user.secondToken.bits);
-    //     setArrayOutput(TXV_BALANCE_P_C_Address, user.thirdToken.bits);
-    //     // Update balances of the protocol fee pool
-    //     setOutput(TXV_BALANCE_P_A_BALANCE, tokenOneTradingFee.back().result());
-    //     setOutput(TXV_BALANCE_P_B_BALANCE, tokenTwoTradingFee.back().result());
-    //     setOutput(TXV_BALANCE_P_C_BALANCE, tokenThreeTradingFee.back().result());
-    // }
-
     const VariableArrayT getPublicData() const
     {
-        // 3 + 5 + 32 + 32 + 2 * 5 + (32 + 30 * 2) * 5 + 32 + 30 * 3 = 
-        // 82 + 460 + 122 = 83 bytes
         VariableArrayT batchSpotTradeData = flattenReverse({
             // 3bits
             typeTx.bits,
@@ -1383,10 +1136,7 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
             tokensDual[0].bits,
             tokensDual[1].bits,
 
-            // All User: 1,2,3,4,5,6
-            // one user token type used 2bits
-            // first byte contains user 2,3,4,5
-            // second byte contains empty 6bits and user 6
+            // one user token type used 2bits, UserA contains three tokens, not need tokenType
             users[1].getBatchSpotTradeTokenType().bits,
             users[2].getBatchSpotTradeTokenType().bits,
             users[3].getBatchSpotTradeTokenType().bits,

@@ -3,7 +3,7 @@
 cd ..
 
 ##ethsnarks
-git submodule update --init --recursive
+git submodule update --init --recursive --remote
 
 make ZKP_WORKER_MODE=1
 

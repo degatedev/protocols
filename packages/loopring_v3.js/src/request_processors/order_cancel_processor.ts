@@ -4,8 +4,6 @@ import { Constants } from "../constants";
 import { EdDSA } from "../eddsa";
 import { fromFloat } from "../float";
 import { BlockContext, ExchangeState } from "../types";
-// DEG-146:order cancel
-// TODO
 interface OrderCancel {
   owner?: string;
   accountID?: number;

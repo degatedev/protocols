@@ -9,7 +9,6 @@ import "../iface/ExchangeData.sol";
 import "../iface/IBlockVerifier.sol";
 import "./VerificationKeys.sol";
 
-
 /// @title An Implementation of IBlockVerifier.
 /// @author Brecht Devos - <brecht@loopring.org>
 contract BlockVerifier is ReentrancyGuard, IBlockVerifier
@@ -24,59 +23,6 @@ contract BlockVerifier is ReentrancyGuard, IBlockVerifier
     mapping (uint8 => mapping (uint16 => mapping (uint8 => Circuit))) public circuits;
 
     constructor() Claimable() {}
-
-    function registerCircuit(
-        uint8    blockType,
-        uint16   blockSize,
-        uint8    blockVersion,
-        uint[18] calldata vk
-        )
-        external
-        override
-        nonReentrant
-        onlyOwner
-    {
-        Circuit storage circuit = circuits[blockType][blockSize][blockVersion];
-        
-        require(circuit.registered == false, "ALREADY_REGISTERED");
-
-        // Store the verification key on-chain.
-        for (uint i = 0; i < 18; i++) {
-            circuit.verificationKey[i] = vk[i];
-        }
-        circuit.registered = true;
-        circuit.enabled = true;
-
-        emit CircuitRegistered(
-            blockType,
-            blockSize,
-            blockVersion
-        );
-    }
-
-    function disableCircuit(
-        uint8  blockType,
-        uint16 blockSize,
-        uint8  blockVersion
-        )
-        external
-        override
-        nonReentrant
-        onlyOwner
-    {
-        Circuit storage circuit = circuits[blockType][blockSize][blockVersion];
-        require(circuit.registered == true, "NOT_REGISTERED");
-        require(circuit.enabled == true, "ALREADY_DISABLED");
-
-        // Disable the circuit
-        circuit.enabled = false;
-
-        emit CircuitDisabled(
-            blockType,
-            blockSize,
-            blockVersion
-        );
-    }
 
     function verifyProofs(
         uint8  blockType,

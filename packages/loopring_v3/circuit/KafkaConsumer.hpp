@@ -48,6 +48,28 @@ public:
     }
 };
 
+class LatestRebalanceCb : public RdKafka::RebalanceCb {
+public:
+  void rebalance_cb (RdKafka::KafkaConsumer *consumer,RdKafka::ErrorCode err, std::vector<RdKafka::TopicPartition*> &partitions) {
+    if (err == RdKafka::ERR__ASSIGN_PARTITIONS) {
+        std::cout << "rebalance callback: " << std::endl;
+//        std::for_each(partitions.begin(), partitions.end(), [&](const RdKafka::TopicPartition *value) {
+//    		std::cout << value->topic() << " , partition: " << value->partition() << " , set to OFFSET_END" << std::endl;
+//            value->set_offset(-1);  //set_offset -1 equals latest.
+//    	});
+    	for (size_t i = 0; i < partitions.size(); i++)
+        {
+            RdKafka::TopicPartition *value = partitions[i];
+            std::cout << value->topic() << " , partition: " << value->partition() << " , set to OFFSET_END" << std::endl;
+            value->set_offset(RdKafka::Topic::OFFSET_END);
+        }
+        consumer->assign(partitions);
+    } else {
+        consumer->unassign();
+    }
+  }
+};
+
 class KafkaConsumer{
 public:
     KafkaConsumer();
@@ -70,6 +92,7 @@ private:
     std::shared_ptr<RdKafka::KafkaConsumer> m_consumer{nullptr};
     bool m_run{false};
     std::shared_ptr<EventCB> m_eventcb{nullptr};
+    std::shared_ptr<LatestRebalanceCb> m_rebalancecb{nullptr};
 };
 
 KafkaConsumer::KafkaConsumer()
@@ -107,6 +130,7 @@ bool KafkaConsumer::Init(const std::string& servers, const std::string& groupid)
     }
 
     std::string errstr;
+    // must set this config
     RdKafka::Conf::ConfResult ret = m_conf->set("group.id", groupid, errstr);
     if (ret != RdKafka::Conf::CONF_OK) {
         m_run = false;
@@ -120,6 +144,8 @@ bool KafkaConsumer::Init(const std::string& servers, const std::string& groupid)
 
     m_eventcb = std::shared_ptr<EventCB>(new EventCB);
     m_conf->set("event_cb", m_eventcb.get(), errstr);
+    m_rebalancecb = std::shared_ptr<LatestRebalanceCb>(new LatestRebalanceCb);
+    m_conf->set("rebalance_cb", m_rebalancecb.get(), errstr);
     m_conf->set("default_topic_conf", m_tconf.get(), errstr);
 
     m_consumer = std::shared_ptr<RdKafka::KafkaConsumer>(RdKafka::KafkaConsumer::create(m_conf.get(), errstr));
@@ -131,27 +157,29 @@ bool KafkaConsumer::Init(const std::string& servers, const std::string& groupid)
 
     std::vector<std::string> topics;
     topics.assign(m_topics.begin(), m_topics.end());
-	RdKafka::Metadata *metadataMap{ nullptr };
-	RdKafka::ErrorCode err = m_consumer->metadata(true, nullptr, &metadataMap, 2000);
-	if (err != RdKafka::ERR_NO_ERROR) {
-		std::cout << RdKafka::err2str(err) << std::endl;
-	}
-	const RdKafka::Metadata::TopicMetadataVector *topicList = metadataMap->topics();
-	std::cout << "broker topic size: " << topicList->size() << std::endl;
-	RdKafka::Metadata::TopicMetadataVector subTopicMetaVec;
-	std::copy_if(topicList->begin(), topicList->end(), std::back_inserter(subTopicMetaVec), [&topics](const RdKafka::TopicMetadata* data) {
-		return std::find_if(topics.begin(), topics.end(), [data](const std::string &tname) {return data->topic() == tname; }) != topics.end();
-	});
-	std::vector<RdKafka::TopicPartition*> topicpartions;
-	std::for_each(subTopicMetaVec.begin(), subTopicMetaVec.end(), [&topicpartions](const RdKafka::TopicMetadata* data) {
-		auto parVec = data->partitions();
-		std::for_each(parVec->begin(), parVec->end(), [&](const RdKafka::PartitionMetadata *value) {
-			std::cout << data->topic() << " has partion: " << value->id() << " Leader is : " << value->leader() << std::endl;
-			topicpartions.push_back(RdKafka::TopicPartition::create(data->topic(), value->id(), RdKafka::Topic::OFFSET_END));
-		});
-	});
-	m_consumer->assign(topicpartions);
 
+//	RdKafka::Metadata *metadataMap{ nullptr };
+//	RdKafka::ErrorCode err = m_consumer->metadata(true, nullptr, &metadataMap, 2000);
+//	if (err != RdKafka::ERR_NO_ERROR) {
+//		std::cout << RdKafka::err2str(err) << std::endl;
+//	}
+//	const RdKafka::Metadata::TopicMetadataVector *topicList = metadataMap->topics();
+//	std::cout << "broker topic size: " << topicList->size() << std::endl;
+//	RdKafka::Metadata::TopicMetadataVector subTopicMetaVec;
+//	std::copy_if(topicList->begin(), topicList->end(), std::back_inserter(subTopicMetaVec), [&topics](const RdKafka::TopicMetadata* data) {
+//		return std::find_if(topics.begin(), topics.end(), [data](const std::string &tname) {return data->topic() == tname; }) != topics.end();
+//	});
+//	std::vector<RdKafka::TopicPartition*> topicpartions;
+//	std::for_each(subTopicMetaVec.begin(), subTopicMetaVec.end(), [&topicpartions](const RdKafka::TopicMetadata* data) {
+//		auto parVec = data->partitions();
+//		std::for_each(parVec->begin(), parVec->end(), [&](const RdKafka::PartitionMetadata *value) {
+//			std::cout << data->topic() << " has partion: " << value->id() << " Leader is : " << value->leader() << std::endl;
+//			topicpartions.push_back(RdKafka::TopicPartition::create(data->topic(), value->id(), RdKafka::Topic::OFFSET_END));
+//		});
+//	});
+//	m_consumer->assign(topicpartions);
+
+    m_consumer->subscribe(topics);
     m_run = true;
     return true;
 }

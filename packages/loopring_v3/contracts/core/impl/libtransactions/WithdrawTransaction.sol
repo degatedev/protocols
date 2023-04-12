@@ -89,7 +89,6 @@ library WithdrawTransaction
             auxData.minGas,
             auxData.to,
             auxData.amount
-            // auxData.extraData
         );
 
         // Only the 20 MSB are used, which is still 80-bit of security, which is more
@@ -232,7 +231,7 @@ library WithdrawTransaction
         bytes32 DOMAIN_SEPARATOR,
         Withdrawal memory withdrawal
         )
-        internal
+        private
         pure
         returns (bytes32)
     {
@@ -261,23 +260,13 @@ library WithdrawTransaction
         uint248 minGas,
         address to,
         uint248 amount
-        // bytes   memory extraData
         )
-        internal
+        private
         view
         returns (bytes20)
     {
         // Only the 20 MSB are used, which is still 80-bit of security, which is more
         // than enough, especially when combined with validUntil.
-        // return bytes20(keccak256(
-        //     abi.encodePacked(
-        //         minGas,
-        //         to,
-        //         amount,
-        //         extraData
-        //     )
-        // ));
-
         return bytes20(
             abi.encodePacked(
                 minGas,

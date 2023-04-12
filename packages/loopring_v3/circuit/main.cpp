@@ -21,7 +21,7 @@
 
 #ifdef ZKP_WORKER_MODE
 #include "KafkaConsumer.hpp"
-#include "S3.hpp"
+//#include "S3.hpp"
 #endif
 
 #ifdef MULTICORE
@@ -489,9 +489,11 @@ void runServer(
             std::cout << "proof:" << jProof;
             bool verified = libsnark::r1cs_gg_ppzksnark_zok_verifier_strong_IC<ppT>(vk, proof_pair.first, proof_pair.second);
             std::cout << "verified:" << verified << std::endl;
+            json proofJson = json::parse(jProof);
+            proofJson["verified"] = verified;
 
 			// Return the proof
-			res.set_content(jProof + "\n", "text/plain");
+			res.set_content(proofJson.dump() + "\n", "text/plain");
 			if(delFileAfterSuccess){
 					std::remove(blockFilename.c_str());
 			}
@@ -607,7 +609,7 @@ struct WorkerParams
 //1.consume zkp task message from kafka.
 //2.call local api general zkp.
 //3.produce zkp_result message to kafka.
-void *runWorker(void *workerParams)
+void runWorker(void *workerParams)
 {
     struct WorkerParams *params =(struct WorkerParams*)workerParams;
     ProverContextT context = params->context;
@@ -617,9 +619,6 @@ void *runWorker(void *workerParams)
 	std::string workerConfFile = "worker_config.json";
 	json workerConf = loadJSON(workerConfFile);
 	std::cout << "Run zkp worker start." << std::endl;
-
-	//s3 client init.
-	S3Service s3 = S3Service(workerConf);
 
 	//kafka consumer
 	std::string topic = workerConf["KAFKA_CONF"]["topic"].get<std::string>();
@@ -663,12 +662,11 @@ void *runWorker(void *workerParams)
 
                 //download block.json.
                 std::string blockId = value["id"];
-                std::string objectKey = std::string("blocks/block_0_" + blockId + ".json");
-                std::string localFile = std::string("s3_data/block_0_" + blockId + ".json");
-                bool downloadSuccess = s3.GetObjectToFile(objectKey, localFile);
+                std::string localFile = value["s3File"];
+
+                bool downloadSuccess = true;
 
                 if(downloadSuccess){
-                    std::cout <<"Download block.json from s3 success, key:" << objectKey << std::endl;
 
                     value["message"] = "";
                     value["proof"] = "";
@@ -728,11 +726,6 @@ void *runWorker(void *workerParams)
                             }
                         }
                     }
-                }else{
-                    std::cout <<"Download block.json from s3 error, key:" << objectKey << std::endl;
-                    value["proof"] = "";
-                    value["success"] = false;
-                    value["message"] = "Download block.json from s3 error";
                 }
 
                 //produce zkp-result message.
@@ -934,7 +927,7 @@ int main(int argc, char **argv)
     std::cout << "Num threads available: " << omp_get_max_threads() << std::endl;
     std::cout << "Num processors available: " << omp_get_num_procs() << std::endl;
 #endif
-
+    
     if (argc < 3)
     {
         std::cerr << "Usage: " << argv[0] << std::endl;
@@ -1154,7 +1147,7 @@ int main(int argc, char **argv)
     {
         if (!fileExists(provingKeyFilename))
         {
-            std::cerr << "Failed to find pk!" << std::endl;
+            std::cerr << "Failed to find pk!" << provingKeyFilename << std::endl;
             return 1;
         }
     }
@@ -1207,19 +1200,21 @@ int main(int argc, char **argv)
     	context.domain = get_domain(circuit->getPb(), context.provingKey, config);
     	initProverContextBuffers(context);
 
-        pthread_t tid;
+//        pthread_t tid;
 
         #ifdef ZKP_WORKER_MODE
-            struct WorkerParams p;
-            p.context = context;
-            p.circuit = circuit;
-            p.provingKeyFilename = provingKeyFilename;
-            int ret = pthread_create(&tid, NULL, runWorker, &p);
-            std::cout << "worker thread start, result:" << ret << std::endl;
-            if(ret == 0)
-            {
-                runServer(context, circuit, provingKeyFilename, config, std::stoi(argv[3]));
-            }
+//             struct WorkerParams p;
+//             p.context = context;
+//             p.circuit = circuit;
+//             p.provingKeyFilename = provingKeyFilename;
+// //            int ret = pthread_create(&tid, NULL, runWorker, &p);
+// //            std::cout << "worker thread start, result:" << ret << std::endl;
+//             runWorker(&p);
+// //            if(ret == 0)
+// //            {
+// //                runServer(context, circuit, provingKeyFilename, config, std::stoi(argv[3]));
+// //            }
+            runServer(context, circuit, provingKeyFilename, config, std::stoi(argv[3]));
         #else
             runServer(context, circuit, provingKeyFilename, config, std::stoi(argv[3]));
         #endif

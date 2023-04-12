@@ -16,7 +16,6 @@ using namespace ethsnarks;
 
 namespace Loopring
 {
-// DEG-146:order cancel
 class OrderCancelCircuit : public BaseTransactionCircuit
 {
   public:
@@ -24,9 +23,7 @@ class OrderCancelCircuit : public BaseTransactionCircuit
     // type is 3bits, need add 1bit, then 4bits can convert to 1 hex char
     DualVariableGadget typeTxPad;
     // Inputs
-    // DualVariableGadget owner;
     DualVariableGadget accountID;
-    // DualVariableGadget tokenID;
     DualVariableGadget storageID;
     DualVariableGadget feeTokenID;
     DualVariableGadget fee;
@@ -35,14 +32,12 @@ class OrderCancelCircuit : public BaseTransactionCircuit
 
     // Signature
     Poseidon_6 hash;
-    // Poseidon_7 hash;
 
     // choose verify key
     TernaryGadget resolvedAuthorX;
     TernaryGadget resolvedAuthorY;
 
     // Validate
-    // OwnerValidGadget ownerValid;
     RequireLeqGadget requireValidFee;
     EqualGadget isOrderCancelTx;
 
@@ -53,8 +48,7 @@ class OrderCancelCircuit : public BaseTransactionCircuit
     FloatGadget fFee;
     RequireAccuracyGadget requireAccuracyFee;
     // Fee payment from From to the operator
-    TransferGadget feePayment;    
-    // DEG-148 Review fix
+    TransferGadget feePayment;
     OrderCancelledNonceGadget nonce;
 
 
@@ -67,9 +61,7 @@ class OrderCancelCircuit : public BaseTransactionCircuit
           typeTx(pb, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
           typeTxPad(pb, NUM_BITS_BIT, FMT(prefix, ".typeTxPad")),
           // Inputs
-          // owner(pb, NUM_BITS_ADDRESS, FMT(prefix, ".owner")),
           accountID(pb, NUM_BITS_ACCOUNT, FMT(prefix, ".accountID")),
-          // tokenID(pb, NUM_BITS_TOKEN, FMT(prefix, ".tokenID")),
           storageID(pb, NUM_BITS_STORAGEID, FMT(prefix, ".storageID")),
           feeTokenID(pb, NUM_BITS_TOKEN, FMT(prefix, ".feeTokenID")),
           fee(pb, NUM_BITS_AMOUNT, FMT(prefix, ".fee")),
@@ -81,9 +73,7 @@ class OrderCancelCircuit : public BaseTransactionCircuit
             pb,
             var_array(
               {state.exchange,
-              //  owner.packed,
                accountID.packed,
-              //  tokenID.packed,
                storageID.packed,
                maxFee.packed,
                feeTokenID.packed,
@@ -104,7 +94,6 @@ class OrderCancelCircuit : public BaseTransactionCircuit
             FMT(prefix, ".resolvedAuthorY")),
 
           // Validate
-          // ownerValid(pb, state.constants, state.accountA.account.owner, owner.packed, FMT(prefix, ".ownerValid")),
           requireValidFee(pb, fee.packed, maxFee.packed, NUM_BITS_AMOUNT, FMT(prefix, ".requireValidFee")),
           isOrderCancelTx(pb, state.type, state.constants.txTypeOrderCancel, FMT(prefix, ".isOrderCancelTx")),
 
@@ -122,18 +111,13 @@ class OrderCancelCircuit : public BaseTransactionCircuit
             FMT(prefix, ".requireAccuracyFee")),
           // Fee payment from to the operator
           feePayment(pb, balanceS_A, balanceB_O, fFee.value(), FMT(prefix, ".feePayment")),
-          // DEG-148 Review fix
           nonce(pb, state.constants, state.accountA.storage, storageID, isOrderCancelTx.result(), FMT(prefix, ".nonce"))
     {
         LOG(LogDebug, "in OrderCancelCircuit", "");
         // Update the account data
         setArrayOutput(TXV_ACCOUNT_A_ADDRESS, accountID.bits);
-        // setOutput(TXV_ACCOUNT_A_OWNER, owner.packed);
         // cancel order, cancelled variable must be 1
-        // DEG-148 Review fix
         setOutput(TXV_STORAGE_A_CANCELLED, nonce.getCancelled());
-        // setOutput(TXV_STORAGE_A_CANCELLED, state.constants._1);
-        // DEG-146 order cancel
         setArrayOutput(TXV_STORAGE_A_ADDRESS, subArray(storageID.bits, 0, NUM_BITS_STORAGE_ADDRESS));
         setOutput(TXV_STORAGE_A_STORAGEID, storageID.packed);
 
@@ -156,16 +140,10 @@ class OrderCancelCircuit : public BaseTransactionCircuit
     {
         LOG(LogDebug, "in OrderCancelCircuit", "generate_r1cs_witness");
         // Inputs
-        // std::cout << "in OrderCancel: before owner:" << update.owner << std::endl;
-        LOG(LogDebug, "in OrderCancelCircuit before update.accountID", update.accountID);
-        // std::cout << "in OrderCancel: before update.tokenID:" << update.tokenID << std::endl;
-        LOG(LogDebug, "in OrderCancelCircuit before update.storageID", update.storageID);
         typeTx.generate_r1cs_witness(pb, ethsnarks::FieldT(int(Loopring::TransactionType::OrderCancel)));
         typeTxPad.generate_r1cs_witness(pb, ethsnarks::FieldT(0));
 
-        // owner.generate_r1cs_witness(pb, update.owner);
         accountID.generate_r1cs_witness(pb, update.accountID);
-        // tokenID.generate_r1cs_witness(pb, update.tokenID);
         storageID.generate_r1cs_witness(pb, update.storageID);
 
         feeTokenID.generate_r1cs_witness(pb, update.feeTokenID);
@@ -181,7 +159,6 @@ class OrderCancelCircuit : public BaseTransactionCircuit
         resolvedAuthorY.generate_r1cs_witness();
 
         // Validate
-        // ownerValid.generate_r1cs_witness();
         requireValidFee.generate_r1cs_witness();
         isOrderCancelTx.generate_r1cs_witness();
 
@@ -193,7 +170,6 @@ class OrderCancelCircuit : public BaseTransactionCircuit
         requireAccuracyFee.generate_r1cs_witness();
         // Fee payment from to the operator
         feePayment.generate_r1cs_witness();
-        // DEG-148 Review fix
         nonce.generate_r1cs_witness();
     }
 
@@ -203,9 +179,7 @@ class OrderCancelCircuit : public BaseTransactionCircuit
         typeTx.generate_r1cs_constraints(true);
         typeTxPad.generate_r1cs_constraints(true);
         // Inputs
-        // owner.generate_r1cs_constraints();
         accountID.generate_r1cs_constraints(true);
-        // tokenID.generate_r1cs_constraints(true);
         storageID.generate_r1cs_constraints(true);
         feeTokenID.generate_r1cs_constraints(true);
         fee.generate_r1cs_constraints(true);
@@ -219,7 +193,6 @@ class OrderCancelCircuit : public BaseTransactionCircuit
         resolvedAuthorY.generate_r1cs_constraints();
 
         // Validate
-        // ownerValid.generate_r1cs_constraints();
         requireValidFee.generate_r1cs_constraints();
         isOrderCancelTx.generate_r1cs_constraints();
 
@@ -231,7 +204,6 @@ class OrderCancelCircuit : public BaseTransactionCircuit
         requireAccuracyFee.generate_r1cs_constraints();
         // Fee payment from to the operator
         feePayment.generate_r1cs_constraints();
-        // DEG-148 Review fix
         nonce.generate_r1cs_constraints();
     }
 
@@ -240,7 +212,6 @@ class OrderCancelCircuit : public BaseTransactionCircuit
         return flattenReverse({
           typeTx.bits, 
           typeTxPad.bits,
-          // owner.bits, 
           accountID.bits, 
           storageID.bits, 
           feeTokenID.bits, 

@@ -687,16 +687,16 @@ contract("Exchange", (accounts: string[]) => {
           tokenB: "GTO",
           amountS: new BN(web3.utils.toWei("101", "ether")),
           amountB: new BN(web3.utils.toWei("10", "ether")),
-          maxFeeBips: 35,
-          feeBips: 30
+          maxFeeBips: 18,
+          feeBips: 18
         },
         orderB: {
           tokenS: "GTO",
           tokenB: "LRC",
           amountS: new BN(web3.utils.toWei("20", "ether")),
           amountB: new BN(web3.utils.toWei("200", "ether")),
-          maxFeeBips: 40,
-          feeBips: 25
+          maxFeeBips: 18,
+          feeBips: 18
         },
         expected: {
           orderA: {

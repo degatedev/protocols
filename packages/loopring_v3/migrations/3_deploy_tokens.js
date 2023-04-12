@@ -10,7 +10,7 @@ const INDAToken = artifacts.require("./test/tokens/INDA.sol");
 const INDBToken = artifacts.require("./test/tokens/INDB.sol");
 
 module.exports = function(deployer, network, accounts) {
-  if (network != "live" && network != "live-fork") {
+  if (network != "live" && network != "live-fork" && network != "goerli") {
     deployer.then(async () => {
       await deployer.deploy(LRCToken);
       await deployer.deploy(GTOToken);

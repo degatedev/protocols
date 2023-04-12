@@ -114,10 +114,6 @@ template <typename HashT> class merkle_path_compute_4 : public GadgetT
         : GadgetT(in_pb, in_annotation_prefix)
     {
         assert(in_depth > 0);
-        // std::cout << "in merkle_path_compute_4 in_address_bits.size():" << in_address_bits.size() << std::endl;
-        // std::cout << "in merkle_path_compute_4 in_annotation_prefix:" << in_annotation_prefix << std::endl;
-        // std::cout << "in merkle_path_compute_4 in_address_bits.size():" << in_address_bits.size() << std::endl;
-        // std::cout << "in merkle_path_compute_4 in_depth:" << in_depth << std::endl;
         assert(in_address_bits.size() == in_depth * 2);
 
         m_selectors.reserve(in_depth);

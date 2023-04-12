@@ -9,7 +9,6 @@ import {
   ExchangeState,
   SpotTrade
 } from "../types";
-//
 interface SettlementValues {
   fillSA: BN;
   fillBA: BN;

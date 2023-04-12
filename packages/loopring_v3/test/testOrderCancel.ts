@@ -289,64 +289,19 @@ contract("Exchange", (accounts: string[]) => {
         { autoSetKeys: true }
       );
 
-      //order cancel
-      //
-      // exchangeTestUtil.requestOrderCancel(
-      //   exchangeTestUtil.testContext.orderOwners[1],
-      //   "WETH",
-      //   3,
-      //   new BN("21000000000000"), //
-      //   new BN("21000000000000"), //
-      //   "GTO");
+      // test order cancel
       await exchangeTestUtil.requestOrderCancel(
         exchangeTestUtil.testContext.orderOwners[1],
         1,
-        new BN("21000000000000"), //
-        new BN("21000000000000"), //
+        new BN("21000000000000"),
+        new BN("21000000000000"),
         "GTO"
       );
 
       await exchangeTestUtil.submitTransactions(16);
-      // // Submit the block
-      await exchangeTestUtil.submitPendingBlocks();
+      // // // Submit the block
+      // await exchangeTestUtil.submitPendingBlocks();
     });
 
-    /*
-    [AuthMethod.EDDSA, AuthMethod.ECDSA].forEach(function(authMethod) {
-      it("Withdrawal (fee > maxFee) (" + authMethod + ")", async () => {
-        await createExchange();
-
-        const owner = exchangeTestUtil.testContext.orderOwners[0];
-        const balance = new BN(web3.utils.toWei("4", "ether"));
-        const toWithdraw = new BN(web3.utils.toWei("2", "ether"));
-        const token = "ETH";
-        const feeToken = "ETH";
-        const fee = new BN(web3.utils.toWei("1.5", "ether"));
-
-        await exchangeTestUtil.deposit(owner, owner, token, balance);
-        await exchangeTestUtil.requestWithdrawal(
-          owner,
-          token,
-          toWithdraw,
-          feeToken,
-          fee,
-          { maxFee: fee.div(new BN(3)), authMethod }
-        );
-
-        // Commit the transfers
-        if (authMethod === AuthMethod.EDDSA) {
-          await expectThrow(
-            exchangeTestUtil.submitTransactions(),
-            "invalid block"
-          );
-        } else {
-          await exchangeTestUtil.submitTransactions();
-          await expectThrow(
-            exchangeTestUtil.submitPendingBlocks(),
-            "WITHDRAWAL_FEE_TOO_HIGH"
-          );
-        }
-      });
-    });*/
   });
 });

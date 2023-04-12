@@ -112,5 +112,26 @@ module.exports = function(deployer, network, accounts) {
       const blockVerifier = await BlockVerifier.deployed();
       await blockVerifier.registerCircuit(0, 16, 0, vkFlattened);
     }
+
+    if (network == "live" || network == "live-fork" || network == "goerli") {
+      console.log("exchange init:");
+      const emptyMerkleRoot = "0x3e1788bf14436c39a3841ae888ffb3e6ec8405bc2773afa28b6d4dfc309cf19";
+      const emptyMerkleAssetRoot = "0x71c8b14d71d432750479f5fe6e08abe1ec04712835a83cdf84d0483b9382ae8";
+
+      const exchangeV3 = await ExchangeV3.deployed();
+      await exchangeV3.initialize(LoopringV3.address, accounts[0], emptyMerkleRoot, emptyMerkleAssetRoot);
+
+      console.log("exchange setDepositContract:");
+      const depositContract = await DefaultDepositContract.deployed();
+      await depositContract.initialize(ExchangeV3.address);
+      await exchangeV3.setDepositContract(depositContract.address);
+
+      console.log("exchange transferOwnership:");
+
+      const ownerContract = await LoopringIOExchangeOwner.deployed();
+      await exchangeV3.transferOwnership(ownerContract.address);
+      const claimData = exchangeV3.contract.methods.claimOwnership().encodeABI();
+      await ownerContract.transact(claimData);
+    }
   });
 };

@@ -14,7 +14,6 @@ using json = nlohmann::json;
 
 namespace Loopring
 {
-// DEG-265 auto market
 static auto dummySpotTrade = R"({
     "fFillS_A": 0,
     "fFillS_B": 0,
@@ -790,12 +789,9 @@ enum class TransactionType
     Noop = 0,
     Transfer,
     SpotTrade,
-    // DEG-146:order cancel
     OrderCancel,
     AppKeyUpdate,
     BatchSpotTrade,
-    // // DEG-170 auto market - config add
-    // AutoMarketUpdate,
     Deposit,
     AccountUpdate,
     Withdrawal,
@@ -817,35 +813,26 @@ static void from_json(const json &j, Proof &proof)
     }
 }
 
-// DEG-265 auto market
 class StorageLeaf
 {
   public:
-    // DEG-347 Storage move
     ethsnarks::FieldT tokenSID;
     ethsnarks::FieldT tokenBID;
     ethsnarks::FieldT data;
     ethsnarks::FieldT storageID;
-    // split trading fee and gas fee - add up gas
     ethsnarks::FieldT gasFee;
-    // DEG-146:order cancel
     ethsnarks::FieldT cancelled;
-    // DEG-347 Storage move
     ethsnarks::FieldT forward;
 };
 
 static void from_json(const json &j, StorageLeaf &leaf)
 {
-    // DEG-347 Storage move
     leaf.tokenSID = ethsnarks::FieldT(j.at("tokenSID").get<std::string>().c_str());
     leaf.tokenBID = ethsnarks::FieldT(j.at("tokenBID").get<std::string>().c_str());
     leaf.data = ethsnarks::FieldT(j.at("data").get<std::string>().c_str());
     leaf.storageID = ethsnarks::FieldT(j.at("storageID").get<std::string>().c_str());
-    // split trading fee and gas fee - add up gas
     leaf.gasFee = ethsnarks::FieldT(j.at("gasFee").get<std::string>().c_str());
-    // DEG-146:order cancel
     leaf.cancelled = ethsnarks::FieldT(j.at("cancelled").get<std::string>().c_str());
-    // DEG-347 Storage move
     leaf.forward = ethsnarks::FieldT(j.at("forward"));
 }
 
@@ -853,15 +840,11 @@ class BalanceLeaf
 {
   public:
     ethsnarks::FieldT balance;
-    // DEG-347 Storage location change
-    // ethsnarks::FieldT storageRoot;
 };
 
 static void from_json(const json &j, BalanceLeaf &leaf)
 {
     leaf.balance = ethsnarks::FieldT(j.at("balance").get<std::string>().c_str());
-    // DEG-347 Storage location change
-    // leaf.storageRoot = ethsnarks::FieldT(j.at("storageRoot").get<std::string>().c_str());
 }
 
 class AccountLeaf
@@ -871,15 +854,10 @@ class AccountLeaf
     ethsnarks::jubjub::EdwardsPoint publicKey;
     ethsnarks::jubjub::EdwardsPoint appKeyPublicKey;
     ethsnarks::FieldT nonce;
-    // DEG-370 add AppKey
     ethsnarks::FieldT disableAppKeySpotTrade;
     ethsnarks::FieldT disableAppKeyWithdraw;
     ethsnarks::FieldT disableAppKeyTransferToOther;
     ethsnarks::FieldT balancesRoot;
-    // DEG-265 auto market
-    // // DEG-170 auto market - config add
-    // ethsnarks::FieldT autoMarketRoot;
-    // DEG-347 Storage location change
     ethsnarks::FieldT storageRoot;
 };
 
@@ -895,57 +873,8 @@ static void from_json(const json &j, AccountLeaf &account)
     account.disableAppKeyWithdraw = ethsnarks::FieldT(j.at("disableAppKeyWithdraw"));
     account.disableAppKeyTransferToOther = ethsnarks::FieldT(j.at("disableAppKeyTransferToOther"));
     account.balancesRoot = ethsnarks::FieldT(j.at("balancesRoot").get<std::string>().c_str());
-    // DEG-265 auto market
-    // // DEG-170 auto market - config add
-    // account.autoMarketRoot = ethsnarks::FieldT(j.at("autoMarketRoot").get<std::string>().c_str());
-    // DEG-347 Storage location change
     account.storageRoot = ethsnarks::FieldT(j.at("storageRoot").get<std::string>().c_str());
 }
-// class AutoMarketLeaf
-// {
-//     public:
-//       ethsnarks::FieldT autoMarketID;
-//       ethsnarks::FieldT tokenSID;
-//       ethsnarks::FieldT tokenBID;
-//       ethsnarks::FieldT maxLevel;
-//       ethsnarks::FieldT gridOffset;
-//       ethsnarks::FieldT orderOffset;
-//       ethsnarks::FieldT cancelled;
-//       ethsnarks::FieldT validUntil;
-//       // DEG-170 auto market - storage add
-//       ethsnarks::FieldT autoMarketStorageRoot;
-// };
-
-// static void from_json(const json &j, AutoMarketLeaf &autoMarket)
-// {
-//     autoMarket.autoMarketID = ethsnarks::FieldT(j.at("autoMarketID").get<std::string>().c_str());
-//     autoMarket.tokenSID = ethsnarks::FieldT(j.at("tokenSID"));
-//     autoMarket.tokenBID = ethsnarks::FieldT(j.at("tokenBID"));
-//     autoMarket.maxLevel = ethsnarks::FieldT(j.at("maxLevel"));
-//     autoMarket.gridOffset = ethsnarks::FieldT(j.at("gridOffset").get<std::string>().c_str());
-//     autoMarket.orderOffset = ethsnarks::FieldT(j.at("orderOffset").get<std::string>().c_str());
-//     autoMarket.cancelled = ethsnarks::FieldT(j.at("cancelled"));
-//     autoMarket.validUntil = ethsnarks::FieldT(j.at("validUntil"));
-//     // DEG-170 auto market - storage add
-//     autoMarket.autoMarketStorageRoot = ethsnarks::FieldT(j.at("autoMarketStorageRoot").get<std::string>().c_str());
-// }
-// // DEG-170 auto market - storage add
-// class AutoMarketStorageLeaf
-// {
-//     public:
-//       ethsnarks::FieldT autoMarketID;
-//       ethsnarks::FieldT tokenStorageID;
-//       ethsnarks::FieldT forward;
-//       ethsnarks::FieldT data;
-// };
-
-// static void from_json(const json &j, AutoMarketStorageLeaf &autoMarket)
-// {
-//     autoMarket.autoMarketID = ethsnarks::FieldT(j.at("autoMarketID").get<std::string>().c_str());
-//     autoMarket.tokenStorageID = ethsnarks::FieldT(j.at("tokenStorageID").get<std::string>().c_str());
-//     autoMarket.forward = ethsnarks::FieldT(j.at("forward"));
-//     autoMarket.data = ethsnarks::FieldT(j.at("data").get<std::string>().c_str());
-// }
 
 class BalanceUpdate
 {
@@ -1015,50 +944,6 @@ static void from_json(const json &j, AccountUpdate &accountUpdate)
     accountUpdate.before = j.at("before").get<AccountLeaf>();
     accountUpdate.after = j.at("after").get<AccountLeaf>();
 }
-// DEG-265 auto market
-// // DEG-170 auto market - config add
-// class AutoMarketUpdate
-// {
-//     public:
-//         ethsnarks::FieldT autoMarketID;
-//         Proof proof;
-//         ethsnarks::FieldT rootBefore;
-//         ethsnarks::FieldT rootAfter;
-//         AutoMarketLeaf before;
-//         AutoMarketLeaf after;
-// };
-
-// static void from_json(const json &j, AutoMarketUpdate &autoMarketUpdate)
-// {
-//     autoMarketUpdate.autoMarketID = ethsnarks::FieldT(j.at("autoMarketID").get<std::string>().c_str());
-//     autoMarketUpdate.proof = j.at("proof").get<Proof>();
-//     autoMarketUpdate.rootBefore = ethsnarks::FieldT(j.at("rootBefore").get<std::string>().c_str());
-//     autoMarketUpdate.rootAfter = ethsnarks::FieldT(j.at("rootAfter").get<std::string>().c_str());
-//     autoMarketUpdate.before = j.at("before").get<AutoMarketLeaf>();
-//     autoMarketUpdate.after = j.at("after").get<AutoMarketLeaf>();
-// }
-// // DEG-170 auto market - storage add
-// class AutoMarketStorageUpdate
-// {
-//     public:
-//         ethsnarks::FieldT autoMarketStorageID;
-//         Proof proof;
-//         ethsnarks::FieldT rootBefore;
-//         ethsnarks::FieldT rootAfter;
-//         AutoMarketStorageLeaf before;
-//         AutoMarketStorageLeaf after;
-// };
-
-// static void from_json(const json &j, AutoMarketStorageUpdate &autoMarketUpdate)
-// {
-//     // autoMarketUpdate.autoMarketStorageID = ethsnarks::FieldT(j.at("autoMarketStorageID").get<std::string>().c_str());
-//     autoMarketUpdate.autoMarketStorageID = ethsnarks::FieldT(j.at("autoMarketStorageID"));;
-//     autoMarketUpdate.proof = j.at("proof").get<Proof>();
-//     autoMarketUpdate.rootBefore = ethsnarks::FieldT(j.at("rootBefore").get<std::string>().c_str());
-//     autoMarketUpdate.rootAfter = ethsnarks::FieldT(j.at("rootAfter").get<std::string>().c_str());
-//     autoMarketUpdate.before = j.at("before").get<AutoMarketStorageLeaf>();
-//     autoMarketUpdate.after = j.at("after").get<AutoMarketStorageLeaf>();
-// }
 
 class Signature
 {
@@ -1082,7 +967,6 @@ static void from_json(const json &j, Signature &signature)
     signature.s = ethsnarks::FieldT(j.at("s").get<std::string>().c_str());
 }
 
-// DEG-265 auto market
 class AutoMarketOrder
 {
   public:
@@ -1100,13 +984,11 @@ class AutoMarketOrder
     ethsnarks::FieldT tradingFee;
     ethsnarks::FieldT feeTokenID;
     ethsnarks::FieldT maxFee;
-    // ethsnarks::FieldT uiReferID;
 
     ethsnarks::FieldT type;
     ethsnarks::FieldT gridOffset;
     ethsnarks::FieldT orderOffset;
     ethsnarks::FieldT maxLevel;
-    // ethsnarks::FieldT autoMarketID;
 
     ethsnarks::FieldT useAppKey;
     
@@ -1129,12 +1011,10 @@ static void from_json(const json &j, AutoMarketOrder &order)
 
     order.feeTokenID = ethsnarks::FieldT(j.at("feeTokenID"));
     order.maxFee = ethsnarks::FieldT(j.at("maxFee").get<std::string>().c_str());
-    // order.uiReferID = ethsnarks::FieldT(j.at("uiReferID"));
     order.type = ethsnarks::FieldT(j.at("type"));
     order.gridOffset = ethsnarks::FieldT(j.at("gridOffset").get<std::string>().c_str());
     order.orderOffset = ethsnarks::FieldT(j.at("orderOffset").get<std::string>().c_str());
     order.maxLevel = ethsnarks::FieldT(j.at("maxLevel"));
-    // order.autoMarketID = ethsnarks::FieldT(j.at("autoMarketID"));
 
     order.useAppKey = ethsnarks::FieldT(j.at("useAppKey"));
 }
@@ -1151,21 +1031,16 @@ class Order
     ethsnarks::FieldT deltaFilledS;
     ethsnarks::FieldT deltaFilledB;
     ethsnarks::FieldT validUntil;
-    // split TradingFee add GasFee - ProtocolFeeBips as the max TradingFee
-    // ethsnarks::FieldT maxFeeBips;
     ethsnarks::FieldT fillAmountBorS;
     ethsnarks::FieldT taker;
 
     ethsnarks::FieldT feeBips;
     ethsnarks::FieldT tradingFee;
-    // split trading fee and gas fee
     ethsnarks::FieldT feeTokenID;
     ethsnarks::FieldT fee;
     ethsnarks::FieldT maxFee;
 
-    // DEG-265 auto market
     ethsnarks::FieldT type;
-    // ethsnarks::FieldT autoMarketID;
     ethsnarks::FieldT level;
     AutoMarketOrder startOrder;
     ethsnarks::FieldT gridOffset;
@@ -1179,12 +1054,9 @@ class Order
 
 static void from_json(const json &j, Order &order)
 {
-    std::cout << "in Order from_json before isNoop:" << j.at("isNoop") << std::endl;
     order.isNoop = ethsnarks::FieldT(j.at("isNoop"));
 
-    std::cout << "in Order from_json before storageID" << std::endl;
     order.storageID = ethsnarks::FieldT(j.at("storageID").get<std::string>().c_str());
-    std::cout << "in Order from_json after storageID" << std::endl;
     order.accountID = ethsnarks::FieldT(j.at("accountID"));
     order.tokenS = ethsnarks::FieldT(j.at("tokenS"));
     order.tokenB = ethsnarks::FieldT(j.at("tokenB"));
@@ -1193,22 +1065,17 @@ static void from_json(const json &j, Order &order)
     order.deltaFilledS = ethsnarks::FieldT(j.at("deltaFilledS").get<std::string>().c_str());
     order.deltaFilledB = ethsnarks::FieldT(j.at("deltaFilledB").get<std::string>().c_str());
     order.validUntil = ethsnarks::FieldT(j.at("validUntil"));
-    // split TradingFee and GasFee - ProtocolFeeBips as the max TradingFee
-    // order.maxFeeBips = ethsnarks::FieldT(j.at("maxFeeBips"));
     order.fillAmountBorS = ethsnarks::FieldT(j.at("fillAmountBorS").get<bool>() ? 1 : 0);
     order.taker = ethsnarks::FieldT(j.at("taker").get<std::string>().c_str());
 
     order.feeBips = ethsnarks::FieldT(j.at("feeBips"));
     order.tradingFee = ethsnarks::FieldT(j.at("tradingFee").get<std::string>().c_str());
 
-    // split trading fee and gas fee
     order.feeTokenID = ethsnarks::FieldT(j.at("feeTokenID"));
     order.fee = ethsnarks::FieldT(j.at("fee").get<std::string>().c_str());
     order.maxFee = ethsnarks::FieldT(j.at("maxFee").get<std::string>().c_str());
 
-    // DEG-265 auto market
     order.type = ethsnarks::FieldT(j.at("type"));
-    // order.autoMarketID = ethsnarks::FieldT(j.at("autoMarketID"));
     order.level = ethsnarks::FieldT(j.at("level"));
     order.gridOffset = ethsnarks::FieldT(j.at("gridOffset").get<std::string>().c_str());
     order.orderOffset = ethsnarks::FieldT(j.at("orderOffset").get<std::string>().c_str());
@@ -1216,11 +1083,8 @@ static void from_json(const json &j, Order &order)
     
     order.useAppKey = ethsnarks::FieldT(j.at("useAppKey"));
     if (order.type == ethsnarks::FieldT(6) || order.type == ethsnarks::FieldT(7)) {
-        std::cout << "in Order from_json before startOrder" << std::endl;
         order.startOrder = j.at("startOrder").get<AutoMarketOrder>();
-        std::cout << "in Order from_json after startOrder" << std::endl;
     }
-    std::cout << "in Order after from json" << std::endl;
 }
 
 class SpotTrade
@@ -1250,25 +1114,18 @@ class BatchSpotTradeUser
 
 static void from_json(const json &j, BatchSpotTradeUser &batchSpotTradeUser)
 {
-    std::cout << "in BatchSpotTradeUser from json" << std::endl;
     batchSpotTradeUser.isNoop = ethsnarks::FieldT(j["isNoop"]);
     batchSpotTradeUser.accountID = ethsnarks::FieldT(j["accountID"]);
 
     json jOrders = j["orders"];
-    // TODO If size is not set here, the default size is 1. Why 1? Because there are six users, at least two, 
-    //      and the maximum order size of the remaining four is 1
+    // If size is not set here, the default size is 1. Why 1? Because there are six users, at least two, and the maximum order size of the remaining four is 1
     unsigned int size = 0;
     if (j.contains("size")) {
-        std::cout << "in BatchSpotTradeUser must size =============" << int(j["size"]) << std::endl;
         size = int(j["size"]);
     } else {
-        std::cout << "in BatchSpotTradeUser must size =============" << 1 << std::endl;
         size = ORDER_SIZE_USER_C;
     }
     
-    std::cout << "in BatchSpotTradeUser order size =============" << j["orders"].size() << std::endl;
-    // for (unsigned int i = 0; i < j.at("size"); i++)
-    // for (unsigned int i = 0; i < ORDER_SIZE_USER_A; i++)
     for (unsigned int i = 0; i < jOrders.size(); i++)
     {
         batchSpotTradeUser.orders.emplace_back(jOrders[i].get<Loopring::Order>());
@@ -1278,7 +1135,6 @@ static void from_json(const json &j, BatchSpotTradeUser &batchSpotTradeUser)
     {
         batchSpotTradeUser.orders.emplace_back(dummyBatchSpotTradeOrder.get<Loopring::Order>());
     }
-    std::cout << "in BatchSpotTradeUser after from json" << std::endl;
 }
 
 class BatchSpotTrade
@@ -1294,11 +1150,8 @@ static void from_json(const json &j, BatchSpotTrade &batchSpotTrade)
     batchSpotTrade.bindTokenID = ethsnarks::FieldT(j["bindTokenID"]);
 
     json jUsers = j["users"];
-    std::cout << "in BatchSpotTrade user size =============" << j["users"].size() << std::endl;
     for (unsigned int i = 0; i < jUsers.size(); i++)
-    // for (unsigned int i = 0; i < 4; i++)
     {
-        // TODO Is there a problem with setting here? However, in order to fix the length, it is necessary to set here
         if (i == 0) {
             jUsers[i]["size"] = ORDER_SIZE_USER_A;
         } else if (i == 1) {
@@ -1318,26 +1171,13 @@ static void from_json(const json &j, BatchSpotTrade &batchSpotTrade)
     // Replenish the remaining empty users
     for (unsigned int i = jUsers.size(); i < BATCH_SPOT_TRADE_MAX_USER; i++) 
     {
-        // if (i == 0) {
-        //     jUsers[i]["size"] = ORDER_SIZE_USER_A;
-        // } else if (i == 1) {
-        //     jUsers[i]["size"] = ORDER_SIZE_USER_B;
-        // } else if (i == 2) {
-        //     jUsers[i]["size"] = ORDER_SIZE_USER_C;
-        // } else {
-        //     jUsers[i]["size"] = ORDER_SIZE_USER_D;
-        // }
         batchSpotTrade.users.emplace_back(dummyBatchSpotTradeUser.get<Loopring::BatchSpotTradeUser>());
     }
-    std::cout << "in BatchSpotTrade after empty location" << std::endl;
     json jTokens = j["tokens"];
     for (unsigned int i = 0; i < BATCH_SPOT_TRADE_MAX_TOKENS; i++)
     {
-        // batchSpotTrade.tokens.emplace_back(ethsnarks::FieldT(jTokens[i].get<std::string>().c_str()));
         batchSpotTrade.tokens.emplace_back(ethsnarks::FieldT(jTokens[i]));
-    // order.tokenS = ethsnarks::FieldT(j.at("tokenS"));
     }
-    std::cout << "in BatchSpotTrade after from json" << std::endl;
 }
 
 class Deposit
@@ -1424,7 +1264,6 @@ static void from_json(const json &j, AccountUpdateTx &update)
 class AppKeyUpdate
 {
   public:
-    // ethsnarks::FieldT owner;
     ethsnarks::FieldT accountID;
     ethsnarks::FieldT appKeyPublicKeyX;
     ethsnarks::FieldT appKeyPublicKeyY;
@@ -1439,7 +1278,6 @@ class AppKeyUpdate
 
 static void from_json(const json &j, AppKeyUpdate &update)
 {
-    // update.owner = ethsnarks::FieldT(j.at("owner").get<std::string>().c_str());
     update.accountID = ethsnarks::FieldT(j.at("accountID"));
     update.appKeyPublicKeyX = ethsnarks::FieldT(j["appKeyPublicKeyX"].get<std::string>().c_str());
     update.appKeyPublicKeyY = ethsnarks::FieldT(j["appKeyPublicKeyY"].get<std::string>().c_str());
@@ -1451,13 +1289,11 @@ static void from_json(const json &j, AppKeyUpdate &update)
     update.disableAppKeyWithdraw = ethsnarks::FieldT(j.at("disableAppKeyWithdraw"));
     update.disableAppKeyTransferToOther = ethsnarks::FieldT(j.at("disableAppKeyTransferToOther"));
 }
-// DEG-146:order cancel
+
 class OrderCancel
 {
   public:
-    // ethsnarks::FieldT owner;
     ethsnarks::FieldT accountID;
-    // ethsnarks::FieldT tokenID;
     ethsnarks::FieldT storageID;
     ethsnarks::FieldT fee;
     ethsnarks::FieldT maxFee;
@@ -1466,55 +1302,13 @@ class OrderCancel
 };
 static void from_json(const json &j, OrderCancel &update)
 {
-    // std::cout << "in OrderCancel from_json before owner" << std::endl;
-    // update.owner = ethsnarks::FieldT(j.at("owner").get<std::string>().c_str());
-    // std::cout << "in OrderCancel from_json before accountID" << std::endl;
     update.accountID = ethsnarks::FieldT(j.at("accountID"));
-    // std::cout << "in OrderCancel from_json before tokenID" << std::endl;
-    // update.tokenID = ethsnarks::FieldT(j.at("tokenID"));
-    // std::cout << "in OrderCancel from_json before storageID" << std::endl;
     update.storageID = ethsnarks::FieldT(j["storageID"].get<std::string>().c_str());
-    // std::cout << "in OrderCancel from_json before fee" << std::endl;
     update.fee = ethsnarks::FieldT(j["fee"].get<std::string>().c_str());
-    // std::cout << "in OrderCancel from_json before maxFee" << std::endl;
     update.maxFee = ethsnarks::FieldT(j["maxFee"].get<std::string>().c_str());
-    // std::cout << "in OrderCancel from_json before feeTokenID" << std::endl;
     update.feeTokenID = ethsnarks::FieldT(j.at("feeTokenID"));
     update.useAppKey = ethsnarks::FieldT(j.at("useAppKey"));
 }
-// class AutoMarketUpdateTx
-// {
-//     public:
-//         ethsnarks::FieldT accountID;
-//         ethsnarks::FieldT autoMarketID;
-//         ethsnarks::FieldT tokenSID;
-//         ethsnarks::FieldT tokenBID;
-//         ethsnarks::FieldT maxLevel;
-//         ethsnarks::FieldT gridOffset;
-//         ethsnarks::FieldT orderOffset;
-//         ethsnarks::FieldT cancelled;
-//         ethsnarks::FieldT validUntil;
-//         ethsnarks::FieldT fee;
-//         ethsnarks::FieldT maxFee;
-//         ethsnarks::FieldT feeTokenID;
-// };
-// static void from_json(const json &j, AutoMarketUpdateTx &update) 
-// {
-//     // std::cout << "in AutoMarketUpdateTx from_json before accountID" << std::endl;
-//     update.accountID = ethsnarks::FieldT(j.at("accountID"));
-//     update.autoMarketID = ethsnarks::FieldT(j["autoMarketID"].get<std::string>().c_str());
-//     update.tokenSID = ethsnarks::FieldT(j.at("tokenSID"));
-//     update.tokenBID = ethsnarks::FieldT(j.at("tokenBID"));
-
-//     update.maxLevel = ethsnarks::FieldT(j.at("maxLevel"));
-//     update.gridOffset = ethsnarks::FieldT(j["gridOffset"].get<std::string>().c_str());
-//     update.orderOffset = ethsnarks::FieldT(j["orderOffset"].get<std::string>().c_str());
-//     update.cancelled = ethsnarks::FieldT(j.at("cancelled"));
-//     update.validUntil = ethsnarks::FieldT(j.at("validUntil"));
-//     update.fee = ethsnarks::FieldT(j["fee"].get<std::string>().c_str());
-//     update.maxFee = ethsnarks::FieldT(j["maxFee"].get<std::string>().c_str());
-//     update.feeTokenID = ethsnarks::FieldT(j.at("feeTokenID"));
-// }
 
 class Transfer
 {
@@ -1571,25 +1365,13 @@ class Witness
 
     BalanceUpdate balanceUpdateS_A;
     BalanceUpdate balanceUpdateB_A;
-    // split trading fee and gas fee
     BalanceUpdate balanceUpdateFee_A;
-    // DEG-265 auto market
-    // // DEG-170 auto market - storage add
-    // AutoMarketStorageUpdate autoMarketStorageUpdate_A;
-    // // DEG-170 auto market - config add
-    // AutoMarketUpdate autoMarketUpdate_A;
     AccountUpdate accountUpdate_A;
 
     BalanceUpdate balanceUpdateS_B;
     BalanceUpdate balanceUpdateB_B;
-    // split trading fee and gas fee
     BalanceUpdate balanceUpdateFee_B;
     AccountUpdate accountUpdate_B;
-    // DEG-265 auto market
-    // // DEG-170 auto market - storage add
-    // AutoMarketStorageUpdate autoMarketStorageUpdate_B;
-    // // DEG-170 auto market - config add
-    // AutoMarketUpdate autoMarketUpdate_B;
 
     // ------- UserC
     std::vector<StorageUpdate> storageUpdate_C_array;
@@ -1633,17 +1415,9 @@ class Witness
     BalanceUpdate balanceUpdateD_O;
     AccountUpdate accountUpdate_O;
 
-    // BalanceUpdate balanceUpdateA_P;
-    // BalanceUpdate balanceUpdateB_P;
-    // BalanceUpdate balanceUpdateC_P;
-
     Signature signatureA;
     Signature signatureB;
     std::vector<std::vector<Signature>> signatureArray;
-    // std::vector<Signature> signatureAArray;
-    // std::vector<Signature> signatureBArray;
-    // std::vector<Signature> signatureCArray;
-    // std::vector<Signature> signatureDArray;
 
     ethsnarks::FieldT numConditionalTransactionsAfter;
 };
@@ -1668,28 +1442,12 @@ static void from_json(const json &j, Witness &state)
 
     state.balanceUpdateS_A = j.at("balanceUpdateS_A").get<BalanceUpdate>();
     state.balanceUpdateB_A = j.at("balanceUpdateB_A").get<BalanceUpdate>();
-    // split trading fee and gas fee
     state.balanceUpdateFee_A = j.at("balanceUpdateFee_A").get<BalanceUpdate>();
-    // DEG-265 auto market
-    // std::cout << "in Witness from_json before autoMarketStorageUpdate_A" << std::endl;
-    // // DEG-170 auto market - storage add
-    // state.autoMarketStorageUpdate_A = j.at("autoMarketStorageUpdate_A").get<AutoMarketStorageUpdate>();
-    // std::cout << "in Witness from_json before autoMarketUpdate_A" << std::endl;
-    // // DEG-170 auto market - config add
-    // state.autoMarketUpdate_A = j.at("autoMarketUpdate_A").get<AutoMarketUpdate>();
     state.accountUpdate_A = j.at("accountUpdate_A").get<AccountUpdate>();
 
     state.balanceUpdateS_B = j.at("balanceUpdateS_B").get<BalanceUpdate>();
     state.balanceUpdateB_B = j.at("balanceUpdateB_B").get<BalanceUpdate>();
-    // split trading fee and gas fee
     state.balanceUpdateFee_B = j.at("balanceUpdateFee_B").get<BalanceUpdate>();
-    // DEG-265 auto market
-    // std::cout << "in Witness from_json before autoMarketStorageUpdate_B" << std::endl;
-    // // DEG-170 auto market - storage add
-    // state.autoMarketStorageUpdate_B = j.at("autoMarketStorageUpdate_B").get<AutoMarketStorageUpdate>();
-    // std::cout << "in Witness from_json before autoMarketUpdate_B" << std::endl;
-    // // DEG-170 auto market - config add
-    // state.autoMarketUpdate_B = j.at("autoMarketUpdate_B").get<AutoMarketUpdate>();
     state.accountUpdate_B = j.at("accountUpdate_B").get<AccountUpdate>();
 
     // ------- UserC
@@ -1762,10 +1520,6 @@ static void from_json(const json &j, Witness &state)
     state.balanceUpdateA_O = j.at("balanceUpdateA_O").get<BalanceUpdate>();
     state.accountUpdate_O = j.at("accountUpdate_O").get<AccountUpdate>();
 
-    // state.balanceUpdateA_P = j.at("balanceUpdateA_P").get<BalanceUpdate>();
-    // state.balanceUpdateB_P = j.at("balanceUpdateB_P").get<BalanceUpdate>();
-    // state.balanceUpdateC_P = j.at("balanceUpdateC_P").get<BalanceUpdate>();
-
     state.signatureA = dummySignature.get<Signature>();
     state.signatureB = dummySignature.get<Signature>();
 
@@ -1823,11 +1577,7 @@ class UniversalTransaction
     Deposit deposit;
     AccountUpdateTx accountUpdate;
     AppKeyUpdate appKeyUpdate;
-    // DEG-146:order cancel
     OrderCancel orderCancel;
-    // DEG-265 auto market
-    // // DEG-170 auto market - config add
-    // AutoMarketUpdateTx autoMarketUpdate;
 };
 
 static void from_json(const json &j, UniversalTransaction &transaction)
@@ -1841,13 +1591,8 @@ static void from_json(const json &j, UniversalTransaction &transaction)
     transaction.withdraw = dummyWithdraw.get<Loopring::Withdrawal>();
     transaction.deposit = dummyDeposit.get<Loopring::Deposit>();
     transaction.accountUpdate = dummyAccountUpdate.get<Loopring::AccountUpdateTx>();
-    // DEG-146:order cancel
     transaction.orderCancel = dummyOrderCancel.get<Loopring::OrderCancel>();
     transaction.appKeyUpdate = dummyAppKeyUpdate.get<Loopring::AppKeyUpdate>();
-    // DEG-265 auto market
-    // // DEG-170 auto market - config add
-    // std::cout << "in UniversalTransaction from_json before autoMarketUpdate" << std::endl;
-    // transaction.autoMarketUpdate = dummyAutoMarketUpdate.get<Loopring::AutoMarketUpdateTx>();
 
     // Patch some of the dummy tx's so they are valid against the current state
     // Deposit
@@ -1855,21 +1600,14 @@ static void from_json(const json &j, UniversalTransaction &transaction)
     // AccountUpdate
     transaction.accountUpdate.owner = transaction.witness.accountUpdate_A.before.owner;
 
-    // transaction.appKeyUpdate.owner = transaction.witness.accountUpdate_A.before.owner;
-    // std::cout << "in UniversalTransaction from_json before referID" << std::endl;
-    // transaction.accountUpdate.referID = transaction.witness.accountUpdate_A.before.referID;
     // Transfer
     transaction.transfer.to = transaction.witness.accountUpdate_B.before.owner;
     transaction.transfer.payerTo = transaction.witness.accountUpdate_B.before.owner;
 
-    // // DEG-146:order cancel
-    // // OrderCancel
-    // transaction.orderCancel.owner = transaction.witness.accountUpdate_A.before.owner;
-    // DEG-347 Storage location change
-    // This value is initialized here because storageid will be verified in ordercancel. 
+    // This value is initialized here because storageID will be verified in OrderCancel. 
     // If the default value is 0 in non ordercancel transactions, there will be problems in the verification
-    // Set to storageupdate_ A.before. Storageid, because even in ordercancel, 
-    // the storageid of ordercancel must be the same as storageupdate_ A.before. Storageid is consistent
+    // Set to StorageUpdate_A.before.StorageID, because even in OrderCancel, 
+    // the storageID of OrderCancel must be the same as StorageUpdate_A.before.StorageID is consistent
     transaction.orderCancel.storageID = transaction.witness.storageUpdate_A.before.storageID;
 
     // Now get the actual transaction data for the actual transaction that will
@@ -1905,11 +1643,9 @@ static void from_json(const json &j, UniversalTransaction &transaction)
     }
     else if (j.contains("accountUpdate"))
     {
-        // std::cout << "in UniversalTransaction from_json before accountUpdate" << std::endl;
         transaction.type = ethsnarks::FieldT(int(Loopring::TransactionType::AccountUpdate));
         transaction.accountUpdate = j.at("accountUpdate").get<Loopring::AccountUpdateTx>();
     }
-    // DEG-146:order cancel
     else if (j.contains("orderCancel"))
     {
         transaction.type = ethsnarks::FieldT(int(Loopring::TransactionType::OrderCancel));
@@ -1917,16 +1653,9 @@ static void from_json(const json &j, UniversalTransaction &transaction)
     }
     else if (j.contains("appKeyUpdate"))
     {
-        // std::cout << "in UniversalTransaction from_json before accountUpdate" << std::endl;
         transaction.type = ethsnarks::FieldT(int(Loopring::TransactionType::AppKeyUpdate));
         transaction.appKeyUpdate = j.at("appKeyUpdate").get<Loopring::AppKeyUpdate>();
     }
-    // // DEG-170 auto market - config add
-    // else if (j.contains("autoMarketUpdate"))
-    // {
-    //     transaction.type = ethsnarks::FieldT(int(Loopring::TransactionType::AutoMarketUpdate));
-    //     transaction.autoMarketUpdate = j.at("autoMarketUpdate").get<Loopring::AutoMarketUpdateTx>();
-    // }
 }
 
 class Block
@@ -1942,8 +1671,6 @@ class Block
 
     ethsnarks::FieldT timestamp;
 
-    // ethsnarks::FieldT protocolTakerFeeBips;
-    // ethsnarks::FieldT protocolMakerFeeBips;
     ethsnarks::FieldT protocolFeeBips;
 
     Signature signature;
@@ -1968,8 +1695,6 @@ static void from_json(const json &j, Block &block)
 
     block.timestamp = ethsnarks::FieldT(j["timestamp"].get<unsigned int>());
 
-    // block.protocolTakerFeeBips = ethsnarks::FieldT(j["protocolTakerFeeBips"].get<unsigned int>());
-    // block.protocolMakerFeeBips = ethsnarks::FieldT(j["protocolMakerFeeBips"].get<unsigned int>());
     block.protocolFeeBips = ethsnarks::FieldT(j["protocolFeeBips"].get<unsigned int>());
 
     block.signature = j.at("signature").get<Signature>();

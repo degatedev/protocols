@@ -59,8 +59,8 @@ class Calculate():
         if savedForward == 0 and not(orderSameToken):
             return 0
 
-    def getData(self, accountID, storageID, state):
-        account = state.getAccount(accountID)
+    def getData(self, account, storageID):
+        # account = state.getAccount(accountID)
         # DEG-347 Storage location change
         # storage = account.getBalanceLeaf(tokenID).getStorage(int(storageID))
         storage = account.getStorage(int(storageID))
@@ -242,7 +242,7 @@ class Calculate():
                 order.fee = str(roundToFloatValue(int(order.fee), Float16Encoding))
 
                 (tokenSIDArray[userIndex][orderIndex], tokenBIDArray[userIndex][orderIndex], filledArray[userIndex][orderIndex], 
-                gasFeeArray[userIndex][orderIndex], cancelledArray[userIndex][orderIndex], forwardArray[userIndex][orderIndex]) = self.getData(order.accountID, order.storageID, state)
+                gasFeeArray[userIndex][orderIndex], cancelledArray[userIndex][orderIndex], forwardArray[userIndex][orderIndex]) = self.getData(state.getAccount(order.accountID), order.storageID)
                 # fill[userIndex][orderIndex].B = roundToFloatValue(order.deltaFilledB, Float24Encoding)
                 # fill[userIndex][orderIndex].S = roundToFloatValue(order.deltaFilledS, Float24Encoding)
                 # fill[userIndex][orderIndex].B = roundToFloatValue(order.deltaFilledB, Float29Encoding)

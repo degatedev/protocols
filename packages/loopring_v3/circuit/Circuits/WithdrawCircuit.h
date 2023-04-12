@@ -18,17 +18,10 @@ using namespace ethsnarks;
 namespace Loopring
 {
 
-// When withdrawing from the protocol fee pool account (account 0),
-// account 1 is used as the main account (without side effects),
-// the withdrawing is done using the optimized protocol pool
-// balance update system.
-// This is to ensure this operation does not update the protocol pool
-// account leaf here, that account should only be modified once,
-// and that is done a single time in a block.
+// DeGate combines the protocol account and the operator account, then disables the account 0, tradingFee and gasFee are paid to the operator account
 class WithdrawCircuit : public BaseTransactionCircuit
 {
   public:
-    // DualVariableGadget typeTx;
     // Inputs
     DualVariableGadget accountID;
     DualVariableGadget tokenID;
@@ -44,7 +37,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
     DualVariableGadget minGas;
     DualVariableGadget to;
-    // DualVariableGadget extraData;
 
     ToBitsGadget disableAppKeyWithdraw;
 
@@ -78,7 +70,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
     // Balances
     DynamicBalanceGadget balanceS_A;
-    // DynamicBalanceGadget balanceB_P;
     DynamicBalanceGadget balanceD_O;
 
     // Check how much should be withdrawn
@@ -130,7 +121,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
       const std::string &prefix)
         : BaseTransactionCircuit(pb, state, prefix),
 
-          // typeTx(pb, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
           // Inputs
           accountID(pb, NUM_BITS_ACCOUNT, FMT(prefix, ".accountID")),
           tokenID(pb, NUM_BITS_TOKEN, FMT(prefix, ".tokenID")),
@@ -147,7 +137,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
           minGas(pb, NUM_BITS_MIN_GAS, FMT(prefix, ".minGas")),
           to(pb, NUM_BITS_ADDRESS, FMT(prefix, ".to")),
-          // extraData(pb, NUM_BITS_EXTRA, FMT(prefix, ".extraData")),
 
           disableAppKeyWithdraw(pb, state.accountA.account.disableAppKeyWithdraw, 1, FMT(prefix, ".disableAppKeyWithdraw")),
 
@@ -224,14 +213,12 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
           // Balances
           balanceS_A(pb, state.accountA.balanceS, FMT(prefix, ".balanceS_A")),
-          // balanceB_P(pb, state.pool.balanceB, FMT(prefix, ".balanceB_P")),
           balanceD_O(pb, state.oper.balanceD, FMT(prefix, ".balanceD_O")),
 
           // Check how much should be withdrawn
           fullBalance(
             pb,
             isProtocolFeeWithdrawal.result(),
-            // balanceB_P.balance(),
             balanceD_O.balance(),
             balanceS_A.balance(),
             FMT(prefix, ".fullBalance")),
@@ -276,7 +263,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
           amountA(pb, isProtocolFeeWithdrawal.result(), state.constants._0, amount.packed, FMT(prefix, ".amountA")),
           amountP(pb, isProtocolFeeWithdrawal.result(), amount.packed, state.constants._0, FMT(prefix, ".amountP")),
           balanceA_after(pb, balanceS_A.balance(), amountA.result(), NUM_BITS_AMOUNT_WITHDRAW, FMT(prefix, ".balanceA_after")),
-          // balanceP_after(pb, balanceB_P.balance(), amountP.result(), NUM_BITS_AMOUNT, FMT(prefix, ".balanceP_after")),
           balanceO_after(pb, balanceD_O.balance(), amountP.result(), NUM_BITS_AMOUNT_WITHDRAW, FMT(prefix, ".balanceO_after")),
           merkleTreeAccountA(
             pb,
@@ -356,18 +342,15 @@ class WithdrawCircuit : public BaseTransactionCircuit
         // Update the account balances (withdrawal + fee)
         setArrayOutput(TXV_BALANCE_A_S_ADDRESS, tokenID.bits);
         setOutput(TXV_BALANCE_A_S_BALANCE, balanceA_after.result());
-        // setArrayOutput(TXV_BALANCE_B_S_ADDRESS, feeTokenID.bits);
         setArrayOutput(TXV_BALANCE_A_B_ADDRESS, feeTokenID.bits);
         setOutput(TXV_BALANCE_A_B_BALANCE, balanceB_A.balance());
 
         // Update the protocol fee pool balance when withdrawing from the protocol
         // pool
-        // setOutput(TXV_BALANCE_P_B_BALANCE, balanceP_after.result());
         setOutput(TXV_BALANCE_O_D_BALANCE, balanceO_after.result());
         setArrayOutput(TXV_BALANCE_O_D_Address, tokenID.bits);
 
         // Update the operator balance for the fee payment
-        // DEG-127 split trading fee and gas fee
         setArrayOutput(TXV_BALANCE_O_A_Address, feeTokenID.bits);
         setOutput(TXV_BALANCE_O_A_BALANCE, balanceA_O.balance());
 
@@ -383,7 +366,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
         // Nonce
         setArrayOutput(TXV_STORAGE_A_ADDRESS, subArray(storageID.bits, 0, NUM_BITS_STORAGE_ADDRESS));
-        // DEG-347 Storage move
         setOutput(TXV_STORAGE_A_TOKENSID, tokenSIDValue.result());
         setOutput(TXV_STORAGE_A_TOKENBID, tokenBIDValue.result());
         setOutput(TXV_STORAGE_A_DATA, storageDataValue.result());
@@ -396,7 +378,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
     void generate_r1cs_witness(const Withdrawal &withdrawal)
     {
         LOG(LogDebug, "in WithdrawCircuit", "generate_r1cs_witness");
-        // typeTx.generate_r1cs_witness(pb, ethsnarks::FieldT(int(Loopring::TransactionType::Withdrawal)));
         // Inputs
         accountID.generate_r1cs_witness(pb, withdrawal.accountID);
         tokenID.generate_r1cs_witness(pb, withdrawal.tokenID);
@@ -412,7 +393,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
         minGas.generate_r1cs_witness(pb, withdrawal.minGas);
         to.generate_r1cs_witness(pb, withdrawal.to);
-        // extraData.generate_r1cs_witness(pb, withdrawal.extraData);
 
         disableAppKeyWithdraw.generate_r1cs_witness();
 
@@ -434,13 +414,7 @@ class WithdrawCircuit : public BaseTransactionCircuit
         // Validate
         requireValidUntil.generate_r1cs_witness();
         requireValidFee.generate_r1cs_witness();
-        LOG(LogDebug, "in WithdrawCircuit minGas", pb.val(minGas.packed));
-        LOG(LogDebug, "in WithdrawCircuit to", pb.val(to.packed));
-        LOG(LogDebug, "in WithdrawCircuit amount", pb.val(amount.packed));
-        // std::cout << "in WithdrawCircuit extraData:" << pb.val(extraData.packed) << std::endl;
-
-        LOG(LogDebug, "in WithdrawCircuit onchainDataHashCalculate", pb.val(onchainDataHashCalculate.result()));
-        LOG(LogDebug, "in WithdrawCircuit onchainDataHash", pb.val(onchainDataHash.packed));
+        
         requireValidOnChainDataHash->generate_r1cs_witness();
 
         // Type
@@ -449,7 +423,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
         // Balances
         balanceS_A.generate_r1cs_witness();
-        // balanceB_P.generate_r1cs_witness();
         balanceD_O.generate_r1cs_witness();
 
         // Check how much should be withdrawn
@@ -475,7 +448,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
         amountA.generate_r1cs_witness();
         amountP.generate_r1cs_witness();
         balanceA_after.generate_r1cs_witness();
-        // balanceP_after.generate_r1cs_witness();
         balanceO_after.generate_r1cs_witness();
         merkleTreeAccountA.generate_r1cs_witness();
 
@@ -499,7 +471,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
     void generate_r1cs_constraints()
     {
         LOG(LogDebug, "in WithdrawCircuit: generate_r1cs_constraints", "");
-        // typeTx.generate_r1cs_constraints(true);
         // Inputs
         accountID.generate_r1cs_constraints(true);
         tokenID.generate_r1cs_constraints(true);
@@ -515,7 +486,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
         minGas.generate_r1cs_constraints(true);
         to.generate_r1cs_constraints(true);
-        // extraData.generate_r1cs_constraints(true);
 
         disableAppKeyWithdraw.generate_r1cs_constraints();
 
@@ -534,7 +504,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
         onchainDataHashCalculate.add(minGas.bits);
         onchainDataHashCalculate.add(to.bits);
         onchainDataHashCalculate.add(amount.bits);
-        // onchainDataHashCalculate.add(extraData.bits);
         onchainDataHashCalculate.generate_r1cs_constraints();
         hash.generate_r1cs_constraints();
 
@@ -551,7 +520,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
         // Balances
         balanceS_A.generate_r1cs_constraints();
-        // balanceB_P.generate_r1cs_constraints();
         balanceD_O.generate_r1cs_constraints();
 
         // Check how much should be withdrawn
@@ -577,7 +545,6 @@ class WithdrawCircuit : public BaseTransactionCircuit
         amountA.generate_r1cs_constraints();
         amountP.generate_r1cs_constraints();
         balanceA_after.generate_r1cs_constraints();
-        // balanceP_after.generate_r1cs_constraints();
         balanceO_after.generate_r1cs_constraints();
         merkleTreeAccountA.generate_r1cs_constraints();
 
@@ -602,13 +569,10 @@ class WithdrawCircuit : public BaseTransactionCircuit
     {
         return flattenReverse(
           {
-            // typeTx.bits,
            type.bits,
            owner.bits,
            accountID.bits,
            tokenID.bits,
-          //  // put amount into onChainData
-          // //  amount.bits,
            feeTokenID.bits,
            fFee.bits(),
            storageID.bits,

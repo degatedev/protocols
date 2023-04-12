@@ -55,6 +55,10 @@ library ExchangeDeposits
             tokenID = S.registerToken(tokenAddress, false);
         }
 
+        if (tokenID == 0 && amount == 0) {
+            require(msg.value == 0, "INVALID_ETH_DEPOSIT");
+        }
+
         // A user may need to pay a fixed ETH deposit fee, set by the protocol.
         uint256 depositFeeETH = 0;
         if (needChargeDepositFee(S)) {
@@ -107,7 +111,7 @@ library ExchangeDeposits
     }
 
     function needChargeDepositFee(ExchangeData.State storage S)
-        internal
+        private
         returns (bool)
     {
         bool needCharge = false;

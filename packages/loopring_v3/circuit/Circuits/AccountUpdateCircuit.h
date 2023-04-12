@@ -16,7 +16,14 @@ using namespace ethsnarks;
 
 namespace Loopring
 {
-
+//  Registration optimization:
+//    In order to further reduce the user registration threshold and support the registration of the degate account without payment, 
+//    the user can provide the AccountUpdate transaction signature when registering the DeGate for the first time. The DeGate server 
+//    records this signature but does not send it to circuit until the user initiates the Deposit transaction and executes the previously stored 
+//    AccountUpdate after the Deposit transaction confirmed. 
+//    Because the Deposit transaction will only perform the binding operation of accountID, the accountID cannot be reserved during the 
+//    user's initial registration (which will lead to the accountID reservation attack). Therefore, the AccountUpdate signature provided 
+//    by the user during the initial registration of DeGate will not contain the real accountID, which is currently set to 0
 class AccountUpdateCircuit : public BaseTransactionCircuit
 {
   public:
@@ -31,7 +38,7 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
     DualVariableGadget fee;
     DualVariableGadget maxFee;
     DualVariableGadget type;
-    // DEG-206 login optimization
+    // registration optimization, nonce equal to 0
     EqualGadget nonce_eq_zero;
     TernaryGadget accountIDToHash;
     ToBitsGadget accountIDToPubData;
@@ -98,8 +105,7 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
             pb,
             var_array({
               state.exchange,
-              // DEG-206 login optimization
-              //  accountID.packed,
+              // login optimization, accountIDToHash instead of accountID, if nonce_eq_zero == 1, then accountIDToHash = 0, else accountIDToHash = accountID
               accountIDToHash.result(),
               feeTokenID.packed,
               maxFee.packed,
@@ -174,7 +180,6 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
         setArrayOutput(TXV_BALANCE_A_S_ADDRESS, feeTokenID.bits);
         setOutput(TXV_BALANCE_A_S_BALANCE, balanceS_A.balance());
         // Update the operator balance for the fee payment
-        // DEG-127 split trading fee and gas fee
         setArrayOutput(TXV_BALANCE_O_B_Address, feeTokenID.bits);
         setOutput(TXV_BALANCE_O_B_BALANCE, balanceB_O.balance());
 
@@ -202,7 +207,6 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
         fee.generate_r1cs_witness(pb, update.fee);
         maxFee.generate_r1cs_witness(pb, update.maxFee);
         type.generate_r1cs_witness(pb, update.type);
-        // DEG-206 login optimization
         nonce_eq_zero.generate_r1cs_witness();
         accountIDToHash.generate_r1cs_witness();
         accountIDToPubData.generate_r1cs_witness();
@@ -250,7 +254,6 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
         maxFee.generate_r1cs_constraints(true);
         type.generate_r1cs_constraints(true);
 
-        // DEG-206 login optimization
         nonce_eq_zero.generate_r1cs_constraints();
         accountIDToHash.generate_r1cs_constraints();
         accountIDToPubData.generate_r1cs_constraints();
@@ -288,11 +291,8 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
     const VariableArrayT getPublicData() const
     {
         return flattenReverse({
-          // typeTx.bits,
           type.bits,
           owner.bits,
-          //  accountID.bits,
-          // DEG-206 login optimization
           accountIDToPubData.bits,
           feeTokenID.bits,
           fFee.bits(),

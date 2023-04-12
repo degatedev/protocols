@@ -191,8 +191,6 @@ export namespace AccountUpdateUtils {
           { name: "publicKey", type: "uint256" },
           { name: "validUntil", type: "uint32" },
           { name: "nonce", type: "uint32" }
-          // //refe-refe
-          // { name: "referID", type: "uint32" }
         ]
       },
       primaryType: "AccountUpdate",
@@ -210,8 +208,6 @@ export namespace AccountUpdateUtils {
         publicKey: new BN(EdDSA.pack(update.publicKeyX, update.publicKeyY), 16),
         validUntil: update.validUntil,
         nonce: update.nonce
-        // //refe-refe
-        // referID: update.referID
       }
     };
     return typedData;
@@ -224,11 +220,9 @@ export namespace AccountUpdateUtils {
 
   export function sign(keyPair: any, update: AccountUpdate) {
     // Calculate hash
-    //refe-refe
     const hasher = Poseidon.createHash(9, 6, 53);
     // const hasher = Poseidon.createHash(10, 6, 53);
     var accountID = update.accountID;
-    //accoun0
     if (update.nonce == 0) {
       accountID = 0;
     }
@@ -242,8 +236,6 @@ export namespace AccountUpdateUtils {
       update.publicKeyY,
       update.validUntil,
       update.nonce
-      // //refe-refe
-      // update.referID
     ];
     const hash = hasher(inputs).toString(10);
 
@@ -465,6 +457,8 @@ export class ExchangeTestUtil {
   public TX_DATA_AVAILABILITY_SIZE: number;
   public MAX_AGE_DEPOSIT_UNTIL_WITHDRAWABLE_UPPERBOUND: number;
   public MAX_FORCED_WITHDRAWAL_FEE: BN;
+  public MAX_PROTOCOL_FEE_BIPS: BN;
+  public DEFAULT_PROTOCOL_FEE_BIPS: BN;
 
   public tokenAddressToIDMap = new Map<string, number>();
   public tokenIDToAddressMap = new Map<number, string>();
@@ -507,12 +501,9 @@ export class ExchangeTestUtil {
     // Initialize LoopringV3
     this.protocolFeeVault = this.testContext.orderOwners[this.testContext.orderOwners.length - 1];
 
-    await this.loopringV3.updateSettings(
-      this.protocolFeeVault,
-      this.blockVerifier.address,
-      new BN(web3.utils.toWei("0.02", "ether")),
-      { from: this.testContext.deployer }
-    );
+    await this.loopringV3.updateSettings(this.protocolFeeVault, new BN(web3.utils.toWei("0.02", "ether")), {
+      from: this.testContext.deployer
+    });
 
     // Register LoopringV3 to UniversalRegistry
     // await this.universalRegistry.registerProtocol(
@@ -520,10 +511,6 @@ export class ExchangeTestUtil {
     //   this.exchange.address,
     //   { from: this.testContext.deployer }
     // );
-
-    await this.loopringV3.updateProtocolFeeSettings(50, {
-      from: this.testContext.deployer
-    });
 
     for (let i = 0; i < this.MAX_NUM_EXCHANGES; i++) {
       this.pendingTransactions.push([]);
@@ -562,6 +549,12 @@ export class ExchangeTestUtil {
       constants.MAX_AGE_DEPOSIT_UNTIL_WITHDRAWABLE_UPPERBOUND
     ).toNumber();
     this.MAX_FORCED_WITHDRAWAL_FEE = new BN(constants.MAX_FORCED_WITHDRAWAL_FEE);
+    this.MAX_PROTOCOL_FEE_BIPS = new BN(constants.MAX_PROTOCOL_FEE_BIPS);
+    this.DEFAULT_PROTOCOL_FEE_BIPS = new BN(constants.DEFAULT_PROTOCOL_FEE_BIPS);
+
+    await this.loopringV3.updateProtocolFeeSettings(this.DEFAULT_PROTOCOL_FEE_BIPS, {
+      from: this.testContext.deployer
+    });
   }
 
   public async setupTestState(exchangeID: number) {
@@ -759,7 +752,6 @@ export class ExchangeTestUtil {
       storageIDB = storageIDB === undefined ? this.storageIDGenerator++ : storageIDB;
       await this.setupOrder(ring.orderB, storageIDB, bDepositB);
     }
-    // TODO？
     ring.tokenID = ring.tokenID !== undefined ? ring.tokenID : await this.getTokenIdFromNameOrAddress("LRC");
     ring.fee = ring.fee ? ring.fee : new BN(web3.utils.toWei("1", "ether"));
   }
@@ -825,7 +817,6 @@ export class ExchangeTestUtil {
     
   }
 
-  //order
   public async setupOrder(order: OrderInfo, index: number, bDeposit: boolean = true) {
     if (
       (order.type == 6 || order.type == 7) &&
@@ -860,11 +851,7 @@ export class ExchangeTestUtil {
     order.fillAmountBorS = order.fillAmountBorS !== undefined ? order.fillAmountBorS : true;
 
     order.taker = order.taker !== undefined ? order.taker : Constants.zeroAddress;
-    //TradingFeGasFee-TradingFeProtocolFeeBips
-    // order.maxFeeBips = order.maxFeeBips !== undefined ? order.maxFeeBips : 30;
 
-    // order.feeBips = order.feeBips !== undefined ? order.feeBips : order.maxFeeBips;
-    //protocolTakerFeeBipprotocolMakerFeeBips
     order.feeBips = order.feeBips !== undefined ? order.feeBips : 0;
     order.tradingFee = order.tradingFee !== undefined ? order.tradingFee : new BN(0);
 
@@ -874,19 +861,10 @@ export class ExchangeTestUtil {
     order.tokenIdB = this.tokenAddressToIDMap.get(order.tokenB);
     console.log("===================order.tokenIdS:" + order.tokenIdS);
     console.log("===================order.tokenIdB:" + order.tokenIdB);
-    //trading fegas fee
-    //fee
     order.fee = order.fee !== undefined ? order.fee : new BN(0);
-    //maxFee
     order.maxFee = order.maxFee !== undefined ? order.maxFee : new BN(0);
-    //feeTokenId
     order.feeTokenID =
       order.feeTokenID !== undefined ? order.feeTokenID : this.tokenAddressToIDMap.get(Constants.zeroAddress);
-
-    // //refeUrefe
-    // //
-    // order.uiReferID = order.uiReferID !== undefined ? order.uiReferID : 1;
-    // order.accountReferID = order.accountReferID !== undefined ? order.accountReferID : 1;
 
     // order.autoMarketID = order.autoMarketID !== undefined ? order.autoMarketID : 0;
     order.type = order.type !== undefined ? order.type : 0;
@@ -899,10 +877,6 @@ export class ExchangeTestUtil {
     order.deltaFilledS = order.deltaFilledS !== undefined ? order.deltaFilledS : new BN(0);
     order.useAppKey = order.useAppKey !== undefined ? order.useAppKey : 0;
 
-    // if (order.stableToken !== undefined && !order.stableToken.startsWith("0x")) {
-    //   //ETHToke
-    //   order.stableToken = this.testContext.tokenSymbolAddrMap.get("ETH");
-    // }
     if (bDeposit) {
       // setup initial balances:
       await this.setOrderBalances(order);
@@ -911,7 +885,7 @@ export class ExchangeTestUtil {
     }
 
     if (order.startOrder === undefined && (order.type == 6 || order.type == 7) && order.level == 0) {
-      //orde,autoMarketStartOrder
+      // This order is the first grid order, which needs to be supplemented by automarketstartorder
       const startOrder: AutoMarketStartOrderInfo = {
         exchange: order.exchange,
         storageID: order.storageID,
@@ -938,7 +912,7 @@ export class ExchangeTestUtil {
       console.log("AutoMarket-====++++++, type:" + startOrder.type);
       order.startOrder = startOrder;
     }
-    // AutoMarke
+    // Automarket does not need to sign any orders except the first one
     if ((order.type == 6 || order.type == 7) && order.startOrder.signature !== undefined) {
       order.signature = order.startOrder.signature;
     } else {
@@ -953,15 +927,6 @@ export class ExchangeTestUtil {
     }
     const account = this.accounts[this.exchangeId][order.accountID];
 
-    //trading fegas fee
-    // Calculate hash
-    // const hasher = Poseidon.createHash(14, 6, 53);
-    //refeUrefe
-    //TradingFeGasFee-TradingFeProtocolFeeBips
-    // const hasher = Poseidon.createHash(15, 6, 53);
-    // const hasher = Poseidon.createHash(14, 6, 53);
-    // const hasher = Poseidon.createHash(15, 6, 53);
-    // const hasher = Poseidon.createHash(17, 6, 53);
     const hasher = Poseidon.createHash(18, 6, 53);
     const inputs = [
       order.exchange,
@@ -972,15 +937,10 @@ export class ExchangeTestUtil {
       order.amountS,
       order.amountB,
       order.validUntil,
-      //TradingFeGasFee-TradingFeProtocolFeeBips
-      // order.maxFeeBips,
       order.fillAmountBorS ? 1 : 0,
       order.taker,
-      //trading fegas fee
       order.feeTokenID,
-      order.maxFee, //maxFee
-      //refeUrefe
-      // order.uiReferID,
+      order.maxFee,
       order.type,
       order.gridOffset,
       order.orderOffset,
@@ -1463,8 +1423,6 @@ export class ExchangeTestUtil {
     fee: BN,
     keyPair: any,
     options: AccountUpdateOptions = {}
-    // //refe-refe
-    // referID?: number,
   ) {
     // referID = referID == undefined ? 1 : referID;
     fee = roundToFloatValue(fee, Constants.Float16Encoding);
@@ -1498,8 +1456,6 @@ export class ExchangeTestUtil {
         secretKey: "0",
         appKeySecretKey: "0",
         nonce: 0
-        // //refe-refe
-        // referID: 1
       };
       this.accounts[this.exchangeId].push(account);
       isNewAccount = true;
@@ -1519,8 +1475,6 @@ export class ExchangeTestUtil {
       fee,
       maxFee,
       originalMaxFee: maxFee
-      // //refe-refe
-      // referID: referID
     };
 
     // Sign the public key update
@@ -1572,8 +1526,6 @@ export class ExchangeTestUtil {
     disableAppKeyWithdraw: number,
     disableAppKeyTransferToOther: number,
     options: AccountUpdateOptions = {}
-    // //refe-refe
-    // referID?: number,
   ) {
     // referID = referID == undefined ? 1 : referID;
     fee = roundToFloatValue(fee, Constants.Float16Encoding);
@@ -1612,7 +1564,7 @@ export class ExchangeTestUtil {
     };
 
     // Sign the public key update
-    //accounKeEDDS
+    // need to use the key of account to sign eddsa
     console.log("==========account public KeyX:" + account.publicKeyX);
     console.log("==========account public KeyY:" + account.publicKeyY);
     appKeyUpdate.signature = this.appKeyUpdateSign(account, appKeyUpdate);
@@ -2034,65 +1986,6 @@ export class ExchangeTestUtil {
     }
   }
 
-  public getCallbackConfig(blockCallbacks: BlockCallback[][]) {
-    interface TxCallback {
-      txIdx: number;
-      numTxs: number;
-      receiverIdx: number;
-      data: string;
-    }
-
-    interface OnchainBlockCallback {
-      blockIdx: number;
-      txCallbacks: TxCallback[];
-    }
-
-    interface CallbackConfig {
-      blockCallbacks: OnchainBlockCallback[];
-      receivers: string[];
-    }
-
-    const callbackConfig: CallbackConfig = {
-      blockCallbacks: [],
-      receivers: []
-    };
-
-    //console.log("Block callbacks: ");
-    for (const [blockIdx, callbacks] of blockCallbacks.entries()) {
-      //console.log(blockIdx);
-      //console.log(block.callbacks);
-      if (callbacks.length > 0) {
-        const onchainBlockCallback: OnchainBlockCallback = {
-          blockIdx,
-          txCallbacks: []
-        };
-        callbackConfig.blockCallbacks.push(onchainBlockCallback);
-
-        for (const blockCallback of callbacks) {
-          // Find receiver index
-          let receiverIdx = callbackConfig.receivers.findIndex(target => target === blockCallback.target);
-          if (receiverIdx === -1) {
-            receiverIdx = callbackConfig.receivers.length;
-            callbackConfig.receivers.push(blockCallback.target);
-          }
-          // Add the block callback to the list
-          onchainBlockCallback.txCallbacks.push({
-            txIdx: blockCallback.txIdx,
-            numTxs: blockCallback.numTxs,
-            receiverIdx,
-            data: blockCallback.auxiliaryData
-          });
-        }
-        //console.log(onchainBlockCallback);
-      }
-    }
-    //console.log(callbackConfig);
-    //for (const bc of callbackConfig.blockCallbacks) {
-    //  console.log(bc);
-    //}
-    return callbackConfig;
-  }
-
   public setPreApprovedTransactions(blocks: Block[]) {
     for (const block of blocks) {
       for (const blockCallback of block.callbacks) {
@@ -2163,28 +2056,18 @@ export class ExchangeTestUtil {
     return this.exchange.contract.methods.submitBlocks(blocks).encodeABI();
   }
 
-  public getSubmitBlocksWithCallbacks(parameters: any) {
+  public getSubmitBlocks(parameters: any) {
     const operatorContract = this.operator ? this.operator : this.exchange;
-    return operatorContract.contract.methods
-      .submitBlocksWithCallbacks(parameters.isDataCompressed, parameters.data, parameters.callbackConfig)
-      .encodeABI();
+    return operatorContract.contract.methods.submitBlocks(parameters.isDataCompressed, parameters.data).encodeABI();
   }
 
-  public getSubmitBlocksWithCallbacksData(
-    isDataCompressed: boolean,
-    txData: string,
-    blockCallbacks: BlockCallback[][]
-  ) {
+  public getSubmitBlocksData(isDataCompressed: boolean, txData: string) {
     const data = isDataCompressed ? compressZeros(txData) : txData;
     //console.log(data);
 
-    // Block callbacks
-    const callbackConfig = this.getCallbackConfig(blockCallbacks);
-
     return {
       isDataCompressed,
-      data,
-      callbackConfig
+      data
     };
   }
 
@@ -2297,7 +2180,7 @@ export class ExchangeTestUtil {
     //   calldataCost: 0
     // };
 
-    const parameters = this.getSubmitBlocksWithCallbacksData(true, txData, blockCallbacks);
+    const parameters = this.getSubmitBlocksData(true, txData);
 
     // Submit the blocks onchain
     const operatorContract = this.operator ? this.operator : this.exchange;
@@ -2333,14 +2216,13 @@ export class ExchangeTestUtil {
     }
     //console.log("num deposits: " + numDeposits);
 
-    const msg_data = this.getSubmitBlocksWithCallbacks(parameters);
+    const msg_data = this.getSubmitBlocks(parameters);
     // console.log("submitBlocksWithCallbacks msg_data:", msg_data);
 
     let tx: any = undefined;
-    tx = await operatorContract.submitBlocksWithCallbacks(
+    tx = await operatorContract.submitBlocks(
       parameters.isDataCompressed,
       parameters.data,
-      parameters.callbackConfig,
       //txData,
       { from: this.exchangeOperator, gasPrice: 0 }
     );
@@ -2536,13 +2418,6 @@ export class ExchangeTestUtil {
       const protocolFeeBips = protocolFees.protocolFeeBips.toNumber();
       // const protocolMakerFeeBips = protocolFees.makerFeeBips.toNumber();
 
-      //refeUrefe
-      // const referFees = await this.exchange.getReferFeeValues();
-      // const referFeeBips = referFees.referFeeBips.toNumber();
-      // const uiFeeBips = referFees.uiFeeBips.toNumber();
-      // const referFeeBips = 40;
-      // const uiFeeBips = 50;
-
       const depositTransactions: TxType[] = [];
       const accountTransactions: TxType[] = [];
       const othersTransactions: TxType[] = [];
@@ -2571,10 +2446,6 @@ export class ExchangeTestUtil {
         transactions,
         timestamp,
         protocolFeeBips,
-        // protocolMakerFeeBips,
-        // //refeUrefe
-        // referFeeBips,
-        // uiFeeBips,
         exchange: this.exchange.address,
         operatorAccountID: operator
       };
@@ -2806,13 +2677,13 @@ export class ExchangeTestUtil {
       );
     }
     // 10 -> 10000000
-    // 2 -> 128 = 2 * 
+    // 2 -> 128 = 2 * 2^6
     var tokenType = secondUserTokenType * 64;
     // 10 -> 100000
-    // 2 -> 32 = 2 * 
+    // 2 -> 32 = 2 * 2^4
     tokenType = tokenType + thirdUserTokenType * 16;
     // 10 -> 1000
-    // 2 -> 8 = 2 * 
+    // 2 -> 8 = 2 * 2^2
     tokenType = tokenType + fourthUserTokenType * 4;
     // 10 -> 10
     // 2 -> 2
@@ -2820,8 +2691,6 @@ export class ExchangeTestUtil {
     // console.log("secondUserTokenType:" + secondUserTokenType + ";thirdUserTokenType:" + thirdUserTokenType + ";fourthUserTokenType:" + fourthUserTokenType + ";tokenType:" + tokenType);
     // da.addNumber(tokenType, 1);
     da.addNumberForBits(tokenType, 8);
-    //byte
-    // da.addNumber(sixthUserTokenType, 1);
     da.addNumberForBits(sixthUserTokenType, 2);
     return [secondUserTokenType, thirdUserTokenType, fourthUserTokenType, fifthUserTokenType, sixthUserTokenType];
   }
@@ -2847,7 +2716,7 @@ export class ExchangeTestUtil {
 
   public feedBatchSpotTradePublicData(da: BitstreamEx, batchSpotTrade: BatchSpotTrade, bindTokenID: number) {
     const firstOrder = batchSpotTrade.users[0].orders[0];
-    // tokeorde
+    
     // var firstTokenID = firstOrder.tokenIdS ? firstOrder.tokenIdS : Number(firstOrder.tokenS);
     // var secondTokenID = firstOrder.tokenIdB ? firstOrder.tokenIdB : Number(firstOrder.tokenB);
     // var thirdTokenID = firstOrder.feeTokenID;
@@ -2887,7 +2756,6 @@ export class ExchangeTestUtil {
     // console.log("D secondTokenExchange:" + batchSpotTrade.userDSecondTokenExchange);
     // console.log("D thirdTokenExchange:" + batchSpotTrade.userDThirdTokenExchange);
 
-    //tokenType
     const tokenTypes = this.feedBatchSpotTradeTokenType(da, batchSpotTrade);
 
     da.print();
@@ -2966,12 +2834,9 @@ export class ExchangeTestUtil {
     // bs.addNumber(block.protocolTakerFeeBips, 1);
     // bs.addNumber(block.protocolMakerFeeBips, 1);
     bs.addNumber(block.protocolFeeBips, 1);
-    // //refeUrefe
-    // bs.addNumber(block.referFeeBips, 1);
-    // bs.addNumber(block.uiFeeBips, 1);
     bs.addNumber(numConditionalTransactions, 4);
     bs.addNumber(block.operatorAccountID, 4);
-    //Deposit、AccountUpdate、Withdra
+    // Deposit、AccountUpdate、Withdraw transaction's count
     var depositSize = 0;
     var accountUpdateSize = 0;
     var withdrawSize = 0;
@@ -2993,7 +2858,7 @@ export class ExchangeTestUtil {
       const da = new Bitstream();
       if (tx.noop || tx.txType === "Noop") {
         // da.addNumber(TransactionType.NOOP, 1);
-        // typ3bit1bit
+        // type need 3bit, pad 1bit
         // 000 0
         // 001 0 = 1 * 2
         // 010 0 = 2 * 2
@@ -3005,7 +2870,7 @@ export class ExchangeTestUtil {
         const orderB = spotTrade.orderB;
 
         // da.addNumber(TransactionType.SPOT_TRADE, 1);
-        // typ3bit1bit
+        // type need 3bit, pad 1bit
         // 000 0
         // 001 0 = 1 * 2
         // 010 0 = 2 * 2
@@ -3024,42 +2889,26 @@ export class ExchangeTestUtil {
         da.addNumber(spotTrade.fFillS_A ? spotTrade.fFillS_A : 0, 4);
         da.addNumber(spotTrade.fFillS_B ? spotTrade.fFillS_B : 0, 4);
 
-        //trading fegas fee
         da.addNumber(orderA.feeTokenID, 4);
         da.addNumber(toFloat(new BN(orderA.fee), Constants.Float16Encoding), 2);
-        // //refeUrefe
-        // // UI refer Account ID
-        // da.addNumber(orderA.uiReferID);
 
         da.addNumber(orderB.feeTokenID, 4);
         da.addNumber(toFloat(new BN(orderB.fee), Constants.Float16Encoding), 2);
-        // //refeUrefe
-        // // UI refer Account ID
-        // da.addNumber(orderB.uiReferID);
 
-        //：10000000 = 128
+        // 10000000 = 128
         let limitMask = orderA.fillAmountBorS ? 0b10000000 : 0;
         let feeData = orderA.feeBips >= 64 ? 64 + orderA.feeBips / Constants.FEE_MULTIPLIER : orderA.feeBips;
         da.addNumber(limitMask + feeData, 1);
 
         limitMask = orderB.fillAmountBorS ? 0b10000000 : 0;
-        //feeBip641feeBips / 50
-        //orderB.feeBips / 50 * 50 == feeBipsfeeBip5
+        // If feepips is greater than 64, it is marked as 1 in the second bit and feepips / 50 in the last 6 bits
+        // Here, a recovery check will be performed on the circuit, namely orderb Feebips / 50 * 50 = = feebips, from which we can see that feebips is required to be a multiple of 50
         feeData = orderB.feeBips >= 64 ? 64 + orderB.feeBips / Constants.FEE_MULTIPLIER : orderB.feeBips;
         da.addNumber(limitMask + feeData, 1);
-
-        // // autoMarket
-        // da.addNumber(orderA.autoMarketOrder, 1);
-        // da.addNumber(orderB.autoMarketOrder, 1);
-        // // autoMarketID max = 3byte
-        // da.addNumber(orderA.autoMarketID, 3);
-        // da.addNumber(orderB.autoMarketID, 3);
-        // da.addNumber(orderA.autoMarketLevel, 1);
-        // da.addNumber(orderB.autoMarketLevel, 1);
       } else if (tx.batchSpotTrade || tx.txType === "BatchSpotTrade") {
         console.log("in getBlockData BatchSpotTrade");
         var batchSpotTrade = tx.batchSpotTrade ? tx.batchSpotTrade : tx;
-        // bind tokenIDtyp1byt，typ3bit，bindTokenIbits
+        // bind tokenID and type use 1byte, type use 3bit, bindTokenID use 5 bits
         // 000 00000
         // 001 00000 = 1 * 32
         // 010 00000 = 2 * 32
@@ -3079,7 +2928,6 @@ export class ExchangeTestUtil {
       } else if (tx.transfer || tx.txType === "Transfer") {
         const transfer = tx.transfer ? tx.transfer : tx;
         // da.addNumber(TransactionType.TRANSFER, 1);
-        // typ3bit1bit
         // 000 0
         // 001 0 = 1 * 2
         // 010 0 = 2 * 2
@@ -3104,7 +2952,7 @@ export class ExchangeTestUtil {
         const needsFromAddress = transfer.type > 0 || transfer.putAddressesInDA;
         da.addBN(new BN(needsFromAddress ? transfer.from : "0"), 20);
 
-        da.addNumber(transfer.useAppKey, 1);
+        // da.addNumber(transfer.useAppKey, 1);
       } else if (tx.withdraw || tx.txType === "Withdraw") {
         const withdraw = tx.withdraw ? tx.withdraw : tx;
         // da.addNumber(TransactionType.WITHDRAWAL, 1);
@@ -3119,7 +2967,7 @@ export class ExchangeTestUtil {
         da.addNumber(toFloat(new BN(withdraw.fee), Constants.Float16Encoding), 2);
         da.addNumber(withdraw.storageID, 4);
         da.addBN(new BN(withdraw.onchainDataHash), 20);
-        da.addNumber(withdraw.useAppKey, 1);
+        // da.addNumber(withdraw.useAppKey, 1);
       } else if (tx.deposit || tx.txType === "Deposit") {
         const deposit = tx.deposit ? tx.deposit : tx;
         // da.addNumber(TransactionType.DEPOSIT, 1);
@@ -3141,7 +2989,6 @@ export class ExchangeTestUtil {
         da.addNumber(update.type, 1);
         da.addBN(new BN(update.owner), 20);
         // da.addNumber(update.accountID, 4);
-        //accoun0
         if (update.nonce == 0) {
           da.addNumber(0, 4);
         } else {
@@ -3152,12 +2999,9 @@ export class ExchangeTestUtil {
         da.addNumber(toFloat(new BN(update.fee), Constants.Float16Encoding), 2);
         da.addBN(new BN(EdDSA.pack(update.publicKeyX, update.publicKeyY), 16), 32);
         da.addNumber(update.nonce, 4);
-        // //refe-refe；referIpublic data
-        // da.addNumber(update.referID, 4);
       } else if (tx.orderCancel || tx.txType === "OrderCancel") {
         const update = tx.orderCancel ? tx.orderCancel : tx;
         // da.addNumber(TransactionType.ORDER_CANCEL, 1);
-        // typ3bit1bit
         // 000 0
         // 001 0 = 1 * 2
         // 010 0 = 2 * 2
@@ -3169,11 +3013,10 @@ export class ExchangeTestUtil {
         da.addNumber(update.storageID, 4);
         da.addNumber(update.feeTokenID, 4);
         da.addNumber(toFloat(new BN(update.fee), Constants.Float16Encoding), 2);
-        da.addNumber(update.useAppKey, 1);
+        // da.addNumber(update.useAppKey, 1);
         console.log("getBlockData::orderCancel", update);
       } else if (tx.appKeyUpdate || tx.txType === "AppKeyUpdate") {
         const update = tx.appKeyUpdate ? tx.appKeyUpdate : tx;
-        // typ3bit1bit
         // 000 0
         // 001 0 = 1 * 2
         // 010 0 = 2 * 2
@@ -3248,9 +3091,6 @@ export class ExchangeTestUtil {
     // Transform DA
     const transformedDa = new Bitstream();
     const size = Constants.TX_DATA_AVAILABILITY_SIZE;
-    // TODO 2，SpotTrade
-    //，operatodeposi。
-    //，toke71bytes
     const size1 = Constants.TX_DATA_AVAILABILITY_SIZE_PART_1;
 
     // const size2 = 39;
@@ -3619,12 +3459,9 @@ export class ExchangeTestUtil {
   }
 
   public async randomizeWithdrawalFee() {
-    await this.loopringV3.updateSettings(
-      await this.loopringV3.protocolFeeVault(),
-      await this.loopringV3.blockVerifierAddress(),
-      this.getRandomFee(),
-      { from: this.testContext.deployer }
-    );
+    await this.loopringV3.updateSettings(await this.loopringV3.protocolFeeVault(), this.getRandomFee(), {
+      from: this.testContext.deployer
+    });
   }
 
   public async doRandomDeposit(ownerIndex?: number) {

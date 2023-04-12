@@ -90,9 +90,7 @@ class TransferCircuit : public BaseTransactionCircuit
     // In one signature verification mode, although only one signature needs to be verified, the other signature will also be verified, 
     // and the fields need to be consistent with the first signature field
     // This reason is bullshit, but that's what it is now
-    // Poseidon_12 hashPayer;
     Poseidon_13 hashPayer;
-    // Poseidon_12 hashDual;
     Poseidon_13 hashDual;
 
     // Balances
@@ -107,6 +105,7 @@ class TransferCircuit : public BaseTransactionCircuit
     // Type
     IsNonZero isConditional;
     NotGadget needsSignature;
+    RequireEqualGadget requireEddsaType;
 
     // DA optimization
     OrGadget da_NeedsToAddress;
@@ -292,6 +291,8 @@ class TransferCircuit : public BaseTransactionCircuit
           // Type
           isConditional(pb, type.packed, ".isConditional"),
           needsSignature(pb, isConditional.result(), ".needsSignature"),
+          // require type == 0
+          requireEddsaType(pb, type.packed, state.constants._0, FMT(prefix, ".requireEddsaType")),
 
           // DA optimization
           da_NeedsToAddress(
@@ -330,13 +331,11 @@ class TransferCircuit : public BaseTransactionCircuit
             NUM_BITS_AMOUNT,
             FMT(prefix, ".requireAccuracyFee")),
           // Amount as float
-          // fAmount(pb, state.constants, Float24Encoding, FMT(prefix, ".fAmount")),
           fAmount(pb, state.constants, Float32Encoding, FMT(prefix, ".fAmount")),
           requireAccuracyAmount(
             pb,
             fAmount.value(),
             amount.packed,
-            // Float24Accuracy,
             Float32Accuracy,
             NUM_BITS_AMOUNT,
             FMT(prefix, ".requireAccuracyAmount")),
@@ -361,8 +360,7 @@ class TransferCircuit : public BaseTransactionCircuit
         // Set the 2 tokens used
         setArrayOutput(TXV_BALANCE_A_S_ADDRESS, tokenID.bits);
         setArrayOutput(TXV_BALANCE_A_B_ADDRESS, feeTokenID.bits);
-        // setArrayOutput(TXV_BALANCE_B_S_ADDRESS, feeTokenID.bits);
-        // DEG-127 split trading fee and gas fee
+
         setArrayOutput(TXV_BALANCE_O_A_Address, feeTokenID.bits);
 
         // Update the From balances (transfer + fee payment)
@@ -395,7 +393,7 @@ class TransferCircuit : public BaseTransactionCircuit
 
         // Nonce
         setArrayOutput(TXV_STORAGE_A_ADDRESS, subArray(storageID.bits, 0, NUM_BITS_STORAGE_ADDRESS));
-        // DEG-347 Storage move
+
         setOutput(TXV_STORAGE_A_TOKENSID, tokenID.packed);
         setOutput(TXV_STORAGE_A_TOKENBID, storageReader.getTokenBID());
         setOutput(TXV_STORAGE_A_DATA, nonce.getData());
@@ -471,6 +469,7 @@ class TransferCircuit : public BaseTransactionCircuit
         // Type
         isConditional.generate_r1cs_witness();
         needsSignature.generate_r1cs_witness();
+        requireEddsaType.generate_r1cs_witness();
 
         // DA optimization
         da_NeedsToAddress.generate_r1cs_witness();
@@ -483,7 +482,6 @@ class TransferCircuit : public BaseTransactionCircuit
         fFee.generate_r1cs_witness(toFloat(transfer.fee, Float16Encoding));
         requireAccuracyFee.generate_r1cs_witness();
         // Amount as float
-        // fAmount.generate_r1cs_witness(toFloat(transfer.amount, Float24Encoding));
         fAmount.generate_r1cs_witness(toFloat(transfer.amount, Float32Encoding));
         requireAccuracyAmount.generate_r1cs_witness();
         // Fee payment from From to the operator
@@ -560,6 +558,7 @@ class TransferCircuit : public BaseTransactionCircuit
         // Type
         isConditional.generate_r1cs_constraints();
         needsSignature.generate_r1cs_constraints();
+        requireEddsaType.generate_r1cs_constraints();
 
         // DA optimization
         da_NeedsToAddress.generate_r1cs_constraints();

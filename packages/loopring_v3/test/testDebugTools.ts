@@ -25,35 +25,14 @@ contract("Exchange", (accounts: string[]) => {
 
       //console.log("original gas cost: " + calculateCalldataCost(data));
 
-      const decodedInput = web3.eth.abi.decodeParameters(
-        [
-          "bool",
-          "bytes",
-          {
-            "struct CallbackConfig": {
-              "struct BlockCallback[]": {
-                blockIdx: "uint16",
-                "struct TxCallback[]": {
-                  txIdx: "uint16",
-                  numTxs: "uint16",
-                  receiverIdx: "uint16",
-                  data: "bytes"
-                }
-              },
-              receivers: "address[]"
-            }
-          }
-        ],
-        "0x" + data.slice(2 + 4 * 2)
-      );
+      const decodedInput = web3.eth.abi.decodeParameters(["bool", "bytes"], "0x" + data.slice(2 + 4 * 2));
 
       const ctx = new ExchangeTestUtil();
       await ctx.initialize(accounts);
 
-      const encodedData = await ctx.getSubmitBlocksWithCallbacks({
+      const encodedData = await ctx.getSubmitBlocks({
         isDataCompressed: true,
-        data: compressZeros(decodedInput[1]),
-        callbackConfig: decodedInput[2]
+        data: compressZeros(decodedInput[1])
       });
 
       //console.log("new gas cost: " + calculateCalldataCost(encodedData));
@@ -85,17 +64,13 @@ contract("Exchange", (accounts: string[]) => {
         /*const callbacksReference = JSON.parse(
           fs.readFileSync(callbacksFilename, "ascii")
         );*/
-        const blockInfo = JSON.parse(
-          fs.readFileSync(blockInfoFilename, "ascii")
-        );
+        const blockInfo = JSON.parse(fs.readFileSync(blockInfoFilename, "ascii"));
         //console.log(callbacksReference);
         const dummyProof: string[] = [];
         for (let i = 0; i < 8; i++) {
           dummyProof.push("0x" + "0".repeat(64));
         }
-        const proof = onlyUseInfoFile
-          ? dummyProof
-          : ctx.readProof(proofFilename);
+        const proof = onlyUseInfoFile ? dummyProof : ctx.readProof(proofFilename);
         //console.log(proof);
 
         // Create the block data
@@ -113,13 +88,7 @@ contract("Exchange", (accounts: string[]) => {
         //console.log(auxiliaryDataReference);
         //console.log(auxiliaryData);
 
-        const onchainBlock = ctx.getOnchainBlock(
-          0,
-          blockInfo.transactions.length,
-          blockData,
-          auxiliaryData,
-          proof
-        );
+        const onchainBlock = ctx.getOnchainBlock(0, blockInfo.transactions.length, blockData, auxiliaryData, proof);
         console.log(onchainBlock);
 
         const callbacks: BlockCallback[] = [];
@@ -139,17 +108,11 @@ contract("Exchange", (accounts: string[]) => {
       };
 
       // LoopringIOExchangeOwner.submitBlocksWithCallbacks
-      const withCallbacksParameters = ctx.getSubmitBlocksWithCallbacksData(
-        useCompression,
-        submitBlocksTxData,
-        blockCallbacks
-      );
+      const withCallbacksParameters = ctx.getSubmitBlocksData(useCompression, submitBlocksTxData);
       console.log(withCallbacksParameters);
 
-      const submitBlocksWithCallbacksBlocksTxData = ctx.getSubmitBlocksWithCallbacks(
-        withCallbacksParameters
-      );
-      console.log(submitBlocksWithCallbacksBlocksTxData);
+      const submitBlocksBlocksTxData = ctx.getSubmitBlocks(withCallbacksParameters);
+      console.log(submitBlocksBlocksTxData);
 
       // Write the  output to a file as well
       fs.writeFileSync(
@@ -159,7 +122,7 @@ contract("Exchange", (accounts: string[]) => {
             blocks: onchainBlocks,
             txData: submitBlocksTxData,
             withCallbacksParameters,
-            txDataWithCallbacks: submitBlocksWithCallbacksBlocksTxData
+            txDataWithCallbacks: submitBlocksBlocksTxData
           },
           undefined,
           4

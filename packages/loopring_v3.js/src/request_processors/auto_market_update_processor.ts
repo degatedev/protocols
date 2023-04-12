@@ -4,8 +4,6 @@ import { Constants } from "../constants";
 import { EdDSA } from "../eddsa";
 import { fromFloat } from "../float";
 import { BlockContext, ExchangeState } from "../types";
-// // DEG-170 auto market - config add
-// TODO
 interface AutoMarketUpdate {
   autoMarketID?: number;
   accountID?: number;
@@ -62,7 +60,6 @@ export class AutoMarketUpdateProcessor {
     let data = new Bitstream(dataInString.slice(3));
 
     let offset = 0;
-    // 1
     autoMarketUpdate.autoMarketID = data.extractUint16(offset);
     offset += 2;
     autoMarketUpdate.tokenSID = data.extractUint32(offset);

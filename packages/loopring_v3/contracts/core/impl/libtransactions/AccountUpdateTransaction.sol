@@ -76,7 +76,7 @@ library AccountUpdateTransaction
         uint         offset,
         AccountUpdate memory accountUpdate
         )
-        internal
+        private
         pure
     {
         uint _offset = offset;
@@ -109,7 +109,7 @@ library AccountUpdateTransaction
         bytes32 DOMAIN_SEPARATOR,
         AccountUpdate memory accountUpdate
         )
-        internal
+        private
         pure
         returns (bytes32)
     {

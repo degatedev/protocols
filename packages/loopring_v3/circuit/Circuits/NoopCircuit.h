@@ -51,7 +51,6 @@ class NoopCircuit : public BaseTransactionCircuit
 
     const VariableArrayT getPublicData() const
     {
-        // return VariableArrayT(0, state.constants._0);
         return flattenReverse({
             typeTx.bits,
             typeTxPad.bits
