@@ -15,6 +15,8 @@ contract BlockVerifierOwner is DelayedOwner
         )
         DelayedOwner(address(blockVerifier), 3 days)
     {
+        require(address(blockVerifier) != address(0), "INVALID_BLOCK_VERIFIER");
+
         setFunctionDelay(blockVerifier.transferOwnership.selector, 7 days);
         setFunctionDelay(blockVerifier.registerCircuit.selector, 7 days);
         setFunctionDelay(blockVerifier.disableCircuit.selector, 1 days);

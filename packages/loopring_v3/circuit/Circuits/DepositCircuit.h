@@ -18,11 +18,13 @@ namespace Loopring
 class DepositCircuit : public BaseTransactionCircuit
 {
   public:
+    // DualVariableGadget typeTx;
     // Inputs
     DualVariableGadget owner;
     DualVariableGadget accountID;
     DualVariableGadget tokenID;
     DualVariableGadget amount;
+    DualVariableGadget type;
 
     // Validate
     OwnerValidGadget ownerValid;
@@ -41,11 +43,14 @@ class DepositCircuit : public BaseTransactionCircuit
       const std::string &prefix)
         : BaseTransactionCircuit(pb, state, prefix),
 
+          // typeTx(pb, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
           // Inputs
           owner(pb, NUM_BITS_ADDRESS, FMT(prefix, ".owner")),
           accountID(pb, NUM_BITS_ACCOUNT, FMT(prefix, ".accountID")),
           tokenID(pb, NUM_BITS_TOKEN, FMT(prefix, ".tokenID")),
-          amount(pb, NUM_BITS_AMOUNT, FMT(prefix, ".amount")),
+          // 248bits for deposit
+          amount(pb, NUM_BITS_AMOUNT_DEPOSIT, FMT(prefix, ".amount")),
+          type(pb, NUM_BITS_TYPE, FMT(prefix, ".type")),
 
           // Validate
           ownerValid(pb, state.constants, state.accountA.account.owner, owner.packed, FMT(prefix, ".ownerValid")),
@@ -57,7 +62,7 @@ class DepositCircuit : public BaseTransactionCircuit
             pb,
             balanceS_A.balance(),
             depositedAmount.balance(),
-            NUM_BITS_AMOUNT,
+            NUM_BITS_AMOUNT_DEPOSIT,
             FMT(prefix, ".balance_after")),
 
           // Increase the number of conditional transactions
@@ -67,6 +72,7 @@ class DepositCircuit : public BaseTransactionCircuit
             state.constants._1,
             FMT(prefix, ".numConditionalTransactionsAfter"))
     {
+        LOG(LogDebug, "in DepositCircuit", "");
         // Update the account balance
         setArrayOutput(TXV_ACCOUNT_A_ADDRESS, accountID.bits);
         setOutput(TXV_ACCOUNT_A_OWNER, owner.packed);
@@ -83,11 +89,14 @@ class DepositCircuit : public BaseTransactionCircuit
 
     void generate_r1cs_witness(const Deposit &deposit)
     {
+        LOG(LogDebug, "in DepositCircuit", "generate_r1cs_witness");
+        // typeTx.generate_r1cs_witness(pb, ethsnarks::FieldT(int(Loopring::TransactionType::Deposit)));
         // Inputs
         owner.generate_r1cs_witness(pb, deposit.owner);
         accountID.generate_r1cs_witness(pb, deposit.accountID);
         tokenID.generate_r1cs_witness(pb, deposit.tokenID);
         amount.generate_r1cs_witness(pb, deposit.amount);
+        type.generate_r1cs_witness(pb, deposit.type);
 
         // Validate
         ownerValid.generate_r1cs_witness();
@@ -103,11 +112,14 @@ class DepositCircuit : public BaseTransactionCircuit
 
     void generate_r1cs_constraints()
     {
+        LOG(LogDebug, "in DepositCircuit", "generate_r1cs_constraints");
+        // typeTx.generate_r1cs_constraints(true);
         // Inputs
         owner.generate_r1cs_constraints(true);
         accountID.generate_r1cs_constraints(true);
         tokenID.generate_r1cs_constraints(true);
         amount.generate_r1cs_constraints(true);
+        type.generate_r1cs_constraints(true);
 
         // Validate
         ownerValid.generate_r1cs_constraints();
@@ -123,7 +135,10 @@ class DepositCircuit : public BaseTransactionCircuit
 
     const VariableArrayT getPublicData() const
     {
-        return flattenReverse({owner.bits, accountID.bits, tokenID.bits, amount.bits});
+        return flattenReverse({
+          // typeTx.bits, 
+          type.bits,
+          owner.bits, accountID.bits, tokenID.bits, amount.bits});
     }
 };
 

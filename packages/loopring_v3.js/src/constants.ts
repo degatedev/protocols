@@ -5,25 +5,55 @@ import { Balance } from "./types";
 export class Constants {
   static readonly BINARY_TREE_DEPTH_STORAGE = 14;
   static readonly BINARY_TREE_DEPTH_ACCOUNTS = 32;
-  static readonly BINARY_TREE_DEPTH_TOKENS = 16;
+  // static readonly BINARY_TREE_DEPTH_TOKENS = 16;
+  static readonly BINARY_TREE_DEPTH_TOKENS = 32;
 
-  static readonly TX_DATA_AVAILABILITY_SIZE = 68;
+  // static readonly TX_DATA_AVAILABILITY_SIZE = 68;
+  static readonly TX_DATA_AVAILABILITY_SIZE = 83;
+
+  static readonly TX_DATA_AVAILABILITY_SIZE_PART_1 = 80;
+  static readonly TX_DATA_AVAILABILITY_SIZE_PART_2 = 3;
 
   static readonly NUM_BITS_ACCOUNTID = Constants.BINARY_TREE_DEPTH_ACCOUNTS;
   static readonly NUM_BITS_STORAGEID = 32;
   static readonly NUM_STORAGE_SLOTS = 2 ** Constants.BINARY_TREE_DEPTH_STORAGE;
 
-  static readonly MAX_NUM_TOKENS = 2 ** 16;
+  // static readonly MAX_NUM_TOKENS = 2 ** 16;
+  static readonly MAX_NUM_TOKENS = 4 ** 16;
 
-  static readonly MAX_AMOUNT = new BN(2).pow(new BN(96)).sub(new BN(1));
+  static readonly MAX_AMOUNT = new BN(2).pow(new BN(248)).sub(new BN(1));
 
   static readonly FEE_MULTIPLIER = 50;
+
+  static readonly Float32Encoding: FloatEncoding = {
+    numBitsExponent: 7,
+    numBitsMantissa: 25,
+    exponentBase: 10
+  };
+  // static readonly Float31Encoding: FloatEncoding = {
+  //   numBitsExponent: 7,
+  //   numBitsMantissa: 24,
+  //   exponentBase: 10
+  // };
+
+  static readonly Float29Encoding: FloatEncoding = {
+    numBitsExponent: 5,
+    numBitsMantissa: 24,
+    exponentBase: 10
+  };
 
   static readonly Float24Encoding: FloatEncoding = {
     numBitsExponent: 5,
     numBitsMantissa: 19,
     exponentBase: 10
   };
+
+  static readonly Float23Encoding: FloatEncoding = {
+    numBitsExponent: 5,
+    numBitsMantissa: 18,
+    exponentBase: 10
+  };
+
   static readonly Float16Encoding: FloatEncoding = {
     numBitsExponent: 5,
     numBitsMantissa: 11,
@@ -39,8 +69,8 @@ export class Constants {
   );
 
   static readonly DefaultBalance: Balance = {
-    balance: new BN(0),
-    weightAMM: new BN(0),
-    storage: {}
+    balance: new BN(0)
+    // weightAMM: new BN(0),
+    // storage: {}
   };
 }

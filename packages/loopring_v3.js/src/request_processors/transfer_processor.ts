@@ -42,7 +42,7 @@ export class TransferProcessor {
 
     // Nonce
     const storage = from
-      .getBalance(transfer.tokenID)
+      // .getBalance(transfer.tokenID)
       .getStorage(transfer.storageID);
     storage.storageID = transfer.storageID;
     storage.data = new BN(1);
@@ -53,9 +53,14 @@ export class TransferProcessor {
     return transfer;
   }
 
-  public static extractData(data: Bitstream) {
+  public static extractData(dataIn: Bitstream) {
     const transfer: Transfer = {};
-    let offset = 1;
+
+    // '0x' + txType(0.5 byte)
+    let dataInString = dataIn.getData();
+    let data = new Bitstream(dataInString.slice(3));
+
+    let offset = 0;
 
     // Check that this is a conditional update
     const transferType = data.extractUint8(offset);
@@ -65,15 +70,24 @@ export class TransferProcessor {
     offset += 4;
     transfer.accountToID = data.extractUint32(offset);
     offset += 4;
-    transfer.tokenID = data.extractUint16(offset);
-    offset += 2;
+
+    // DEG token deep to 16
+    transfer.tokenID = data.extractUint32(offset);
+    offset += 4;
+    // transfer.amount = fromFloat(
+    //   data.extractUint24(offset),
+    //   Constants.Float24Encoding
+    // );
+    // offset += 3;
     transfer.amount = fromFloat(
-      data.extractUint24(offset),
-      Constants.Float24Encoding
+      data.extractUint32(offset),
+      Constants.Float32Encoding
     );
-    offset += 3;
-    transfer.feeTokenID = data.extractUint16(offset);
-    offset += 2;
+    offset += 4;
+
+    // DEG token deep to 16
+    transfer.feeTokenID = data.extractUint32(offset);
+    offset += 4;
     transfer.fee = fromFloat(
       data.extractUint16(offset),
       Constants.Float16Encoding

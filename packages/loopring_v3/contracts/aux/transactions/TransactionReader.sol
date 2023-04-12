@@ -5,10 +5,7 @@ pragma experimental ABIEncoderV2;
 
 import "../../core/impl/libtransactions/BlockReader.sol";
 
-import "../../core/impl/libtransactions/AmmUpdateTransaction.sol";
 import "../../core/impl/libtransactions/DepositTransaction.sol";
-import "../../core/impl/libtransactions/SignatureVerificationTransaction.sol";
-import "../../core/impl/libtransactions/TransferTransaction.sol";
 import "../../core/impl/libtransactions/WithdrawTransaction.sol";
 
 /// @title TransactionReader
@@ -43,45 +40,6 @@ library TransactionReader {
     {
         _block.readTx(txIdx, txData);
         WithdrawTransaction.readTx(txData, 0, withdrawal);
-    }
-
-    function readAmmUpdate(
-        ExchangeData.Block memory _block,
-        uint txIdx,
-        bytes memory txData
-        )
-        internal
-        pure
-        returns (AmmUpdateTransaction.AmmUpdate memory ammUpdate)
-    {
-        _block.readTx(txIdx, txData);
-        AmmUpdateTransaction.readTx(txData, 0, ammUpdate);
-    }
-
-    function readTransfer(
-        ExchangeData.Block memory _block,
-        uint txIdx,
-        bytes memory txData
-        )
-        internal
-        pure
-        returns (TransferTransaction.Transfer memory transfer)
-    {
-        _block.readTx(txIdx, txData);
-        TransferTransaction.readTx(txData, 0, transfer);
-    }
-
-    function readSignatureVerification(
-        ExchangeData.Block memory _block,
-        uint txIdx,
-        bytes memory txData
-        )
-        internal
-        pure
-        returns (SignatureVerificationTransaction.SignatureVerification memory verification)
-    {
-        _block.readTx(txIdx, txData);
-        SignatureVerificationTransaction.readTx(txData, 0, verification);
     }
 
     function readTx(

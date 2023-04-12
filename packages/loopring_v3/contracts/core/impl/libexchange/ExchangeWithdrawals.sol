@@ -4,6 +4,7 @@ pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
 import "../../../lib/AddressUtil.sol";
+import "../../../lib/MathUint248.sol";
 import "../../../thirdparty/BytesUtil.sol";
 import "../../iface/ExchangeData.sol";
 import "./ExchangeBalances.sol";
@@ -28,6 +29,7 @@ library ExchangeWithdrawals
     using AddressUtil       for address payable;
     using BytesUtil         for bytes;
     using MathUint          for uint;
+    using MathUint248       for uint248;
     using ExchangeBalances  for ExchangeData.State;
     using ExchangeMode      for ExchangeData.State;
     using ExchangeTokens    for ExchangeData.State;
@@ -67,13 +69,13 @@ library ExchangeWithdrawals
         require(S.getNumAvailableForcedSlots() > 0, "TOO_MANY_REQUESTS_OPEN");
         require(accountID < ExchangeData.MAX_NUM_ACCOUNTS, "INVALID_ACCOUNTID");
 
-        uint16 tokenID = S.getTokenID(token);
+        uint32 tokenID = S.getTokenID(token);
 
         // A user needs to pay a fixed ETH withdrawal fee, set by the protocol.
         uint withdrawalFeeETH = S.loopring.forcedWithdrawalFee();
 
         // Check ETH value sent, can be larger than the expected withdraw fee
-        require(msg.value >= withdrawalFeeETH, "INSUFFICIENT_FEE");
+        require(msg.value >= withdrawalFeeETH, "INSUFFICIENT_WITHDRAW_FEE");
 
         // Send surplus of ETH back to the sender
         uint feeSurplus = msg.value.sub(withdrawalFeeETH);
@@ -114,15 +116,15 @@ library ExchangeWithdrawals
 
         address owner = merkleProof.accountLeaf.owner;
         uint32 accountID = merkleProof.accountLeaf.accountID;
-        uint16 tokenID = merkleProof.balanceLeaf.tokenID;
-        uint96 balance = merkleProof.balanceLeaf.balance;
+        uint32 tokenID = merkleProof.balanceLeaf.tokenID;
+        uint248 balance = merkleProof.balanceLeaf.balance;
 
         // Make sure the funds aren't withdrawn already.
         require(S.withdrawnInWithdrawMode[accountID][tokenID] == false, "WITHDRAWN_ALREADY");
 
         // Verify that the provided Merkle tree data is valid by using the Merkle proof.
         ExchangeBalances.verifyAccountBalance(
-            uint(S.merkleRoot),
+            uint(S.merkleAssetRoot),
             merkleProof
         );
 
@@ -137,7 +139,7 @@ library ExchangeWithdrawals
             owner,
             tokenID,
             balance,
-            new bytes(0),
+            // new bytes(0),
             gasleft(),
             false
         );
@@ -150,7 +152,7 @@ library ExchangeWithdrawals
         )
         public
     {
-        uint16 tokenID = S.getTokenID(token);
+        uint32 tokenID = S.getTokenID(token);
         ExchangeData.Deposit storage deposit = S.pendingDeposits[owner][tokenID];
         require(deposit.timestamp != 0, "DEPOSIT_NOT_WITHDRAWABLE_YET");
 
@@ -161,7 +163,7 @@ library ExchangeWithdrawals
             "DEPOSIT_NOT_WITHDRAWABLE_YET"
         );
 
-        uint amount = deposit.amount;
+        uint248 amount = deposit.amount;
 
         // Reset the deposit request
         delete S.pendingDeposits[owner][tokenID];
@@ -174,7 +176,7 @@ library ExchangeWithdrawals
             owner,
             tokenID,
             amount,
-            new bytes(0),
+            // new bytes(0),
             gasleft(),
             false
         );
@@ -190,8 +192,8 @@ library ExchangeWithdrawals
         require(owners.length == tokens.length, "INVALID_INPUT_DATA");
         for (uint i = 0; i < owners.length; i++) {
             address owner = owners[i];
-            uint16 tokenID = S.getTokenID(tokens[i]);
-            uint amount = S.amountWithdrawable[owner][tokenID];
+            uint32 tokenID = S.getTokenID(tokens[i]);
+            uint248 amount = S.amountWithdrawable[owner][tokenID];
 
             // Make sure this amount can't be withdrawn again
             delete S.amountWithdrawable[owner][tokenID];
@@ -204,7 +206,7 @@ library ExchangeWithdrawals
                 owner,
                 tokenID,
                 amount,
-                new bytes(0),
+                // new bytes(0),
                 gasleft(),
                 false
             );
@@ -215,9 +217,9 @@ library ExchangeWithdrawals
         ExchangeData.State storage S,
         address from,
         address to,
-        uint16  tokenID,
-        uint    amount,
-        bytes   memory extraData,
+        uint32  tokenID,
+        uint248    amount,
+        // bytes   memory extraData,
         uint    gasLimit
         )
         public
@@ -230,7 +232,7 @@ library ExchangeWithdrawals
             to,
             tokenID,
             amount,
-            extraData,
+            // extraData,
             gasLimit,
             true
         );
@@ -254,9 +256,9 @@ library ExchangeWithdrawals
         uint8   category,
         address from,
         address to,
-        uint16  tokenID,
-        uint    amount,
-        bytes   memory extraData,
+        uint32  tokenID,
+        uint248 amount,
+        // bytes   memory extraData,
         uint    gasLimit,
         bool    allowFailure
         )
@@ -271,7 +273,7 @@ library ExchangeWithdrawals
 
         // Transfer the tokens from the deposit contract to the owner
         if (gasLimit > 0) {
-            try S.depositContract.withdraw{gas: gasLimit}(from, to, token, amount, extraData) {
+            try S.depositContract.withdraw{gas: gasLimit}(from, to, token, amount) {
                 success = true;
             } catch {
                 success = false;
@@ -290,6 +292,9 @@ library ExchangeWithdrawals
             if (from == address(0)) {
                 S.protocolFeeLastWithdrawnTime[token] = block.timestamp;
             }
+
+            S.tokenIdToDepositBalance[tokenID] = S.tokenIdToDepositBalance[tokenID].sub(amount);
+
         } else {
             emit WithdrawalFailed(category, from, to, token, amount);
         }

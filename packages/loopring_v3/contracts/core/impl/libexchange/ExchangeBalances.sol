@@ -40,8 +40,6 @@ library ExchangeBalances
         uint calculatedRoot = getBalancesRoot(
             merkleProof.balanceLeaf.tokenID,
             merkleProof.balanceLeaf.balance,
-            merkleProof.balanceLeaf.weightAMM,
-            merkleProof.balanceLeaf.storageRoot,
             merkleProof.balanceMerkleProof
         );
         calculatedRoot = getAccountInternalsRoot(
@@ -49,9 +47,11 @@ library ExchangeBalances
             merkleProof.accountLeaf.owner,
             merkleProof.accountLeaf.pubKeyX,
             merkleProof.accountLeaf.pubKeyY,
+            // merkleProof.accountLeaf.appKeyPubKeyX,
+            // merkleProof.accountLeaf.appKeyPubKeyY,
             merkleProof.accountLeaf.nonce,
-            merkleProof.accountLeaf.feeBipsAMM,
             calculatedRoot,
+            // merkleProof.accountLeaf.storageRoot,
             merkleProof.accountMerkleProof
         );
         // Check against the expected Merkle root
@@ -59,21 +59,19 @@ library ExchangeBalances
     }
 
     function getBalancesRoot(
-        uint16   tokenID,
+        uint32   tokenID,
         uint     balance,
-        uint     weightAMM,
-        uint     storageRoot,
-        uint[24] memory balanceMerkleProof
+        uint[48] memory balanceMerkleProof
         )
         private
         pure
         returns (uint)
     {
         // Hash the balance leaf
-        uint balanceItem = hashImpl(balance, weightAMM, storageRoot, 0);
+        uint balanceItem = hashImpl(balance, 0, 0, 0);
         // Calculate the Merkle root of the balance quad Merkle tree
         uint _id = tokenID;
-        for (uint depth = 0; depth < 8; depth++) {
+        for (uint depth = 0; depth < ExchangeData.BINARY_TREE_DEPTH_TOKENS/2; depth++) { // quad tree depth 
             uint base = depth * 3;
             if (_id & 3 == 0) {
                 balanceItem = hashImpl(
@@ -114,9 +112,11 @@ library ExchangeBalances
         address  owner,
         uint     pubKeyX,
         uint     pubKeyY,
+        // uint     appKeyPubKeyX,
+        // uint     appKeyPubKeyY,
         uint     nonce,
-        uint     feeBipsAMM,
         uint     balancesRoot,
+        // uint     storageRoot,
         uint[48] memory accountMerkleProof
         )
         private
@@ -124,10 +124,10 @@ library ExchangeBalances
         returns (uint)
     {
         // Hash the account leaf
-        uint accountItem = hashAccountLeaf(uint(owner), pubKeyX, pubKeyY, nonce, feeBipsAMM, balancesRoot);
+        uint accountItem = hashAccountLeaf(uint(owner), pubKeyX, pubKeyY, nonce, balancesRoot);
         // Calculate the Merkle root of the account quad Merkle tree
         uint _id = accountID;
-        for (uint depth = 0; depth < 16; depth++) {
+        for (uint depth = 0; depth < ExchangeData.BINARY_TREE_DEPTH_ACCOUNTS/2; depth++) { // quad tree depth 
             uint base = depth * 3;
             if (_id & 3 == 0) {
                 accountItem = hashImpl(
@@ -168,15 +168,16 @@ library ExchangeBalances
         uint t1,
         uint t2,
         uint t3,
-        uint t4,
-        uint t5
+        uint t4
+        // uint t5,
+        // uint t6
         )
         public
         pure
         returns (uint)
     {
-        Poseidon.HashInputs7 memory inputs = Poseidon.HashInputs7(t0, t1, t2, t3, t4, t5, 0);
-        return Poseidon.hash_t7f6p52(inputs, ExchangeData.SNARK_SCALAR_FIELD);
+        Poseidon.HashInputs6 memory inputs = Poseidon.HashInputs6(t0, t1, t2, t3, t4, 0);
+        return Poseidon.hash_t6f6p52(inputs, ExchangeData.SNARK_SCALAR_FIELD);
     }
 
     function hashImpl(

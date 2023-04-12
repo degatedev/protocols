@@ -1,8 +1,13 @@
 from collections import namedtuple
 
 FloatEncoding = namedtuple("FloatEncoding", "numBitsExponent numBitsMantissa exponentBase")
+Float32Encoding = FloatEncoding(7, 25, 10)
+Float31Encoding = FloatEncoding(7, 24, 10)
+Float30Encoding = FloatEncoding(5, 25, 10)
+Float29Encoding = FloatEncoding(5, 24, 10)
 Float28Encoding = FloatEncoding(5, 23, 10)
 Float24Encoding = FloatEncoding(5, 19, 10)
+Float23Encoding = FloatEncoding(5, 18, 10)
 Float16Encoding = FloatEncoding(5, 11, 10)
 Float12Encoding = FloatEncoding(5,  7, 10)
 Float8Encoding = FloatEncoding(5,  3, 10)
@@ -38,3 +43,14 @@ def roundToFloatValue(value, encoding):
   f = toFloat(int(value), encoding)
   floatValue = fromFloat(f, encoding)
   return floatValue
+
+def roundToFloatValueWithNegative(value, encoding):
+    floatValue = 0
+    if value > 0:
+        f = toFloat(int(value), encoding)
+        floatValue = fromFloat(f, encoding)
+    else:
+        f = toFloat(int(-value), encoding)
+        floatValue = fromFloat(f, encoding)
+        floatValue = -floatValue
+    return floatValue

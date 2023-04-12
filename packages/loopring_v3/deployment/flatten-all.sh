@@ -25,11 +25,6 @@ declare -a all_contracts=(
     "contracts/core/impl/libexchange/ExchangeDeposits.sol"
     "contracts/core/impl/libexchange/ExchangeGenesis.sol"
     "contracts/core/impl/libexchange/ExchangeBlocks.sol"
-    "contracts/amm/LoopringAmmPool.sol"
-    "contracts/amm/libamm/AmmJoinRequest.sol"
-    "contracts/amm/libamm/AmmExitRequest.sol"
-    "contracts/amm/libamm/AmmStatus.sol"
-    "contracts/amm/libamm/AmmWithdrawal.sol"
 )
 
 mkdir -p $DEST

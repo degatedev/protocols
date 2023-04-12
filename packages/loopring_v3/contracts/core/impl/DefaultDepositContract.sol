@@ -48,6 +48,8 @@ contract DefaultDepositContract is IDepositContract, Claimable
         bool            checkBalance
     );
 
+    receive() external payable { }
+
     function initialize(
         address _exchange
         )
@@ -86,7 +88,7 @@ contract DefaultDepositContract is IDepositContract, Claimable
     function deposit(
         address from,
         address token,
-        uint96  amount,
+        uint248  amount,
         bytes   calldata /*extraData*/
         )
         external
@@ -94,7 +96,7 @@ contract DefaultDepositContract is IDepositContract, Claimable
         payable
         onlyExchange
         ifNotZero(amount)
-        returns (uint96 amountReceived)
+        returns (uint248 amountReceived)
     {
         uint ethToReturn = 0;
 
@@ -114,7 +116,7 @@ contract DefaultDepositContract is IDepositContract, Claimable
 
             uint balanceAfter = checkBalance ? ERC20(token).balanceOf(address(this)) : amount;
             uint diff = balanceAfter.sub(balanceBefore);
-            amountReceived = diff.toUint96();
+            amountReceived = diff.toUint248();
 
             ethToReturn = msg.value;
         }
@@ -128,8 +130,8 @@ contract DefaultDepositContract is IDepositContract, Claimable
         address /*from*/,
         address to,
         address token,
-        uint    amount,
-        bytes   calldata /*extraData*/
+        uint    amount
+        // bytes   calldata /*extraData*/
         )
         external
         override

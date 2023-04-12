@@ -27,7 +27,11 @@ export class AccountUpdateProcessor {
   ) {
     const update = AccountUpdateProcessor.extractData(txData);
 
-    const account = state.getAccount(update.accountID);
+    const accountID = state.ownerToAccountId[update.owner];
+    console.log("AccountUpdateProcessor", update.owner, accountID);
+
+    // const account = state.getAccount(update.accountID);
+    const account = state.getAccount(accountID);
     account.owner = update.owner;
     account.publicKeyX = update.publicKeyX;
     account.publicKeyY = update.publicKeyY;
@@ -45,7 +49,7 @@ export class AccountUpdateProcessor {
 
   public static extractData(data: Bitstream) {
     const update: AccountUpdate = {};
-    let offset = 1;
+    let offset = 0;
 
     const updateType = data.extractUint8(offset);
     offset += 1;
@@ -53,8 +57,8 @@ export class AccountUpdateProcessor {
     offset += 20;
     update.accountID = data.extractUint32(offset);
     offset += 4;
-    update.feeTokenID = data.extractUint16(offset);
-    offset += 2;
+    update.feeTokenID = data.extractUint32(offset);
+    offset += 4;
     update.fee = fromFloat(
       data.extractUint16(offset),
       Constants.Float16Encoding

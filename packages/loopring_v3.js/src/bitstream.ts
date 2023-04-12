@@ -38,6 +38,11 @@ export class Bitstream {
     return this.insert(formattedData);
   }
 
+  public addBigNumberWithChar(x: BigNumber, numChar = 2) {
+    const formattedData = this.padString(x.toString(16), numChar);
+    return this.insert(formattedData);
+  }
+
   public addBN(x: BN, numBytes = 32) {
     const formattedData = this.padString(x.toString(16), numBytes * 2);
     return this.insert(formattedData);
@@ -52,6 +57,11 @@ export class Bitstream {
     } else {
       return this.addBigNumber(new BigNumber(x), numBytes);
     }
+  }
+
+  // 1byte = 1
+  public addNumberWithChar(x: number, numChar = 2) {
+    return this.addBigNumberWithChar(new BigNumber(x), numChar);
   }
 
   public addAddress(x: string, numBytes = 20) {
@@ -103,6 +113,10 @@ export class Bitstream {
     return new BN(this.extractData(offset, 12), 16);
   }
 
+  public extractUint248(offset: number) {
+    return new BN(this.extractData(offset, 31), 16);
+  }
+
   public extractUint(offset: number) {
     return new BN(this.extractData(offset, 32), 16);
   }
@@ -141,6 +155,9 @@ export class Bitstream {
   // Returns the number of bytes of data
   public length() {
     return this.data.length / 2;
+  }
+  public bitLength() {
+    return this.data.length;
   }
 
   private insert(x: string) {

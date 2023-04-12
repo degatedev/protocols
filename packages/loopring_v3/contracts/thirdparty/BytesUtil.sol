@@ -360,6 +360,17 @@ library BytesUtil {
         return tempUint;
     }
 
+
+    function toUint248Unsafe(bytes memory _bytes, uint _start) internal  pure returns (uint248) {
+        uint248 tempUint;
+
+        assembly {
+            tempUint := mload(add(add(_bytes, 0x1f), _start))
+        }
+
+        return tempUint;
+    }
+
     function toUintUnsafe(bytes memory _bytes, uint _start) internal  pure returns (uint256) {
         uint256 tempUint;
 

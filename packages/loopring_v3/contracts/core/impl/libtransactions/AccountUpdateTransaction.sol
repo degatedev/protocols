@@ -19,14 +19,14 @@ library AccountUpdateTransaction
     using ExchangeSignatures   for ExchangeData.State;
 
     bytes32 constant public ACCOUNTUPDATE_TYPEHASH = keccak256(
-        "AccountUpdate(address owner,uint32 accountID,uint16 feeTokenID,uint96 maxFee,uint256 publicKey,uint32 validUntil,uint32 nonce)"
+        "AccountUpdate(address owner,uint32 accountID,uint32 feeTokenID,uint96 maxFee,uint256 publicKey,uint32 validUntil,uint32 nonce)"
     );
 
     struct AccountUpdate
     {
         address owner;
         uint32  accountID;
-        uint16  feeTokenID;
+        uint32  feeTokenID;
         uint96  maxFee;
         uint96  fee;
         uint    publicKey;
@@ -68,6 +68,7 @@ library AccountUpdateTransaction
 
         // Check onchain authorization
         S.requireAuthorizedTx(accountUpdate.owner, auxData.signature, txHash);
+
     }
 
     function readTx(
@@ -80,8 +81,8 @@ library AccountUpdateTransaction
     {
         uint _offset = offset;
 
-        require(data.toUint8Unsafe(_offset) == uint8(ExchangeData.TransactionType.ACCOUNT_UPDATE), "INVALID_TX_TYPE");
-        _offset += 1;
+        // require(data.toUint8Unsafe(_offset) == uint8(ExchangeData.TransactionType.ACCOUNT_UPDATE), "INVALID_TX_TYPE");
+        // _offset += 1;
 
         // Check that this is a conditional offset
         require(data.toUint8Unsafe(_offset) == 1, "INVALID_AUXILIARYDATA_DATA");
@@ -94,8 +95,8 @@ library AccountUpdateTransaction
         _offset += 20;
         accountUpdate.accountID = data.toUint32Unsafe(_offset);
         _offset += 4;
-        accountUpdate.feeTokenID = data.toUint16Unsafe(_offset);
-        _offset += 2;
+        accountUpdate.feeTokenID = data.toUint32Unsafe(_offset);
+        _offset += 4;
         accountUpdate.fee = data.toUint16Unsafe(_offset).decodeFloat16();
         _offset += 2;
         accountUpdate.publicKey = data.toUintUnsafe(_offset);

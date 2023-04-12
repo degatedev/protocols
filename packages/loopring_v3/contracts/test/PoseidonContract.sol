@@ -22,20 +22,55 @@ contract PoseidonContract {
         return Poseidon.hash_t5f6p52(inputs, ExchangeData.SNARK_SCALAR_FIELD);
     }
 
-    function hash_t7f6p52(
+    function hash_t6f6p52(
         uint t0,
         uint t1,
         uint t2,
         uint t3,
         uint t4,
-        uint t5,
-        uint t6
+        uint t5
         )
         external
         pure
         returns (uint)
     {
-        Poseidon.HashInputs7 memory inputs = Poseidon.HashInputs7(t0, t1, t2, t3, t4, t5, t6);
-        return Poseidon.hash_t7f6p52(inputs, ExchangeData.SNARK_SCALAR_FIELD);
+        Poseidon.HashInputs6 memory inputs = Poseidon.HashInputs6(t0, t1, t2, t3, t4, t5);
+        return Poseidon.hash_t6f6p52(inputs, ExchangeData.SNARK_SCALAR_FIELD);
     }
+
+    // function hash_t7f6p52(
+    //     uint t0,
+    //     uint t1,
+    //     uint t2,
+    //     uint t3,
+    //     uint t4,
+    //     uint t5,
+    //     uint t6
+    //     )
+    //     external
+    //     pure
+    //     returns (uint)
+    // {
+    //     Poseidon.HashInputs7 memory inputs = Poseidon.HashInputs7(t0, t1, t2, t3, t4, t5, t6);
+    //     return Poseidon.hash_t7f6p52(inputs, ExchangeData.SNARK_SCALAR_FIELD);
+    // }
+
+
+    // function hash_t8f6p53(
+    //     uint t0,
+    //     uint t1,
+    //     uint t2,
+    //     uint t3,
+    //     uint t4,
+    //     uint t5,
+    //     uint t6,
+    //     uint t7
+    //     )
+    //     external
+    //     pure
+    //     returns (uint)
+    // {
+    //     Poseidon.HashInputs8 memory inputs = Poseidon.HashInputs8(t0, t1, t2, t3, t4, t5, t6, t7);
+    //     return Poseidon.hash_t8f6p53(inputs, ExchangeData.SNARK_SCALAR_FIELD);
+    // }
 }

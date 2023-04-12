@@ -7,6 +7,7 @@ export class Poseidon {
 
 export * from "./src/types";
 export * from "./src/bitstream";
+export * from "./src/bitstreamEx";
 export * from "./src/compression";
 export * from "./src/constants";
 export * from "./src/eddsa";

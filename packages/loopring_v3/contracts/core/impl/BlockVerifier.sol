@@ -37,6 +37,7 @@ contract BlockVerifier is ReentrancyGuard, IBlockVerifier
         onlyOwner
     {
         Circuit storage circuit = circuits[blockType][blockSize][blockVersion];
+        
         require(circuit.registered == false, "ALREADY_REGISTERED");
 
         // Store the verification key on-chain.

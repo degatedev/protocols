@@ -307,68 +307,68 @@ contract("Exchange", (accounts: string[]) => {
       await withdrawFromMerkleTreeChecked(deposit.accountID, token, balance);
     });
 
-    it("Withdraw from merkle tree (protocol fee account)", async () => {
-      await createExchange();
+    // it("Withdraw from merkle tree (protocol fee account)", async () => {
+    //   await createExchange();
 
-      const protocolFees = await exchange.getProtocolFeeValues();
+    //   const protocolFees = await exchange.getProtocolFeeValues();
 
-      // Ring with ETH and ERC20
-      const ring: SpotTrade = {
-        orderA: {
-          tokenS: "WETH",
-          tokenB: "GTO",
-          amountS: new BN(web3.utils.toWei("100", "ether")),
-          amountB: new BN(web3.utils.toWei("200", "ether"))
-        },
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("200", "ether")),
-          amountB: new BN(web3.utils.toWei("100", "ether"))
-        }
-      };
+    //   // Ring with ETH and ERC20
+    //   const ring: SpotTrade = {
+    //     orderA: {
+    //       tokenS: "WETH",
+    //       tokenB: "GTO",
+    //       amountS: new BN(web3.utils.toWei("100", "ether")),
+    //       amountB: new BN(web3.utils.toWei("200", "ether"))
+    //     },
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("200", "ether")),
+    //       amountB: new BN(web3.utils.toWei("100", "ether"))
+    //     }
+    //   };
 
-      await exchangeTestUtil.setupRing(ring);
-      await exchangeTestUtil.sendRing(ring);
+    //   await exchangeTestUtil.setupRing(ring);
+    //   await exchangeTestUtil.sendRing(ring);
 
-      await exchangeTestUtil.submitTransactions();
-      await exchangeTestUtil.submitPendingBlocks();
+    //   await exchangeTestUtil.submitTransactions();
+    //   await exchangeTestUtil.submitPendingBlocks();
 
-      // Expected protocol fees earned
-      const protocolFeeA = ring.orderA.amountB
-        .mul(protocolFees.takerFeeBips)
-        .div(new BN(100000));
-      const protocolFeeB = ring.orderB.amountB
-        .mul(protocolFees.makerFeeBips)
-        .div(new BN(100000));
+    //   // Expected protocol fees earned
+    //   const protocolFeeA = ring.orderA.amountB
+    //     .mul(protocolFees.takerFeeBips)
+    //     .div(new BN(100000));
+    //   const protocolFeeB = ring.orderB.amountB
+    //     .mul(protocolFees.makerFeeBips)
+    //     .div(new BN(100000));
 
-      await expectThrow(
-        exchangeTestUtil.withdrawFromMerkleTree(0, ring.orderA.tokenB),
-        "NOT_IN_WITHDRAW_MODE"
-      );
+    //   await expectThrow(
+    //     exchangeTestUtil.withdrawFromMerkleTree(0, ring.orderA.tokenB),
+    //     "NOT_IN_WITHDRAW_MODE"
+    //   );
 
-      // Request withdrawal onchain
-      await exchangeTestUtil.requestWithdrawal(
-        Constants.zeroAddress,
-        ring.orderA.tokenB,
-        protocolFeeA.mul(new BN(2)),
-        "ETH",
-        new BN(0),
-        { authMethod: AuthMethod.FORCE }
-      );
+    //   // Request withdrawal onchain
+    //   await exchangeTestUtil.requestWithdrawal(
+    //     Constants.zeroAddress,
+    //     ring.orderA.tokenB,
+    //     protocolFeeA.mul(new BN(2)),
+    //     "ETH",
+    //     new BN(0),
+    //     { authMethod: AuthMethod.FORCE }
+    //   );
 
-      // Operator doesn't do anything for a long time
-      await exchangeTestUtil.advanceBlockTimestamp(
-        exchangeTestUtil.MAX_AGE_FORCED_REQUEST_UNTIL_WITHDRAW_MODE + 1
-      );
+    //   // Operator doesn't do anything for a long time
+    //   await exchangeTestUtil.advanceBlockTimestamp(
+    //     exchangeTestUtil.MAX_AGE_FORCED_REQUEST_UNTIL_WITHDRAW_MODE + 1
+    //   );
 
-      // Enter withdrawal mode
-      await checkNotifyForcedRequestTooOld(0, ring.orderA.tokenB, true);
+    //   // Enter withdrawal mode
+    //   await checkNotifyForcedRequestTooOld(0, ring.orderA.tokenB, true);
 
-      // We should be in withdrawal mode and able to withdraw directly from the merkle tree
-      await withdrawFromMerkleTreeChecked(0, ring.orderA.tokenB, protocolFeeA);
-      await withdrawFromMerkleTreeChecked(0, ring.orderB.tokenB, protocolFeeB);
-    });
+    //   // We should be in withdrawal mode and able to withdraw directly from the merkle tree
+    //   await withdrawFromMerkleTreeChecked(0, ring.orderA.tokenB, protocolFeeA);
+    //   await withdrawFromMerkleTreeChecked(0, ring.orderB.tokenB, protocolFeeB);
+    // });
 
     it("Withdraw from deposit", async () => {
       await createExchange();

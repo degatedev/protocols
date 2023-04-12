@@ -8,6 +8,7 @@ interface Deposit {
   toAccountID?: number;
   tokenID?: number;
   amount?: BN;
+  type?: number;
 }
 
 /**
@@ -24,6 +25,8 @@ export class DepositProcessor {
     const account = state.getAccount(deposit.toAccountID);
     account.owner = deposit.to;
 
+    state.ownerToAccountId[account.owner] = deposit.toAccountID;
+
     const balance = account.getBalance(deposit.tokenID);
     balance.balance.iadd(deposit.amount);
 
@@ -32,17 +35,23 @@ export class DepositProcessor {
 
   public static extractData(data: Bitstream) {
     const deposit: Deposit = {};
-    let offset = 1;
+    let offset = 0;
 
     // Read in the deposit data
+    deposit.type = data.extractUint8(offset);
+    offset += 1;
+
     deposit.to = data.extractAddress(offset);
     offset += 20;
     deposit.toAccountID = data.extractUint32(offset);
     offset += 4;
-    deposit.tokenID = data.extractUint16(offset);
-    offset += 2;
-    deposit.amount = data.extractUint96(offset);
-    offset += 12;
+    // DEG token deep to 16
+    deposit.tokenID = data.extractUint32(offset);
+    offset += 4;
+    // deposit.amount = data.extractUint96(offset);
+    // offset += 12;
+    deposit.amount = data.extractUint248(offset);
+    offset += 31;
 
     return deposit;
   }

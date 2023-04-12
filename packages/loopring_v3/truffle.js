@@ -2,6 +2,9 @@ require("dotenv").config({ path: require("find-config")(".env") });
 const HDWalletProvider = require("truffle-hdwallet-provider");
 const PrivateKeyProvider = require("truffle-privatekey-provider");
 
+const wrapProvider = require("arb-ethers-web3-bridge").wrapProvider;
+const arbProviderUrl = "https://rinkeby.arbitrum.io/rpc";
+
 // Please config the following env variables in `.env` in any parent directory
 // as follows:
 //```
@@ -20,22 +23,16 @@ const getWalletProvider = function(network) {
     console.error(">>>> ERROR: INFURA_PROJECT_ID is missing !!!");
     return;
   }
-  var infuraAPI =
-    "https://" + network + ".infura.io/v3/" + process.env.INFURA_PROJECT_ID;
+  var infuraAPI = "https://" + network + ".infura.io/v3/" + process.env.INFURA_PROJECT_ID;
 
   var provider;
   if (process.env.WALLET_PRIVATE_KEY != "") {
-    provider = new PrivateKeyProvider(
-      process.env.WALLET_PRIVATE_KEY,
-      infuraAPI
-    );
+    provider = new PrivateKeyProvider(process.env.WALLET_PRIVATE_KEY, infuraAPI);
   } else if (process.env.WALLET_MNEMONIC != "") {
     provider = new HDWalletProvider(process.env.WALLET_MNEMONIC, infuraAPI);
   } else {
     console.log(process.env);
-    console.error(
-      ">>>> ERROR: WALLET_PRIVATE_KEY or WALLET_MNEMONIC has to be set !!!"
-    );
+    console.error(">>>> ERROR: WALLET_PRIVATE_KEY or WALLET_MNEMONIC has to be set !!!");
     return;
   }
   return provider;
@@ -58,7 +55,7 @@ module.exports = {
     etherscan: process.env.ETHERSCAN_API_KEY
   },
   verify: {
-    preamble: "Author: Loopring Foundation (Loopring Project Ltd)"
+    preamble: ""
   },
   networks: {
     live: {
@@ -87,8 +84,10 @@ module.exports = {
       provider: function() {
         return getWalletProvider("rinkeby");
       },
-      gasPrice: 1000000000,
+      gasPrice: 2000000000,
       gas: 6700000
+      // skipDryRun: true,
+      // networkCheckTimeout: 999999,
     },
     goerli: {
       network_id: "5",
@@ -97,6 +96,15 @@ module.exports = {
       },
       gasPrice: 1000000000
     },
+    arbitrum: {
+      provider: function() {
+        // return wrapped provider:
+        return wrapProvider(new HDWalletProvider(process.env.WALLET_MNEMONIC, arbProviderUrl));
+      },
+      network_id: "*",
+      gasPrice: 0
+    },
+
     development: {
       host: "localhost",
       port: 8545,

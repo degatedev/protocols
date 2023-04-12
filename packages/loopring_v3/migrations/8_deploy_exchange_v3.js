@@ -15,13 +15,10 @@ const ExchangeV3 = artifacts.require("./impl/ExchangeV3.sol");
 const LoopringV3 = artifacts.require("LoopringV3");
 const DefaultDepositContract = artifacts.require("DefaultDepositContract");
 const LoopringIOExchangeOwner = artifacts.require("LoopringIOExchangeOwner");
-const AgentRegistry = artifacts.require("AgentRegistry");
-const LoopringAmmSharedConfig = artifacts.require("LoopringAmmSharedConfig");
+
 const LRCToken = artifacts.require("./test/tokens/LRC.sol");
 const GTOToken = artifacts.require("./test/tokens/GTO.sol");
 
-const LoopringAmmPool = artifacts.require("LoopringAmmPool");
-const LoopringAmmPoolCopy = artifacts.require("LoopringAmmPoolCopy");
 const BlockVerifier = artifacts.require("BlockVerifier");
 
 module.exports = function(deployer, network, accounts) {
@@ -31,13 +28,7 @@ module.exports = function(deployer, network, accounts) {
 
   function flattenVK(vk) {
     return [
-      flattenList([
-        vk.alpha[0],
-        vk.alpha[1],
-        flattenList(vk.beta),
-        flattenList(vk.gamma),
-        flattenList(vk.delta)
-      ]),
+      flattenList([vk.alpha[0], vk.alpha[1], flattenList(vk.beta), flattenList(vk.gamma), flattenList(vk.delta)]),
       flattenList(vk.gammaABC)
     ];
   }
@@ -59,15 +50,13 @@ module.exports = function(deployer, network, accounts) {
 
     if (process.env.TEST_ENV == "docker") {
       console.log("setup exchange:");
-      const emptyMerkleRoot =
-        "0x1efe4f31c90f89eb9b139426a95e5e87f6e0c9e8dab9ddf295e3f9d651f54698";
+      const emptyMerkleRoot = "0x3e1788bf14436c39a3841ae888ffb3e6ec8405bc2773afa28b6d4dfc309cf19";
+      const emptyMerkleAssetRoot = "0x71c8b14d71d432750479f5fe6e08abe1ec04712835a83cdf84d0483b9382ae8";
+
       const exchangeV3 = await ExchangeV3.deployed();
-      await exchangeV3.initialize(
-        LoopringV3.address,
-        process.env.FROM,
-        emptyMerkleRoot
-      );
-      await exchangeV3.setAgentRegistry(AgentRegistry.address);
+      await exchangeV3.initialize(LoopringV3.address, process.env.FROM, emptyMerkleRoot, emptyMerkleAssetRoot);
+
+      // await exchangeV3.setAgentRegistry(AgentRegistry.address);
 
       const depositContract = await DefaultDepositContract.deployed();
       await depositContract.initialize(ExchangeV3.address);
@@ -77,56 +66,16 @@ module.exports = function(deployer, network, accounts) {
       // setup amm:
       // register tokens:
       await exchangeV3.registerToken(GTOToken.address);
-      await exchangeV3.registerToken(LoopringAmmPool.address);
-      await exchangeV3.registerToken(LoopringAmmPoolCopy.address);
-      // register universal agent:
-      const agentRegistry = await AgentRegistry.deployed();
-      await agentRegistry.registerUniversalAgent(LoopringAmmPool.address, true);
-      await agentRegistry.registerUniversalAgent(
-        LoopringAmmPoolCopy.address,
-        true
-      );
 
       // set ownerContract:
       const ownerContract = await LoopringIOExchangeOwner.deployed();
       await exchangeV3.transferOwnership(ownerContract.address);
-      const claimData = exchangeV3.contract.methods
-        .claimOwnership()
-        .encodeABI();
+      const claimData = exchangeV3.contract.methods.claimOwnership().encodeABI();
       // console.log("claimData:", claimData);
       await ownerContract.transact(claimData);
       await ownerContract.openAccessToSubmitBlocks(true);
 
       // do setup:
-      const poolConfig1 = {
-        sharedConfig: LoopringAmmSharedConfig.address,
-        exchange: exchangeV3.address,
-        poolName: "LRC-ETH-Pool-3",
-        accountID: 1,
-        tokens: [LRCToken.address, "0x" + "00".repeat(20)],
-        weights: [10000, 10000],
-        feeBips: 30,
-        tokenSymbol: "LP-LRCETH"
-      };
-      const ammPool1 = await LoopringAmmPool.deployed();
-      await ammPool1.setupPool(poolConfig1);
-      console.log("poolConfig1:", poolConfig1);
-      console.log("ammPool1.address:", ammPool1.address);
-
-      const poolConfig2 = {
-        sharedConfig: LoopringAmmSharedConfig.address,
-        exchange: exchangeV3.address,
-        poolName: "GTO-ETH-Pool-3",
-        accountID: 2,
-        tokens: [GTOToken.address, "0x" + "00".repeat(20)],
-        weights: [10000, 10000],
-        feeBips: 30,
-        tokenSymbol: "LP-GTOETH"
-      };
-      const ammPool2 = await LoopringAmmPoolCopy.deployed();
-      await ammPool2.setupPool(poolConfig2);
-      console.log("poolConfig2:", poolConfig2);
-      console.log("ammPool2.address:", ammPool2.address);
 
       const lrcToken = await LRCToken.deployed();
       const gtoToken = await GTOToken.deployed();
@@ -140,32 +89,21 @@ module.exports = function(deployer, network, accounts) {
           from: account
         });
 
-        await exchangeV3.deposit(
-          account,
-          account,
-          LRCToken.address,
-          "1" + "0".repeat(26),
-          [],
-          { from: account, gas: 200000 }
-        );
+        await exchangeV3.deposit(account, account, LRCToken.address, "1" + "0".repeat(26), [], {
+          from: account,
+          gas: 200000
+        });
 
-        await exchangeV3.deposit(
-          account,
-          account,
-          GTOToken.address,
-          "1" + "0".repeat(26),
-          [],
-          { from: account, gas: 200000 }
-        );
+        await exchangeV3.deposit(account, account, GTOToken.address, "1" + "0".repeat(26), [], {
+          from: account,
+          gas: 200000
+        });
 
-        await exchangeV3.deposit(
-          account,
-          account,
-          "0x" + "00".repeat(20),
-          "1" + "0".repeat(20),
-          [],
-          { from: account, gas: 200000, value: "1" + "0".repeat(20) }
-        );
+        await exchangeV3.deposit(account, account, "0x" + "00".repeat(20), "1" + "0".repeat(20), [], {
+          from: account,
+          gas: 200000,
+          value: "1" + "0".repeat(20)
+        });
       }
 
       // set VK in blockVerifier:

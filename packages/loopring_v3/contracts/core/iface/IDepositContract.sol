@@ -38,12 +38,12 @@ interface IDepositContract
     function deposit(
         address from,
         address token,
-        uint96  amount,
+        uint248  amount,
         bytes   calldata extraData
         )
         external
         payable
-        returns (uint96 amountReceived);
+        returns (uint248 amountReceived);
 
     /// @dev Transfers tokens from the exchange to a user. This function will
     ///      be called when a withdrawal is done for a user on the exchange.
@@ -62,13 +62,12 @@ interface IDepositContract
     /// @param to The address to which 'amount' tokens are transferred.
     /// @param token The address of the token to transfer (`0x0` for ETH).
     /// @param amount The amount of tokens transferred.
-    /// @param extraData Opaque data that can be used by the contract to handle the withdrawal
     function withdraw(
         address from,
         address to,
         address token,
-        uint    amount,
-        bytes   calldata extraData
+        uint    amount
+        // bytes   calldata extraData
         )
         external
         payable;

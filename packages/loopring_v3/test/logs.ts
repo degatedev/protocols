@@ -3,7 +3,8 @@ export function doInfoLogging() {
 }
 
 export function doDebugLogging() {
-  return process.argv.indexOf("-x") > -1;
+  // return process.argv.indexOf("-x") > -1;
+  return true;
 }
 
 export function logInfo(...args: any[]) {

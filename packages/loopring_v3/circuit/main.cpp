@@ -13,6 +13,16 @@
 #include <fstream>
 #include <chrono>
 #include <mutex>
+#include <cstdio>
+#include <iostream>
+#include <exception>
+#include <pthread.h>
+#include <unistd.h>
+
+#ifdef ZKP_WORKER_MODE
+#include "KafkaConsumer.hpp"
+#include "S3.hpp"
+#endif
 
 #ifdef MULTICORE
 #include <omp.h>
@@ -23,8 +33,6 @@
 #if WITH_MEMORY_STATS
 #include <unistd.h>
 #include <ios>
-#include <iostream>
-#include <fstream>
 #include <string>
 
 #include <malloc.h>
@@ -97,7 +105,8 @@ enum class Mode
     ExportCircuit,
     ExportWitness,
     Server,
-    Benchmark
+    Benchmark,
+	Test
 };
 
 namespace libsnark
@@ -333,6 +342,9 @@ bool validateCircuit(Loopring::Circuit *circuit)
     std::cout << "Validating block..." << std::endl;
     auto begin = now();
     // Check if the inputs are valid for the circuit
+    #ifndef NDEBUG
+        circuit->printInfo();
+    #endif
     if (!circuit->getPb().is_satisfied())
     {
         std::cerr << "Block is not valid!" << std::endl;
@@ -357,6 +369,7 @@ std::string getProvingKeyFilename(const std::string &baseFilename)
 }
 
 void runServer(
+  ProverContextT &context,
   Loopring::Circuit *circuit,
   const std::string &provingKeyFilename,
   const libsnark::Config &config,
@@ -391,14 +404,6 @@ void runServer(
         }
     };
 
-    // Setup the context a single time
-    ProverContextT context;
-    loadProvingKey(provingKeyFilename, context.provingKey);
-    context.constraint_system = &(circuit->getPb().constraint_system);
-    context.config = config;
-    context.domain = get_domain(circuit->getPb(), context.provingKey, config);
-    initProverContextBuffers(context);
-
     // Prover status info
     ProverStatus proverStatus;
     // Lock for the prover
@@ -407,71 +412,96 @@ void runServer(
     Server svr;
     // Called to prove blocks
     svr.Get("/prove", [&](const Request &req, Response &res) {
-        const std::lock_guard<std::mutex> lock(mtx);
+    		try
+    		{
+			const std::lock_guard<std::mutex> lock(mtx);
 
-        // Parse the parameters
-        std::string blockFilename = req.get_param_value("block_filename");
-        std::string proofFilename = req.get_param_value("proof_filename");
-        std::string strValidate = req.get_param_value("validate");
-        bool validate = (strValidate.compare("true") == 0) ? true : false;
-        if (blockFilename.length() == 0)
-        {
-            res.set_content("Error: block_filename missing!\n", "text/plain");
-            return;
-        }
+			// Parse the parameters
+			std::string blockFilename = req.get_param_value("block_filename");
+			std::string proofFilename = req.get_param_value("proof_filename");
+			std::string strValidate = req.get_param_value("validate");
+			bool validate = (strValidate.compare("true") == 0) ? true : false;
+			if (blockFilename.length() == 0)
+			{
+				res.set_content("Error: block_filename missing!\n", "text/plain");
+				return;
+			}
+			std::string strDelFile = req.get_param_value("delFile");
+			bool delFileAfterSuccess = (strDelFile.compare("true") == 0) ? true : false;
 
-        // Set the prover status for this session
-        ProverStatusRAII statusRAII(proverStatus, blockFilename, proofFilename);
+			// Set the prover status for this session
+			ProverStatusRAII statusRAII(proverStatus, blockFilename, proofFilename);
 
-        // Prove the block
-        json input = loadJSON(blockFilename);
-        if (input == json())
-        {
-            res.set_content("Error: Failed to load block!\n", "text/plain");
-            return;
-        }
+			// Prove the block
+			json input = loadJSON(blockFilename);
+			if (input == json())
+			{
+				res.set_content("Error: Failed to load block!\n", "text/plain");
+				return;
+			}
 
-        // Some checks to see if this block is compatible with the loaded circuit
-        int iBlockType = input["blockType"].get<int>();
-        unsigned int blockSize = input["blockSize"].get<int>();
-        if (/*iBlockType & circuit->getBlockType() != 1 || */ blockSize != circuit->getBlockSize())
-        {
-            res.set_content(
-              "Error: Incompatible block requested! Use /info to check "
-              "which blocks can be proven.\n",
-              "text/plain");
-            return;
-        }
+			// Some checks to see if this block is compatible with the loaded circuit
+			int iBlockType = input["blockType"].get<int>();
+			unsigned int blockSize = input["blockSize"].get<int>();
+			if (/*iBlockType & circuit->getBlockType() != 1 || */ blockSize != circuit->getBlockSize())
+			{
+				res.set_content(
+				  "Error: Incompatible block requested! Use /info to check "
+				  "which blocks can be proven.\n",
+				  "text/plain");
+				return;
+			}
 
-        if (!generateWitness(circuit, input))
-        {
-            res.set_content("Error: Failed to generate witness for block!\n", "text/plain");
-            return;
-        }
-        if (validate)
-        {
-            if (!validateCircuit(circuit))
-            {
-                res.set_content("Error: Block is invalid!\n", "text/plain");
-                return;
-            }
-        }
-        std::string jProof = proveCircuit(context, circuit);
-        if (jProof.length() == 0)
-        {
-            res.set_content("Error: Failed to prove block!\n", "text/plain");
-            return;
-        }
-        if (proofFilename.length() != 0)
-        {
-            if (!writeProof(jProof, proofFilename))
-            {
-                res.set_content("Error: Failed to write proof!\n", "text/plain");
-                return;
-            }
-        }
-        // Return the proof
-        res.set_content(jProof + "\n", "text/plain");
+			if (!generateWitness(circuit, input))
+			{
+				res.set_content("Error: Failed to generate witness for block!\n", "text/plain");
+				return;
+			}
+			if (validate)
+			{
+				if (!validateCircuit(circuit))
+				{
+					res.set_content("Error: Block is invalid!\n", "text/plain");
+					return;
+				}
+			}
+			std::string jProof = proveCircuit(context, circuit);
+			if (jProof.length() == 0)
+			{
+				res.set_content("Error: Failed to prove block!\n", "text/plain");
+				return;
+			}
+			if (proofFilename.length() != 0)
+			{
+				if (!writeProof(jProof, proofFilename))
+				{
+					res.set_content("Error: Failed to write proof!\n", "text/plain");
+					return;
+				}
+			}
+
+			// verify the proof.
+			VerificationKeyT vk = loadVerificationKey(provingKeyFilename.substr(0, provingKeyFilename.length() - 6) + "vk.json");
+            std::stringstream proof_stream;
+            proof_stream << jProof;
+            auto proof_pair = proof_from_json(proof_stream);
+
+            std::cout << "proof:" << jProof;
+            bool verified = libsnark::r1cs_gg_ppzksnark_zok_verifier_strong_IC<ppT>(vk, proof_pair.first, proof_pair.second);
+            std::cout << "verified:" << verified << std::endl;
+
+			// Return the proof
+			res.set_content(jProof + "\n", "text/plain");
+			if(delFileAfterSuccess){
+					std::remove(blockFilename.c_str());
+			}
+    		}catch(std::exception& e)
+    		{
+    			std::string message = std::string("Prove error, exception:") + std::string(e.what());
+    			std::cout << message << std::endl;
+    			res.set_content(message, "text/plain");
+    			return;
+    		}
     });
     // Retuns the status of the server
     svr.Get("/status", [&](const Request &req, Response &res) {
@@ -511,8 +541,220 @@ void runServer(
     });
 
     std::cout << "Running server on 'localhost' on port " << port << std::endl;
-    svr.listen("127.0.0.1", port);
+    svr.listen("0.0.0.0", port);
 }
+
+#ifdef ZKP_WORKER_MODE
+int msg_consume(std::vector<char> &data, RdKafka::Message* message, void* opaque) {
+    int len = -1;
+    switch (message->err()) {
+    case RdKafka::ERR__TIMED_OUT:
+        //std::cout << "RdKafka::ERR__TIMED_OUT" << std::endl;
+        break;
+    case RdKafka::ERR_NO_ERROR:
+    {
+        if(message->payload())
+        {
+            len = static_cast<int>(message->len());
+            data.resize(len);
+            const char *msg = static_cast<const char *>(message->payload());
+            memcpy(&data[0], msg, len);
+        }
+    }
+        break;
+
+    case RdKafka::ERR__PARTITION_EOF:
+    {
+        len = 0;
+    }
+        break;
+
+    case RdKafka::ERR__UNKNOWN_TOPIC:
+    case RdKafka::ERR__UNKNOWN_PARTITION:
+    default:
+        /* Errors */
+        std::cerr << "Consume failed: " << message->errstr() << std::endl;
+        len = -1;
+    }
+    return len;
+}
+#endif
+
+std::string& replace_all(std::string& str,const std::string& old_value,const std::string& new_value)
+{
+	for(std::string::size_type   pos(0);   pos!=std::string::npos;   pos+=new_value.length())
+	{
+		if((pos=str.find(old_value,pos))!=std::string::npos)
+		{
+           str.replace(pos,old_value.length(),new_value);
+		}
+		else
+		{
+			break;
+		}
+    }
+    return str;
+}
+
+#ifdef ZKP_WORKER_MODE
+struct WorkerParams  
+{  
+    ProverContextT context;
+    Loopring::Circuit *circuit;
+    std::string provingKeyFilename;
+};  
+
+//1.consume zkp task message from kafka.
+//2.call local api general zkp.
+//3.produce zkp_result message to kafka.
+void *runWorker(void *workerParams)
+{
+    struct WorkerParams *params =(struct WorkerParams*)workerParams;
+    ProverContextT context = params->context;
+    Loopring::Circuit *circuit = params->circuit;
+    std::string provingKeyFilename = params->provingKeyFilename;
+
+	std::string workerConfFile = "worker_config.json";
+	json workerConf = loadJSON(workerConfFile);
+	std::cout << "Run zkp worker start." << std::endl;
+
+	//s3 client init.
+	S3Service s3 = S3Service(workerConf);
+
+	//kafka consumer
+	std::string topic = workerConf["KAFKA_CONF"]["topic"].get<std::string>();
+	std::string servers = workerConf["KAFKA_CONF"]["servers"].get<std::string>();
+	std::string groupId = workerConf["KAFKA_CONF"]["group_id"].get<std::string>();
+	KafkaConsumer consumer;
+	consumer.SetTopic(topic);
+	consumer.Init(servers, groupId);
+
+	//kafka producer.
+	std::string errstr;
+	RdKafka::Conf *conf = RdKafka::Conf::create(RdKafka::Conf::CONF_GLOBAL);
+	conf->set("bootstrap.servers", servers, errstr);
+	std::shared_ptr<EventCB> m_eventcb = std::shared_ptr<EventCB>(new EventCB);
+	conf->set("event_cb", m_eventcb.get(), errstr);
+	RdKafka::Producer *producer = RdKafka::Producer::create(conf, errstr);
+	if(!producer)
+	{
+		std::cerr << "Failed to create Kafka producer:" << errstr << std::endl;
+		exit(1);
+	}
+
+	while(true)
+	{
+		std::vector<char> data;
+		std::shared_ptr<RdKafka::Message> msg = consumer.consume(1000);
+		RdKafka::Message* message = msg.get();
+        if(message->err() != RdKafka::ERR_NO_ERROR)
+        {
+            if(message->err() != RdKafka::ERR__TIMED_OUT)
+            {
+                std::cerr << "Consume failed: " << message->errstr() << std::endl;
+            }
+            sleep(10);
+        }
+        else if(message->err() == RdKafka::ERR_NO_ERROR){
+            if(message->payload()){
+                std::string payload = reinterpret_cast<char *>(message->payload());
+                std::cout << "Get zkp-request message, offset:" << message->offset() << ", value:" << payload << std::endl;
+                auto value = json::parse(payload);
+
+                //download block.json.
+                std::string blockId = value["id"];
+                std::string objectKey = std::string("blocks/block_0_" + blockId + ".json");
+                std::string localFile = std::string("s3_data/block_0_" + blockId + ".json");
+                bool downloadSuccess = s3.GetObjectToFile(objectKey, localFile);
+
+                if(downloadSuccess){
+                    std::cout <<"Download block.json from s3 success, key:" << objectKey << std::endl;
+
+                    value["message"] = "";
+                    value["proof"] = "";
+                    value["success"] = false;
+                    // Prove the block
+                    json input = loadJSON(localFile);
+                    if (input == json())
+                    {
+                        std::cout << "Error: Failed to load block!" << std::endl;
+                        value["message"] = "Error: Failed to load block!";
+                    }
+                    else
+                    {
+                        // Some checks to see if this block is compatible with the loaded circuit
+                        int iBlockType = input["blockType"].get<int>();
+                        unsigned int blockSize = input["blockSize"].get<int>();
+                        if (/*iBlockType & circuit->getBlockType() != 1 || */ blockSize != circuit->getBlockSize())
+                        {
+                            std::cout <<
+                                    "Error: Incompatible block requested! Use /info to check "
+                                    "which blocks can be proven.\n" << std::endl;
+                            value["message"] = "Error: Incompatible block requested! Use /info to check which blocks can be proven.";
+                        }
+                        else
+                        {
+                            if (!generateWitness(circuit, input))
+                            {
+                                std::cout << "Error: Failed to generate witness for block!"<< std::endl;
+                                value["message"] = "Error: Failed to generate witness for block!";
+                            }
+                            else
+                            {
+                                if (!validateCircuit(circuit))
+                                {
+                                    value["message"] = "Error: Validate Block Failed!";
+                                }else
+                                {
+                                    std::string jProof = proveCircuit(context, circuit);
+                                    if (jProof.length() == 0)
+                                    {
+                                        std::cout << "Error: Failed to prove block!" << std::endl;
+                                        value["message"] = "Error: Failed to prove block!";
+                                    }
+                                    else
+                                    {
+                                        VerificationKeyT vk = loadVerificationKey(provingKeyFilename.substr(0, provingKeyFilename.length() - 6) + "vk.json");
+                                        std::stringstream proof_stream;
+                                        proof_stream << jProof;
+                                        auto proof_pair = proof_from_json(proof_stream);
+
+                                        std::cout << "proof:" << jProof;
+                                        value["success"] = libsnark::r1cs_gg_ppzksnark_zok_verifier_strong_IC<ppT>(vk, proof_pair.first, proof_pair.second);
+                                        std::cout << "verified:" << value["success"] << std::endl;
+                                        value["proof"] = jProof;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }else{
+                    std::cout <<"Download block.json from s3 error, key:" << objectKey << std::endl;
+                    value["proof"] = "";
+                    value["success"] = false;
+                    value["message"] = "Download block.json from s3 error";
+                }
+
+                //produce zkp-result message.
+                std::string message = value.dump();
+                RdKafka::ErrorCode resp = producer->produce(workerConf["KAFKA_CONF"]["zkp-result-topic"].get<std::string>(),
+                                                    RdKafka::Topic::PARTITION_UA,
+                                                    RdKafka::Producer::RK_MSG_COPY,
+                                                    const_cast<char *>(message.c_str()), message.size(), NULL, 0, 0, NULL);
+                if (resp != RdKafka::ERR_NO_ERROR)
+                {
+                    std::cerr << "% Produce failed: " << RdKafka::err2str(resp) << std::endl;
+                }
+                else
+                {
+                    std::cerr << "% Produced zkp-result message:" << message << std::endl;
+                    producer->poll(0);
+                }
+            }
+        }
+	}
+}
+#endif
 
 bool runBenchmark(Loopring::Circuit *circuit, const std::string &provingKeyFilename)
 {
@@ -639,8 +881,46 @@ bool runBenchmark(Loopring::Circuit *circuit, const std::string &provingKeyFilen
     return true;
 }
 
+#ifdef ZKP_WORKER_MODE
+void test(std::string provingKeyFilename)
+{
+	std::cout << "Test start." << std::endl;
+//	Aws::SDKOptions options;
+//	Aws::InitAPI(options);
+//	{
+//	    const Aws::String bucket_name = "degate-dev";
+//	    const Aws::String object_name = "blocks/block_0_1.json";
+//	    const Aws::String region = "ap-northeast-2";
+//
+//	    if (!GetObjectToFile(object_name, bucket_name, region, "../../s3_data/block_0_1.json"))
+//	    {
+//	    		std::cout << "Get s3 object error." << std::endl;
+//	    }
+//	}
+//	Aws::ShutdownAPI(options);
+//	std::cout << "Test end." << std::endl;
+//    VerificationKeyT vk = loadVerificationKey(provingKeyFilename.substr(0, provingKeyFilename.length() - 6) + "vk.json");
+//	std::string jProof = "";
+//    if (jProof.length() == 0)
+//    {
+//         return false;
+//    }
+//
+//    std::stringstream proof_stream;
+//    proof_stream << jProof;
+//    auto proof_pair = proof_from_json(proof_stream);
+//
+//    if (!libsnark::r1cs_gg_ppzksnark_zok_verifier_strong_IC<ppT>(vk, proof_pair.first, proof_pair.second))
+//    {
+//        std::cerr << "Invalid proof!" << std::endl;
+//        return false;
+//    }
+}
+#endif
+
 int main(int argc, char **argv)
 {
+    std::cout << "in main: " << std::endl;
     ethsnarks::ppT::init_public_params();
 
     // Load in the config
@@ -688,7 +968,13 @@ int main(int argc, char **argv)
 
     const char *proofFilename = NULL;
     Mode mode = Mode::Validate;
-    std::string baseFilename = "keys/";
+
+    #ifdef ZKP_WORKER_MODE
+        std::string baseFilename = "/data/keys/";
+    #else
+        std::string baseFilename = "keys/";
+    #endif
+
     if (strcmp(argv[1], "-validate") == 0)
     {
         mode = Mode::Validate;
@@ -817,6 +1103,16 @@ int main(int argc, char **argv)
         mode = Mode::Benchmark;
         std::cout << "Benchmarking " << argv[2] << "..." << std::endl;
     }
+    else if (strcmp(argv[1], "-test") == 0)
+    {
+        if (argc != 3)
+        {
+            std::cout << "Invalid number of arguments!" << std::endl;
+            return 1;
+        }
+        mode = Mode::Test;
+        std::cout << "Test ..." << std::endl;
+    }
     else
     {
         std::cerr << "Unknown option: " << argv[1] << std::endl;
@@ -824,7 +1120,9 @@ int main(int argc, char **argv)
     }
 
     // Read the block file
+    std::cout << "in main before loadJSON" << std::endl;
     json input = loadJSON(argv[2]);
+    std::cout << "in main after loadJSON" << std::endl;
     if (input == json())
     {
         return 1;
@@ -843,6 +1141,14 @@ int main(int argc, char **argv)
     unsigned int blockType = iBlockType;
     baseFilename += getBaseName(blockType) + postFix;
     std::string provingKeyFilename = getProvingKeyFilename(baseFilename);
+
+    #ifdef ZKP_WORKER_MODE
+        if (mode == Mode::Test)
+        {
+                test(provingKeyFilename);
+                return 0;
+        }
+    #endif
 
     if (mode == Mode::Prove || mode == Mode::Server)
     {
@@ -893,7 +1199,30 @@ int main(int argc, char **argv)
 
     if (mode == Mode::Server)
     {
-        runServer(circuit, provingKeyFilename, config, std::stoi(argv[3]));
+    	// Setup the context a single time
+    	ProverContextT context;
+    	loadProvingKey(provingKeyFilename, context.provingKey);
+    	context.constraint_system = &(circuit->getPb().constraint_system);
+    	context.config = config;
+    	context.domain = get_domain(circuit->getPb(), context.provingKey, config);
+    	initProverContextBuffers(context);
+
+        pthread_t tid;
+
+        #ifdef ZKP_WORKER_MODE
+            struct WorkerParams p;
+            p.context = context;
+            p.circuit = circuit;
+            p.provingKeyFilename = provingKeyFilename;
+            int ret = pthread_create(&tid, NULL, runWorker, &p);
+            std::cout << "worker thread start, result:" << ret << std::endl;
+            if(ret == 0)
+            {
+                runServer(context, circuit, provingKeyFilename, config, std::stoi(argv[3]));
+            }
+        #else
+            runServer(context, circuit, provingKeyFilename, config, std::stoi(argv[3]));
+        #endif
     }
 
     if (mode == Mode::Validate || mode == Mode::Prove)
@@ -946,6 +1275,15 @@ int main(int argc, char **argv)
         {
             return 1;
         }
+
+        VerificationKeyT vk = loadVerificationKey(provingKeyFilename.substr(0, provingKeyFilename.length() - 6) + "vk.json");
+        std::stringstream proof_stream;
+        proof_stream << jProof;
+        auto proof_pair = proof_from_json(proof_stream);
+
+        std::cout << "proof:" << jProof;
+        bool verified = libsnark::r1cs_gg_ppzksnark_zok_verifier_strong_IC<ppT>(vk, proof_pair.first, proof_pair.second);
+        std::cout << "verified:" << verified << std::endl;
 #endif
     }
 
@@ -967,5 +1305,6 @@ int main(int argc, char **argv)
         }
     }
 
+    pthread_exit(NULL);
     return 0;
 }

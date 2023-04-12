@@ -11,8 +11,8 @@ AccountState createAccountState(ProtoboardT &pb, const AccountLeaf &state)
     accountState.publicKeyX = make_variable(pb, state.publicKey.x, ".publicKeyX");
     accountState.publicKeyY = make_variable(pb, state.publicKey.y, ".publicKeyY");
     accountState.nonce = make_variable(pb, state.nonce, ".nonce");
-    accountState.feeBipsAMM = make_variable(pb, state.feeBipsAMM, ".feeBipsAMM");
     accountState.balancesRoot = make_variable(pb, state.balancesRoot, ".balancesRoot");
+    accountState.storageRoot = make_variable(pb, state.storageRoot, ".storage");
     return accountState;
 }
 
@@ -20,8 +20,7 @@ BalanceState createBalanceState(ProtoboardT &pb, const BalanceLeaf &state)
 {
     BalanceState balanceState;
     balanceState.balance = make_variable(pb, state.balance, ".balance");
-    balanceState.weightAMM = make_variable(pb, state.weightAMM, ".weightAMM");
-    balanceState.storageRoot = make_variable(pb, state.storageRoot, ".storage");
+    // balanceState.storageRoot = make_variable(pb, state.storageRoot, ".storage");
     return balanceState;
 }
 
@@ -44,13 +43,15 @@ TEST_CASE("UpdateAccount", "[UpdateAccountGadget]")
           protoboard<FieldT> pb;
 
           pb_variable<FieldT> rootBefore = make_variable(pb, "rootBefore");
+          pb_variable<FieldT> assetRootBefore = make_variable(pb, "assetRootBefore");
           VariableArrayT address = make_var_array(pb, NUM_BITS_ACCOUNT, ".address");
           AccountState stateBefore = createAccountState(pb, accountUpdate.before);
           AccountState stateAfter = createAccountState(pb, accountUpdate.after);
           address.fill_with_bits_of_field_element(pb, accountUpdate.accountID);
           pb.val(rootBefore) = accountUpdate.rootBefore;
+          pb.val(assetRootBefore) = accountUpdate.assetRootBefore;
 
-          UpdateAccountGadget updateAccount(pb, rootBefore, address, stateBefore, stateAfter, "updateAccount");
+          UpdateAccountGadget updateAccount(pb, rootBefore, assetRootBefore, address, stateBefore, stateAfter, "updateAccount");
           updateAccount.generate_r1cs_constraints();
           updateAccount.generate_r1cs_witness(accountUpdate);
 

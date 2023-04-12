@@ -31,6 +31,10 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
     DualVariableGadget fee;
     DualVariableGadget maxFee;
     DualVariableGadget type;
+    // DEG-206 login optimization
+    EqualGadget nonce_eq_zero;
+    TernaryGadget accountIDToHash;
+    ToBitsGadget accountIDToPubData;
 
     // Signature
     Poseidon_8 hash;
@@ -67,6 +71,7 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
       const std::string &prefix)
         : BaseTransactionCircuit(pb, state, prefix),
 
+          // typeTx(pb, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
           // Inputs
           owner(pb, NUM_BITS_ADDRESS, FMT(prefix, ".owner")),
           accountID(pb, NUM_BITS_ACCOUNT, FMT(prefix, ".accountID")),
@@ -78,19 +83,31 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
           fee(pb, NUM_BITS_AMOUNT, FMT(prefix, ".fee")),
           maxFee(pb, NUM_BITS_AMOUNT, FMT(prefix, ".maxFee")),
           type(pb, NUM_BITS_TYPE, FMT(prefix, ".type")),
+          // DEG-206 login optimization
+          nonce_eq_zero(pb, nonce.packed, state.constants._0, FMT(prefix, ".nonce equal 0")),
+          accountIDToHash(
+            pb,
+            nonce_eq_zero.result(),
+            state.constants._0,
+            accountID.packed,
+            FMT(prefix, ".accountIDToHash if nonce equal zero then return 0, otherwise return accountID")),
+          accountIDToPubData(pb, accountIDToHash.result(), NUM_BITS_ACCOUNT, FMT(prefix, ".accountIDToPubData")),
 
           // Signature
           hash(
             pb,
-            var_array(
-              {state.exchange,
-               accountID.packed,
-               feeTokenID.packed,
-               maxFee.packed,
-               publicKeyX,
-               publicKeyY,
-               validUntil.packed,
-               nonce.packed}),
+            var_array({
+              state.exchange,
+              // DEG-206 login optimization
+              //  accountID.packed,
+              accountIDToHash.result(),
+              feeTokenID.packed,
+              maxFee.packed,
+              publicKeyX,
+              publicKeyY,
+              validUntil.packed,
+              nonce.packed
+            }),
             FMT(this->annotation_prefix, ".hash")),
 
           // Validate
@@ -145,6 +162,7 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
             isConditional.result(),
             FMT(prefix, ".numConditionalTransactionsAfter"))
     {
+        LOG(LogDebug, "in AccountUpdateCircuit", "");
         // Update the account data
         setArrayOutput(TXV_ACCOUNT_A_ADDRESS, accountID.bits);
         setOutput(TXV_ACCOUNT_A_OWNER, owner.packed);
@@ -156,6 +174,8 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
         setArrayOutput(TXV_BALANCE_A_S_ADDRESS, feeTokenID.bits);
         setOutput(TXV_BALANCE_A_S_BALANCE, balanceS_A.balance());
         // Update the operator balance for the fee payment
+        // DEG-127 split trading fee and gas fee
+        setArrayOutput(TXV_BALANCE_O_B_Address, feeTokenID.bits);
         setOutput(TXV_BALANCE_O_B_BALANCE, balanceB_O.balance());
 
         // We need a single signature of the account that's being updated if not
@@ -170,6 +190,7 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
 
     void generate_r1cs_witness(const AccountUpdateTx &update)
     {
+        LOG(LogDebug, "in AccountUpdateCircuit", "generate_r1cs_witness");
         // Inputs
         owner.generate_r1cs_witness(pb, update.owner);
         accountID.generate_r1cs_witness(pb, update.accountID);
@@ -181,6 +202,10 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
         fee.generate_r1cs_witness(pb, update.fee);
         maxFee.generate_r1cs_witness(pb, update.maxFee);
         type.generate_r1cs_witness(pb, update.type);
+        // DEG-206 login optimization
+        nonce_eq_zero.generate_r1cs_witness();
+        accountIDToHash.generate_r1cs_witness();
+        accountIDToPubData.generate_r1cs_witness();
 
         // Signature
         hash.generate_r1cs_witness();
@@ -214,6 +239,7 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
 
     void generate_r1cs_constraints()
     {
+        LOG(LogDebug, "in AccountUpdateCircuit", "generate_r1cs_constraints");
         // Inputs
         owner.generate_r1cs_constraints();
         accountID.generate_r1cs_constraints(true);
@@ -223,6 +249,11 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
         fee.generate_r1cs_constraints(true);
         maxFee.generate_r1cs_constraints(true);
         type.generate_r1cs_constraints(true);
+
+        // DEG-206 login optimization
+        nonce_eq_zero.generate_r1cs_constraints();
+        accountIDToHash.generate_r1cs_constraints();
+        accountIDToPubData.generate_r1cs_constraints();
 
         // Signature
         hash.generate_r1cs_constraints();
@@ -256,14 +287,18 @@ class AccountUpdateCircuit : public BaseTransactionCircuit
 
     const VariableArrayT getPublicData() const
     {
-        return flattenReverse(
-          {type.bits,
-           owner.bits,
-           accountID.bits,
-           feeTokenID.bits,
-           fFee.bits(),
-           compressPublicKey.result(),
-           nonce.bits});
+        return flattenReverse({
+          // typeTx.bits,
+          type.bits,
+          owner.bits,
+          //  accountID.bits,
+          // DEG-206 login optimization
+          accountIDToPubData.bits,
+          feeTokenID.bits,
+          fFee.bits(),
+          compressPublicKey.result(),
+          nonce.bits
+        });
     }
 };
 

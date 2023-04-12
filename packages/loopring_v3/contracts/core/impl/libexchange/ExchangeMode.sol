@@ -23,7 +23,7 @@ library ExchangeMode
         view
         returns (bool result)
     {
-        result = S.withdrawalModeStartTime > 0;
+        result = S.modeTime.withdrawalModeStartTime > 0;
     }
 
     function isShutdown(
@@ -33,7 +33,7 @@ library ExchangeMode
         view
         returns (bool)
     {
-        return S.shutdownModeStartTime > 0;
+        return S.modeTime.shutdownModeStartTime > 0;
     }
 
     function getNumAvailableForcedSlots(

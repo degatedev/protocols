@@ -22,10 +22,8 @@ abstract contract ILoopringV3 is Claimable
     uint    public totalStake;
     address public blockVerifierAddress;
     uint    public forcedWithdrawalFee;
-    uint    public tokenRegistrationFeeLRCBase;
-    uint    public tokenRegistrationFeeLRCDelta;
-    uint8   public protocolTakerFeeBips;
-    uint8   public protocolMakerFeeBips;
+    uint8   public protocolFeeBips;
+    
 
     address payable public protocolFeeVault;
 
@@ -58,8 +56,7 @@ abstract contract ILoopringV3 is Claimable
     ///      Warning: these new values will be used by existing and
     ///      new Loopring exchanges.
     function updateProtocolFeeSettings(
-        uint8 _protocolTakerFeeBips,
-        uint8 _protocolMakerFeeBips
+        uint8 _protocolFeeBips
         )
         external
         virtual;
@@ -112,15 +109,13 @@ abstract contract ILoopringV3 is Claimable
         returns (uint amountLRC);
 
     /// @dev Gets the protocol fee values for an exchange.
-    /// @return takerFeeBips The protocol taker fee
-    /// @return makerFeeBips The protocol maker fee
+    /// @return feeBips The protocol fee
     function getProtocolFeeValues(
         )
         public
         virtual
         view
         returns (
-            uint8 takerFeeBips,
-            uint8 makerFeeBips
+            uint8 feeBips
         );
 }

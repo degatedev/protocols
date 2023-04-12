@@ -8,7 +8,6 @@ import "../../../lib/MathUint.sol";
 import "../../iface/ExchangeData.sol";
 import "./ExchangeMode.sol";
 
-
 /// @title ExchangeTokens.
 /// @author Daniel Wang  - <daniel@loopring.org>
 /// @author Brecht Devos - <brecht@loopring.org>
@@ -20,47 +19,62 @@ library ExchangeTokens
 
     event TokenRegistered(
         address token,
-        uint16  tokenId
+        uint32  tokenId
     );
 
     function getTokenAddress(
         ExchangeData.State storage S,
-        uint16 tokenID
+        uint32 tokenID
         )
         public
         view
         returns (address)
     {
-        require(tokenID < S.tokens.length, "INVALID_TOKEN_ID");
-        return S.tokens[tokenID].token;
+        require(tokenID < S.normalTokens.length.add(ExchangeData.MAX_NUM_RESERVED_TOKENS), "INVALID_TOKEN_ID");
+
+        if (tokenID < ExchangeData.MAX_NUM_RESERVED_TOKENS) {
+            return S.reservedTokens[tokenID].token;
+        }
+
+        return S.normalTokens[tokenID - ExchangeData.MAX_NUM_RESERVED_TOKENS].token;
     }
 
     function registerToken(
         ExchangeData.State storage S,
-        address tokenAddress
+        address tokenAddress,
+        bool isOwnerRegister
         )
         public
-        returns (uint16 tokenID)
+        returns (uint32 tokenID)
     {
         require(!S.isInWithdrawalMode(), "INVALID_MODE");
         require(S.tokenToTokenId[tokenAddress] == 0, "TOKEN_ALREADY_EXIST");
-        require(S.tokens.length < ExchangeData.MAX_NUM_TOKENS, "TOKEN_REGISTRY_FULL");
+
+        if (isOwnerRegister) {
+            require(S.reservedTokens.length < ExchangeData.MAX_NUM_RESERVED_TOKENS, "TOKEN_REGISTRY_FULL");
+        } else {
+            require(S.normalTokens.length < ExchangeData.MAX_NUM_NORMAL_TOKENS, "TOKEN_REGISTRY_FULL");
+        }
 
         // Check if the deposit contract supports the new token
         if (S.depositContract != IDepositContract(0)) {
-            require(
-                S.depositContract.isTokenSupported(tokenAddress),
-                "UNSUPPORTED_TOKEN"
-            );
+            require(S.depositContract.isTokenSupported(tokenAddress), "UNSUPPORTED_TOKEN");
         }
 
         // Assign a tokenID and store the token
-        ExchangeData.Token memory token = ExchangeData.Token(
-            tokenAddress
-        );
-        tokenID = uint16(S.tokens.length);
-        S.tokens.push(token);
+        ExchangeData.Token memory token = ExchangeData.Token(tokenAddress);
+
+        if (isOwnerRegister) {
+            tokenID = uint32(S.reservedTokens.length);
+            S.reservedTokens.push(token);
+        } else {
+            tokenID = uint32(S.normalTokens.length.add(ExchangeData.MAX_NUM_RESERVED_TOKENS));
+            S.normalTokens.push(token);
+        }
         S.tokenToTokenId[tokenAddress] = tokenID + 1;
+        S.tokenIdToToken[tokenID] = tokenAddress;
+
+        S.tokenIdToDepositBalance[tokenID] = 0;
 
         emit TokenRegistered(tokenAddress, tokenID);
     }
@@ -71,10 +85,27 @@ library ExchangeTokens
         )
         internal  // inline call
         view
-        returns (uint16 tokenID)
+        returns (uint32 tokenID)
     {
         tokenID = S.tokenToTokenId[tokenAddress];
         require(tokenID != 0, "TOKEN_NOT_FOUND");
         tokenID = tokenID - 1;
     }
+
+    function findTokenID(
+        ExchangeData.State storage S,
+        address tokenAddress
+        )
+        internal  // inline call
+        view
+        returns (uint32 tokenID, bool found)
+    {
+        tokenID = S.tokenToTokenId[tokenAddress];
+        if(tokenID == 0) {
+            return (0, false);
+        }
+        tokenID = tokenID - 1;
+        found = true;
+    }
+
 }

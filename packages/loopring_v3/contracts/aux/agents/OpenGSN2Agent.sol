@@ -49,7 +49,7 @@ contract OpenGSN2Agent is BaseRelayRecipient, IKnowForwarderAddress
         address from,
         address /* to */,
         address /* tokenAddress */,
-        uint96  /* amount */,
+        uint248  /* amount */,
         bytes   calldata /* auxiliaryData */
         )
         external

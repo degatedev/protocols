@@ -361,6 +361,9 @@ class SignatureVerifier : public GadgetT
 
     void generate_r1cs_witness(Signature sig)
     {
+        std::cout << "in SignatureVerifier: sig_R.x" << sig.R.x << std::endl;
+        std::cout << "in SignatureVerifier: sig_R.y" << sig.R.y << std::endl;
+        std::cout << "in SignatureVerifier: sig.s" << sig.s << std::endl;
         pb.val(sig_R.x) = sig.R.x;
         pb.val(sig_R.y) = sig.R.y;
         sig_s.fill_with_bits_of_field_element(pb, sig.s);
@@ -382,6 +385,49 @@ class SignatureVerifier : public GadgetT
     const VariableT &result() const
     {
         return signatureVerifier.result();
+    }
+};
+
+class BatchSignatureVerifier : public GadgetT 
+{
+  public:
+    std::vector<SignatureVerifier> signatureVerifierArray;
+    BatchSignatureVerifier(
+      ProtoboardT &pb,
+      const jubjub::Params &params,
+      const Constants &constants,
+      const VariableArrayT &publicXArray,
+      const VariableArrayT &publicYArray,
+      const VariableArrayT &messageArray,
+      const VariableArrayT &requiredArray,
+      const std::string &prefix)
+        : GadgetT(pb, prefix)
+    {
+      ASSERT(messageArray.size() == requiredArray.size(), FMT(prefix, ".ASSERT size not match"));
+      for (unsigned int i = 0; i < messageArray.size(); i++) 
+      {
+        signatureVerifierArray.emplace_back(
+          pb,
+          params,
+          constants,
+          jubjub::VariablePointT(publicXArray[i], publicYArray[i]),
+          messageArray[i],
+          requiredArray[i],
+          FMT(prefix, ".signatureVerifierArray"));
+      }
+    }
+    void generate_r1cs_witness(const std::vector<Signature> &signatures) {
+      for (unsigned int i = 0; i < signatureVerifierArray.size(); i++) 
+      {
+        signatureVerifierArray[i].generate_r1cs_witness(signatures[i]);
+      }
+    }
+    void generate_r1cs_constraints() 
+    {
+      for (unsigned int i = 0; i < signatureVerifierArray.size(); i++) 
+      {
+        signatureVerifierArray[i].generate_r1cs_constraints();
+      }
     }
 };
 

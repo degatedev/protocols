@@ -22,6 +22,21 @@ pragma solidity ^0.7.0;
 library SafeCast {
 
     /**
+     * @dev Returns the downcasted uint248 from uint256, reverting on
+     * overflow (when the input is greater than largest uint248).
+     *
+     * Counterpart to Solidity's `uint248` operator.
+     *
+     * Requirements:
+     *
+     * - input must fit into 248 bits
+     */
+    function toUint248(uint256 value) internal pure returns (uint248) {
+        require(value < 2**248, "SafeCast: value doesn\'t fit in 248 bits");
+        return uint248(value);
+    }
+
+    /**
      * @dev Returns the downcasted uint128 from uint256, reverting on
      * overflow (when the input is greater than largest uint128).
      *

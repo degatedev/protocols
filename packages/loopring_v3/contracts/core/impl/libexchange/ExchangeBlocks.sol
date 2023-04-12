@@ -10,9 +10,7 @@ import "../../iface/ExchangeData.sol";
 import "../../iface/IBlockVerifier.sol";
 import "../libtransactions/BlockReader.sol";
 import "../libtransactions/AccountUpdateTransaction.sol";
-import "../libtransactions/AmmUpdateTransaction.sol";
 import "../libtransactions/DepositTransaction.sol";
-import "../libtransactions/TransferTransaction.sol";
 import "../libtransactions/WithdrawTransaction.sol";
 import "./ExchangeMode.sol";
 import "./ExchangeWithdrawals.sol";
@@ -39,10 +37,8 @@ library ExchangeBlocks
     );
 
     event ProtocolFeesUpdated(
-        uint8 takerFeeBips,
-        uint8 makerFeeBips,
-        uint8 previousTakerFeeBips,
-        uint8 previousMakerFeeBips
+        uint8 protocolFeeBips,
+        uint8 previousProtocolFeeBips
     );
 
     function submitBlocks(
@@ -84,7 +80,11 @@ library ExchangeBlocks
         // Validate the Merkle roots
         require(header.merkleRootBefore == S.merkleRoot, "INVALID_MERKLE_ROOT");
         require(header.merkleRootAfter != header.merkleRootBefore, "EMPTY_BLOCK_DISABLED");
+        require(header.merkleAssetRootBefore == S.merkleAssetRoot, "INVALID_MERKLE_ASSET_ROOT");
+        require(header.merkleAssetRootAfter != header.merkleAssetRootBefore, "EMPTY_BLOCK_DISABLED");
+
         require(uint(header.merkleRootAfter) < ExchangeData.SNARK_SCALAR_FIELD, "INVALID_MERKLE_ROOT");
+        require(uint(header.merkleAssetRootAfter) < ExchangeData.SNARK_SCALAR_FIELD, "INVALID_ASSERT_MERKLE_ROOT");
         // Validate the timestamp
         require(
             header.timestamp > block.timestamp - ExchangeData.TIMESTAMP_HALF_WINDOW_SIZE_IN_SECONDS &&
@@ -93,7 +93,7 @@ library ExchangeBlocks
         );
         // Validate the protocol fee values
         require(
-            validateAndSyncProtocolFees(S, header.protocolTakerFeeBips, header.protocolMakerFeeBips),
+            validateAndSyncProtocolFees(S, header.protocolFeeBips),
             "INVALID_PROTOCOL_FEES"
         );
 
@@ -109,6 +109,7 @@ library ExchangeBlocks
         emit BlockSubmitted(numBlocks, header.merkleRootAfter, _publicDataHash);
 
         S.merkleRoot = header.merkleRootAfter;
+        S.merkleAssetRoot = header.merkleAssetRootAfter;
 
         if (_block.storeBlockInfoOnchain) {
             S.blocks[numBlocks] = ExchangeData.BlockInfo(
@@ -216,18 +217,33 @@ library ExchangeBlocks
             uint minTxIndex = 0;
             bytes memory txData = new bytes(ExchangeData.TX_DATA_AVAILABILITY_SIZE);
             for (uint i = 0; i < block_auxiliaryData.length; i++) {
-                // Load the data from auxiliaryData, which is still encoded as calldata
                 uint txIndex;
-                bool approved;
+                ExchangeData.TransactionType txType;
+                if (i < header.depositSize) {
+                    txType = ExchangeData.TransactionType.DEPOSIT;
+                    txIndex = i; 
+                }else if(i < header.depositSize + header.accountUpdateSize) {
+                    txType = ExchangeData.TransactionType.ACCOUNT_UPDATE;
+                    txIndex = i;
+                }else {
+                    txType = ExchangeData.TransactionType.WITHDRAWAL;
+                    txIndex = i + _block.blockSize - header.depositSize - header.accountUpdateSize - header.withdrawSize; 
+                }
+
+                // Load the data from auxiliaryData, which is still encoded as calldata
+
+
+
                 bytes memory auxData;
                 assembly {
                     // Offset to block_auxiliaryData[i]
                     let auxOffset := mload(add(block_auxiliaryData, add(32, mul(32, i))))
-                    // Load `txIndex` (pos 0) and `approved` (pos 1) in block_auxiliaryData[i]
-                    txIndex := mload(add(add(32, block_auxiliaryData), auxOffset))
-                    approved := mload(add(add(64, block_auxiliaryData), auxOffset))
-                    // Load `data` (pos 2)
-                    let auxDataOffset := mload(add(add(96, block_auxiliaryData), auxOffset))
+                    // // Load `txIndex` (pos 0) and `approved` (pos 1) in block_auxiliaryData[i]
+                    // txIndex := mload(add(add(32, block_auxiliaryData), auxOffset))
+                    // approved := mload(add(add(64, block_auxiliaryData), auxOffset))
+
+                    // Load `data` (pos 0)
+                    let auxDataOffset := mload(add(add(32, block_auxiliaryData), auxOffset))
                     auxData := add(add(32, block_auxiliaryData), add(auxOffset, auxDataOffset))
                 }
 
@@ -236,17 +252,14 @@ library ExchangeBlocks
 
                 minTxIndex = txIndex + 1;
 
-                if (approved) {
-                    continue;
-                }
 
                 // Get the transaction data
                 _block.data.readTransactionData(txIndex, _block.blockSize, txData);
 
-                // Process the transaction
-                ExchangeData.TransactionType txType = ExchangeData.TransactionType(
-                    txData.toUint8(0)
-                );
+                // // Process the transaction
+                // ExchangeData.TransactionType txType = ExchangeData.TransactionType(
+                //     txData.toUint8(0)
+                // );
                 uint txDataOffset = 0;
 
                 if (txType == ExchangeData.TransactionType.DEPOSIT) {
@@ -265,14 +278,6 @@ library ExchangeBlocks
                         txDataOffset,
                         auxData
                     );
-                } else if (txType == ExchangeData.TransactionType.TRANSFER) {
-                    TransferTransaction.process(
-                        S,
-                        ctx,
-                        txData,
-                        txDataOffset,
-                        auxData
-                    );
                 } else if (txType == ExchangeData.TransactionType.ACCOUNT_UPDATE) {
                     AccountUpdateTransaction.process(
                         S,
@@ -281,18 +286,13 @@ library ExchangeBlocks
                         txDataOffset,
                         auxData
                     );
-                } else if (txType == ExchangeData.TransactionType.AMM_UPDATE) {
-                    AmmUpdateTransaction.process(
-                        S,
-                        ctx,
-                        txData,
-                        txDataOffset,
-                        auxData
-                    );
                 } else {
                     // ExchangeData.TransactionType.NOOP,
+                    // ExchangeData.TransactionType.TRANSFER and
                     // ExchangeData.TransactionType.SPOT_TRADE and
-                    // ExchangeData.TransactionType.SIGNATURE_VERIFICATION
+                    // ExchangeData.TransactionType.ORDER_CANCEL and
+                    // ExchangeData.TransactionType.BATCH_SPOT_TRADE 
+                    // ExchangeData.TransactionType.APPKEY_UPDATE 
                     // are not supported
                     revert("UNSUPPORTED_TX_TYPE");
                 }
@@ -302,8 +302,7 @@ library ExchangeBlocks
 
     function validateAndSyncProtocolFees(
         ExchangeData.State storage S,
-        uint8 takerFeeBips,
-        uint8 makerFeeBips
+        uint8 protocolFeeBips
         )
         private
         returns (bool)
@@ -311,19 +310,15 @@ library ExchangeBlocks
         ExchangeData.ProtocolFeeData memory data = S.protocolFeeData;
         if (block.timestamp > data.syncedAt + ExchangeData.MIN_AGE_PROTOCOL_FEES_UNTIL_UPDATED) {
             // Store the current protocol fees in the previous protocol fees
-            data.previousTakerFeeBips = data.takerFeeBips;
-            data.previousMakerFeeBips = data.makerFeeBips;
+            data.previousProtocolFeeBips = data.protocolFeeBips;
             // Get the latest protocol fees for this exchange
-            (data.takerFeeBips, data.makerFeeBips) = S.loopring.getProtocolFeeValues();
+            data.protocolFeeBips = S.loopring.getProtocolFeeValues();
             data.syncedAt = uint32(block.timestamp);
 
-            if (data.takerFeeBips != data.previousTakerFeeBips ||
-                data.makerFeeBips != data.previousMakerFeeBips) {
+            if (data.protocolFeeBips != data.previousProtocolFeeBips ) {
                 emit ProtocolFeesUpdated(
-                    data.takerFeeBips,
-                    data.makerFeeBips,
-                    data.previousTakerFeeBips,
-                    data.previousMakerFeeBips
+                    data.protocolFeeBips,
+                    data.previousProtocolFeeBips
                 );
             }
 
@@ -331,7 +326,7 @@ library ExchangeBlocks
             S.protocolFeeData = data;
         }
         // The given fee values are valid if they are the current or previous protocol fee values
-        return (takerFeeBips == data.takerFeeBips && makerFeeBips == data.makerFeeBips) ||
-            (takerFeeBips == data.previousTakerFeeBips && makerFeeBips == data.previousMakerFeeBips);
+        return (protocolFeeBips == data.protocolFeeBips) ||
+            (protocolFeeBips == data.previousProtocolFeeBips );
     }
 }

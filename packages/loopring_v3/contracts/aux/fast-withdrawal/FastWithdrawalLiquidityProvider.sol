@@ -29,7 +29,7 @@ contract FastWithdrawalLiquidityProvider is ReentrancyGuard, OwnerManagable
         address from;
         address to;
         address token;
-        uint96  amount;
+        uint248  amount;
         uint32  storageID;
         uint64  validUntil; // most significant 32 bits as block height, least significant 32 bits as block time
         address signer;
@@ -37,7 +37,7 @@ contract FastWithdrawalLiquidityProvider is ReentrancyGuard, OwnerManagable
     }
 
     bytes32 constant public FASTWITHDRAWAL_APPROVAL_TYPEHASH = keccak256(
-        "FastWithdrawalApproval(address exchange,address from,address to,address token,uint96 amount,uint32 storageID,uint64 validUntil)"
+        "FastWithdrawalApproval(address exchange,address from,address to,address token,uint248 amount,uint32 storageID,uint64 validUntil)"
     );
 
     bytes32 public immutable DOMAIN_SEPARATOR;

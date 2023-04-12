@@ -1,6 +1,5 @@
 import BN = require("bn.js");
 import fs = require("fs");
-import { AmmPool } from "./ammUtils";
 import { Constants } from "loopringV3.js";
 import { ExchangeTestUtil, OnchainBlock } from "./testExchangeUtil";
 import { BlockCallback, GasTokenConfig } from "./types";
@@ -123,12 +122,7 @@ contract("Exchange", (accounts: string[]) => {
         );
         console.log(onchainBlock);
 
-        // Read the AMM transactions
         const callbacks: BlockCallback[] = [];
-        for (const ammTx of blockInfo.ammTransactions) {
-          callbacks.push(AmmPool.getBlockCallback(ammTx));
-        }
-        //console.log(callbacks);
 
         onchainBlocks.push(onchainBlock);
         blockCallbacks.push(callbacks);

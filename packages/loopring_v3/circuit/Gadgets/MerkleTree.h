@@ -114,6 +114,10 @@ template <typename HashT> class merkle_path_compute_4 : public GadgetT
         : GadgetT(in_pb, in_annotation_prefix)
     {
         assert(in_depth > 0);
+        // std::cout << "in merkle_path_compute_4 in_address_bits.size():" << in_address_bits.size() << std::endl;
+        // std::cout << "in merkle_path_compute_4 in_annotation_prefix:" << in_annotation_prefix << std::endl;
+        // std::cout << "in merkle_path_compute_4 in_address_bits.size():" << in_address_bits.size() << std::endl;
+        // std::cout << "in merkle_path_compute_4 in_depth:" << in_depth << std::endl;
         assert(in_address_bits.size() == in_depth * 2);
 
         m_selectors.reserve(in_depth);
@@ -207,9 +211,12 @@ template <typename HashT> class merkle_path_authenticator_4 : public merkle_path
 
 // Same parameters for ease of implementation in EVM
 using HashMerkleTree = Poseidon_4;
-using HashAccountLeaf = Poseidon_6;
-using HashBalanceLeaf = Poseidon_4_<3>;
-using HashStorageLeaf = Poseidon_4_<2>;
+using HashAccountLeaf = Poseidon_11;
+using HashAssetAccountLeaf = Poseidon_5;
+using HashBalanceLeaf = Poseidon_4_<1>;
+using HashStorageLeaf = Poseidon_7;
+using HashAutoMarketLeaf = Poseidon_9;
+using HashAutoMarketStorageLeaf = Poseidon_4_<4>;
 
 using MerklePathCheckT = merkle_path_authenticator_4<HashMerkleTree>;
 using MerklePathT = merkle_path_compute_4<HashMerkleTree>;

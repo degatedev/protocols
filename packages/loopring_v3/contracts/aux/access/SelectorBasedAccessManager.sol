@@ -19,6 +19,11 @@ contract SelectorBasedAccessManager is Claimable
         bool            allowed
     );
 
+    event TargetCalled(
+        address target,
+        bytes data
+    );
+
     address public immutable target;
     mapping(address => mapping(bytes4 => bool)) public permissions;
 
@@ -67,6 +72,8 @@ contract SelectorBasedAccessManager is Claimable
         if (!success) {
             assembly { revert(add(returnData, 32), mload(returnData)) }
         }
+
+        emit TargetCalled(target, data);
     }
 
     function hasAccessTo(address user, bytes4 selector)

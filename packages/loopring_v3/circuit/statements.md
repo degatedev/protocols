@@ -6,34 +6,66 @@ For a full overview of the Loopring protocol, see https://github.com/Loopring/pr
 
 - TREE_DEPTH_STORAGE = 7
 - TREE_DEPTH_ACCOUNTS = 16
-- TREE_DEPTH_TOKENS = 8
+- TREE_DEPTH_TOKENS = 16
 
-- TX_DATA_AVAILABILITY_SIZE = 68
+- TX_DATA_AVAILABILITY_SIZE = 83
 
 - NUM_BITS_MAX_VALUE = 254
 - NUM_BITS_FIELD_CAPACITY = 253
 - NUM_BITS_AMOUNT = 96
+- NUM_BITS_AMOUNT_DEPOSIT = 248
+- NUM_BITS_AMOUNT_WITHDRAW = 248
 - NUM_BITS_STORAGE_ADDRESS = TREE_DEPTH_STORAGE\*2
 - NUM_BITS_ACCOUNT = TREE_DEPTH_ACCOUNTS\*2
 - NUM_BITS_TOKEN = TREE_DEPTH_TOKENS\*2
+- NUM_BITS_AUTOMARKET_LEVEL = 8
 - NUM_BITS_STORAGEID = 32
 - NUM_BITS_TIMESTAMP = 32
 - NUM_BITS_NONCE = 32
-- NUM_BITS_BIPS = 6
+- NUM_BITS_BIPS = 12
+- NUM_BITS_BIPS_DA = 6
 - NUM_BITS_PROTOCOL_FEE_BIPS = 8
 - NUM_BITS_TYPE = 8
 - NUM_STORAGE_SLOTS = 16384
 - NUM_MARKETS_PER_BLOCK = 16
-- NUM_BITS_TX_TYPE = 8
+
+- NUM_BITS_TX_TYPE = 3
+- NUM_BITS_TX_TYPE_FOR_SELECT = 5
+- NUM_BITS_BATCH_SPOTRADE_TOKEN_TYPE = 2
+- NUM_BITS_TX_SIZE = 16
+- NUM_BITS_BIND_TOKEN_ID_SIZE = 5
 - NUM_BITS_ADDRESS = 160
 - NUM_BITS_HASH = 160
-- NUM_BITS_AMM_BIPS = 8
+- NUM_BITS_BOOL = 8
+- NUM_BITS_BIT = 1
+- NUM_BITS_BYTE = 8
+- NUM_BITS_FLOAT_31 = 31
+- NUM_BITS_FLOAT_30 = 30
+- NUM_BITS_MIN_GAS = 248
 
 - EMPTY_STORAGE_ROOT = 6592749167578234498153410564243369229486412054742481069049239297514590357090
 - MAX_AMOUNT = 79228162514264337593543950335 // 2^96 - 1
 - FIXED_BASE = 1000000000000000000 // 10^18
 - NUM_BITS_FIXED_BASE = 60 // ceil(log2(10^18))
+- FEE_MULTIPLIER = 50
 
+- BATCH_SPOT_TRADE_MAX_USER = 6
+- BATCH_SPOT_TRADE_MAX_TOKENS = 3
+- ORDER_SIZE_USER_MAX = 4
+- ORDER_SIZE_USER_A = 4
+- ORDER_SIZE_USER_B = 2
+- ORDER_SIZE_USER_C = 1
+- ORDER_SIZE_USER_D = 1
+- ORDER_SIZE_USER_E = 1
+- ORDER_SIZE_USER_F = 1
+
+- LogDebug = "Debug"
+- LogInfo = "Info"
+- LogError = "Error"
+
+- Float32Encoding: Accuracy = {7, 24} The remaining 1 bit is used for the symbols of positive and negative numbers
+- Float30Encoding: Accuracy = {5, 25}
+- Float29Encoding: Accuracy = {5, 24}
 - Float24Encoding: Accuracy = {5, 19}
 - Float16Encoding: Accuracy = {5, 11}
 
@@ -41,22 +73,22 @@ For a full overview of the Loopring protocol, see https://github.com/Loopring/pr
 - JubJub.d := 168696
 - JubJub.A := 168698
 
-- TransactionType.Noop := 0 (8 bits)
-- TransactionType.Deposit := 1 (8 bits)
-- TransactionType.Withdrawal := 2 (8 bits)
-- TransactionType.Transfer := 3 (8 bits)
-- TransactionType.SpotTrade := 4 (8 bits)
-- TransactionType.AccountUpdate := 5 (8 bits)
-- TransactionType.AmmUpdate := 6 (8 bits)
-- TransactionType.SignatureVerification := 7 (8 bits)
+- TransactionType.Noop := 0 (4 bits)
+- TransactionType.Transfer := 1 (4 bits)
+- TransactionType.SpotTrade := 2 (4 bits)
+- TransactionType.OrderCancel := 3 (4 bits)
+- TransactionType.AppKeyUpdate := 4 (4 bits)
+- TransactionType.BatchSpotTrade := 5 (4 bits)
+- TransactionType.Deposit := 6 (4 bits)
+- TransactionType.AccountUpdate := 7 (4 bits)
+- TransactionType.Withdrawal := 8 (4 bits)
 
 ## Data types
 
 - F := Snark field element
-- Storage := (data: F, storageID: F)
-- Balance := (balance: F, weightAMM: F, storageRoot: F)
-- Account := (owner: F, publicKeyX: F, publicKeyY: F, nonce: F, feeBipsAMM: F, balancesRoot: F)
-
+- Storage := (tokenSID: F, tokenBID: F, data: F, storageID: F, gasFee: F, cancelled: F, forward: F)
+- Balance := (balance: F)
+- Account := (owner: F, publicKeyX: F, publicKeyY: F, appKeyPublicKeyX: F, appKeyPublicKeyY: F, nonce: F, disableAppKeySpotTrade:F, disableAppKeyWithdraw: F, disableAppKeyTransferToOther: F, balancesRoot: F, storageRoot: F)
 - SignedF := (sign: {0..2}, value: F),
   sign == 1 -> positive value,
   sign == 0 -> negative value,
@@ -64,60 +96,112 @@ For a full overview of the Loopring protocol, see https://github.com/Loopring/pr
 
 - AccountState := (
   storage: Storage,
+  storageArray: StorageGadget[],
   balanceS: Balance,
   balanceB: Balance,
+  balanceFee: Balance,
   account: Account
   )
 - AccountOperator := (
   balanceA: Balance,
   balanceB: Balance,
+  balanceC: Balance,
+  balanceD: Balance,
   account: Account
   )
 - AccountBalances := (
   balanceA: Balance,
-  balanceB: Balance
+  balanceB: Balance,
+  balanceC: Balance
   )
 - State := (
   exchange: {0..2^NUM_BITS_ADDRESS},
   timestamp: {0..2^NUM_BITS_TIMESTAMP},
-  protocolTakerFeeBips: {0..2^NUM_BITS_PROTOCOL_FEE_BIPS},
-  protocolMakerFeeBips: {0..2^NUM_BITS_PROTOCOL_FEE_BIPS},
+  protocolFeeBips: {0..2^NUM_BITS_PROTOCOL_FEE_BIPS},
   numConditionalTransactions: F,
   txType: {0..2^NUM_BITS_TX_TYPE},
 
   accountA: AccountState,
   accountB: AccountState,
-  operator: AccountOperatorState,
-  pool: AccountBalancesState,
+  accountC: AccountState,
+  accountD: AccountState,
+  accountE: AccountState,
+  accountF: AccountState,
+  operator: AccountOperatorState
   )
 
 - Accuracy := (N: unsigned int, D: unsigned int)
 
 - TxOutput := (
   STORAGE_A_ADDRESS: F[NUM_BITS_STORAGE_ADDRESS],
+  STORAGE_A_TOKENSID: F,
+  STORAGE_A_TOKENBID: F,
   STORAGE_A_DATA: F,
   STORAGE_A_STORAGEID: F,
+  STORAGE_A_GASFEE: F,
+  STORAGE_A_CANCELLED: F,
+  STORAGE_A_FORWARD: F,
 
   BALANCE_A_S_ADDRESS: F[NUM_BITS_TOKEN],
   BALANCE_A_S_BALANCE: F,
-  BALANCE_A_S_WEIGHTAMM: F,
 
-  BALANCE_A_B_BALANCE: F
+  BALANCE_A_B_ADDRESS: F[NUM_BITS_TOKEN],
+  BALANCE_A_B_BALANCE: F,
 
   ACCOUNT_A_ADDRESS: F[NUM_BITS_ACCOUNT],
   ACCOUNT_A_OWNER: F,
   ACCOUNT_A_PUBKEY_X: F,
   ACCOUNT_A_PUBKEY_Y: F,
   ACCOUNT_A_NONCE: F,
-  ACCOUNT_A_FEEBIPSAMM: F,
+
+  STORAGE_A_ADDRESS_ARRAY_0: F[NUM_BITS_ACCOUNT],
+  STORAGE_A_TOKENSID_ARRAY_0: F,
+  STORAGE_A_TOKENBID_ARRAY_0: F,
+  STORAGE_A_DATA_ARRAY_0: F,
+  STORAGE_A_STORAGEID_ARRAY_0: F,
+  STORAGE_A_GASFEE_ARRAY_0: F,
+  STORAGE_A_CANCELLED_ARRAY_0: F,
+  STORAGE_A_FORWARD_ARRAY_0: F,
+
+  STORAGE_A_ADDRESS_ARRAY_1: F[NUM_BITS_ACCOUNT],
+  STORAGE_A_TOKENSID_ARRAY_1: F,
+  STORAGE_A_TOKENBID_ARRAY_1: F,
+  STORAGE_A_DATA_ARRAY_1: F,
+  STORAGE_A_STORAGEID_ARRAY_1: F,
+  STORAGE_A_GASFEE_ARRAY_1: F,
+  STORAGE_A_CANCELLED_ARRAY_1: F,
+  STORAGE_A_FORWARD_ARRAY_1: F,
+
+  STORAGE_A_ADDRESS_ARRAY_2: F[NUM_BITS_ACCOUNT],
+  STORAGE_A_TOKENSID_ARRAY_2: F,
+  STORAGE_A_TOKENBID_ARRAY_2: F,
+  STORAGE_A_DATA_ARRAY_2: F,
+  STORAGE_A_STORAGEID_ARRAY_2: F,
+  STORAGE_A_GASFEE_ARRAY_2: F,
+  STORAGE_A_CANCELLED_ARRAY_2: F,
+  STORAGE_A_FORWARD_ARRAY_2: F,
+
+  STORAGE_A_ADDRESS_ARRAY_3: F[NUM_BITS_ACCOUNT],
+  STORAGE_A_TOKENSID_ARRAY_3: F,
+  STORAGE_A_TOKENBID_ARRAY_3: F,
+  STORAGE_A_DATA_ARRAY_3: F,
+  STORAGE_A_STORAGEID_ARRAY_3: F,
+  STORAGE_A_GASFEE_ARRAY_3: F,
+  STORAGE_A_CANCELLED_ARRAY_3: F,
+  STORAGE_A_FORWARD_ARRAY_3: F,
 
   STORAGE_B_ADDRESS: F[NUM_BITS_STORAGE_ADDRESS],
+  STORAGE_B_TOKENSID: F,
+  STORAGE_B_TOKENBID: F,
   STORAGE_B_DATA: F,
   STORAGE_B_STORAGEID: F,
+  STORAGE_B_GASFEE: F,
+  STORAGE_B_FORWARD: F,
 
   BALANCE_B_S_ADDRESS: F[NUM_BITS_TOKEN],
   BALANCE_B_S_BALANCE: F,
 
+  BALANCE_B_B_ADDRESS: F,
   BALANCE_B_B_BALANCE: F,
 
   ACCOUNT_B_ADDRESS: F[NUM_BITS_ACCOUNT],
@@ -126,11 +210,120 @@ For a full overview of the Loopring protocol, see https://github.com/Loopring/pr
   ACCOUNT_B_PUBKEY_Y: F,
   ACCOUNT_B_NONCE: F,
 
-  BALANCE_P_A_BALANCE: F,
-  BALANCE_P_B_BALANCE: F,
+  STORAGE_B_ADDRESS_ARRAY_0: F[NUM_BITS_ACCOUNT],
+  STORAGE_B_TOKENSID_ARRAY_0: F,
+  STORAGE_B_TOKENBID_ARRAY_0: F,
+  STORAGE_B_DATA_ARRAY_0: F,
+  STORAGE_B_STORAGEID_ARRAY_0: F,
+  STORAGE_B_GASFEE_ARRAY_0: F,
+  STORAGE_B_CANCELLED_ARRAY_0: F,
+  STORAGE_B_FORWARD_ARRAY_0: F,
 
+  BALANCE_C_S_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_C_S_BALANCE: F,
+
+  BALANCE_C_B_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_C_B_BALANCE: F,
+
+  ACCOUNT_C_ADDRESS: F[NUM_BITS_ACCOUNT],
+  ACCOUNT_C_OWNER: F,
+  ACCOUNT_C_PUBKEY_X: F,
+  ACCOUNT_C_PUBKEY_Y: F,
+  ACCOUNT_C_NONCE: F,
+
+  STORAGE_C_ADDRESS_ARRAY_0: F[NUM_BITS_ACCOUNT],
+  STORAGE_C_TOKENSID_ARRAY_0: F,
+  STORAGE_C_TOKENBID_ARRAY_0: F,
+  STORAGE_C_DATA_ARRAY_0: F,
+  STORAGE_C_STORAGEID_ARRAY_0: F,
+  STORAGE_C_GASFEE_ARRAY_0: F,
+  STORAGE_C_CANCELLED_ARRAY_0: F,
+  STORAGE_C_FORWARD_ARRAY_0: F,
+
+  BALANCE_D_S_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_D_S_BALANCE: F,
+
+  BALANCE_D_B_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_D_B_BALANCE: F,
+
+  ACCOUNT_D_ADDRESS: F[NUM_BITS_ACCOUNT],
+  ACCOUNT_D_OWNER: F,
+  ACCOUNT_D_PUBKEY_X: F,
+  ACCOUNT_D_PUBKEY_Y: F,
+  ACCOUNT_D_NONCE: F,
+
+  STORAGE_D_ADDRESS_ARRAY_0: F[NUM_BITS_ACCOUNT],
+  STORAGE_D_TOKENSID_ARRAY_0: F,
+  STORAGE_D_TOKENBID_ARRAY_0: F,
+  STORAGE_D_DATA_ARRAY_0: F,
+  STORAGE_D_STORAGEID_ARRAY_0: F,
+  STORAGE_D_GASFEE_ARRAY_0: F,
+  STORAGE_D_CANCELLED_ARRAY_0: F,
+  STORAGE_D_FORWARD_ARRAY_0: F,
+
+  BALANCE_E_S_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_E_S_BALANCE: F,
+
+  BALANCE_E_B_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_E_B_BALANCE: F,
+
+  ACCOUNT_E_ADDRESS: F[NUM_BITS_ACCOUNT],
+  ACCOUNT_E_OWNER: F,
+  ACCOUNT_E_PUBKEY_X: F,
+  ACCOUNT_E_PUBKEY_Y: F,
+  ACCOUNT_E_NONCE: F,
+
+  STORAGE_E_ADDRESS_ARRAY_0: F[NUM_BITS_ACCOUNT],
+  STORAGE_E_TOKENSID_ARRAY_0: F,
+  STORAGE_E_TOKENBID_ARRAY_0: F,
+  STORAGE_E_DATA_ARRAY_0: F,
+  STORAGE_E_STORAGEID_ARRAY_0: F,
+  STORAGE_E_GASFEE_ARRAY_0: F,
+  STORAGE_E_CANCELLED_ARRAY_0: F,
+  STORAGE_E_FORWARD_ARRAY_0: F,
+
+  BALANCE_F_S_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_F_S_BALANCE: F,
+
+  BALANCE_F_B_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_F_B_BALANCE: F,
+
+  ACCOUNT_F_ADDRESS: F[NUM_BITS_ACCOUNT],
+  ACCOUNT_F_OWNER: F,
+  ACCOUNT_F_PUBKEY_X: F,
+  ACCOUNT_F_PUBKEY_Y: F,
+  ACCOUNT_F_NONCE: F,
+
+  STORAGE_F_ADDRESS_ARRAY_0: F[NUM_BITS_ACCOUNT],
+  STORAGE_F_TOKENSID_ARRAY_0: F,
+  STORAGE_F_TOKENBID_ARRAY_0: F,
+  STORAGE_F_DATA_ARRAY_0: F,
+  STORAGE_F_STORAGEID_ARRAY_0: F,
+  STORAGE_F_GASFEE_ARRAY_0: F,
+  STORAGE_F_CANCELLED_ARRAY_0: F,
+  STORAGE_F_FORWARD_ARRAY_0: F,
+
+  BALANCE_O_A_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_O_B_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_O_C_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_O_D_ADDRESS: F[NUM_BITS_ACCOUNT],
   BALANCE_O_A_BALANCE: F,
   BALANCE_O_B_BALANCE: F,
+  BALANCE_O_C_BALANCE: F,
+  BALANCE_O_D_BALANCE: F,
+
+  BALANCE_A_FEE_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_B_FEE_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_C_FEE_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_D_FEE_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_E_FEE_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_F_FEE_ADDRESS: F[NUM_BITS_ACCOUNT],
+  BALANCE_A_FEE_BALANCE: F,
+  BALANCE_B_FEE_BALANCE: F,
+  BALANCE_C_FEE_BALANCE: F,
+  BALANCE_D_FEE_BALANCE: F,
+  BALANCE_E_FEE_BALANCE: F,
+  BALANCE_F_FEE_BALANCE: F,
 
   HASH_A: F,
   PUBKEY_X_A: F,
@@ -142,32 +335,48 @@ For a full overview of the Loopring protocol, see https://github.com/Loopring/pr
   PUBKEY_Y_B: F,
   SIGNATURE_REQUIRED_B: F,
 
+  HASH_A_ARRAY: F[3],
+  PUBKEY_X_A_ARRAY: F[3],
+  PUBKEY_Y_A_ARRAY: F[3],
+  SIGNATURE_REQUIRED_A_ARRAY: F[3],
+
+  HASH_B_ARRAY: F[1],
+  PUBKEY_X_B_ARRAY: F[1],
+  PUBKEY_Y_B_ARRAY: F[1],
+  SIGNATURE_REQUIRED_B_ARRAY: F[1],
+
+  HASH_C_ARRAY: F[1],
+  PUBKEY_X_C_ARRAY: F[1],
+  PUBKEY_Y_C_ARRAY: F[1],
+  SIGNATURE_REQUIRED_C_ARRAY: F[1],
+
+  HASH_D_ARRAY: F[1],
+  PUBKEY_X_D_ARRAY: F[1],
+  PUBKEY_Y_D_ARRAY: F[1],
+  SIGNATURE_REQUIRED_D_ARRAY: F[1],
+
+  HASH_E_ARRAY: F[1],
+  PUBKEY_X_E_ARRAY: F[1],
+  PUBKEY_Y_E_ARRAY: F[1],
+  SIGNATURE_REQUIRED_E_ARRAY: F[1],
+
+  HASH_F_ARRAY: F[1],
+  PUBKEY_X_F_ARRAY: F[1],
+  PUBKEY_Y_F_ARRAY: F[1],
+  SIGNATURE_REQUIRED_F_ARRAY: F[1],
+
   NUM_CONDITIONAL_TXS: F,
 
   DA: F[TX_DATA_AVAILABILITY_SIZE\*8]
-  )
+)
 
 - OrderMatchingData := (
-  amm: {0..2},
   orderFeeBips: {0..2^8},
   fillS: {0..2^NUM_BITS_AMOUNT},
   balanceBeforeS: {0..2^NUM_BITS_AMOUNT},
   balanceBeforeB: {0..2^NUM_BITS_AMOUNT},
   balanceAfterS: {0..2^NUM_BITS_AMOUNT},
   balanceAfterB: {0..2^NUM_BITS_AMOUNT},
-  weightS: {0..2^NUM_BITS_AMOUNT},
-  weightB: {0..2^NUM_BITS_AMOUNT},
-  ammFeeBips: {0..2^NUM_BITS_AMM_BIPS},
-  )
-
-- AmmData := (
-  inBalanceBefore: {0..2^NUM_BITS_AMOUNT},
-  inBalanceAfter: {0..2^NUM_BITS_AMOUNT},
-  inWeight: {0..2^NUM_BITS_AMOUNT},
-  outBalanceBefore: {0..2^NUM_BITS_AMOUNT},
-  outBalanceAfter: {0..2^NUM_BITS_AMOUNT},
-  outWeight: {0..2^NUM_BITS_AMOUNT},
-  ammFill: {0..2^NUM_BITS_AMOUNT}
   )
 
 ## Poseidon
@@ -195,28 +404,69 @@ such that the following conditions hold:
 
 - output.STORAGE_A_ADDRESS = 0
 - output.STORAGE_A_DATA = state.accountA.storage.data
+- output.STORAGE_A_TOKENSID = state.accountA.storage.tokenSID
+- output.STORAGE_A_TOKENBID = state.accountA.storage.tokenBID
 - output.TORAGE_A_STORAGEID = state.accountA.storage.storageID
+- output.STORAGE_A_GASFEE = state.accountA.storage.gasFee
+- output.STORAGE_A_CANCELLED = state.accountA.storage.cancelled
+- output.STORAGE_A_FORWARD = state.accountA.storage.forward
 
 - output.BALANCE_A_S_ADDRESS = 0
 - output.BALANCE_A_S_BALANCE = state.accountA.balanceS.balance
-- output.BALANCE_A_S_WEIGHTAMM = state.accountA.balanceS.weightAMM
 
+- output.BALANCE_A_B_ADDRESS = 0
 - output.BALANCE_A_B_BALANCE = state.accountA.balanceB.balance
+
+- output.BALANCE_A_FEE_ADDRESS = 0
+- output.BALANCE_A_FEE_BALANCE = state.accountA.balanceFee.balance
 
 - output.ACCOUNT_A_ADDRESS = 1
 - output.ACCOUNT_A_OWNER = state.accountA.account.owner
 - output.ACCOUNT_A_PUBKEY_X = state.accountA.account.publicKeyX
 - output.ACCOUNT_A_PUBKEY_Y = state.accountA.account.publicKeyY
 - output.ACCOUNT_A_NONCE = state.accountA.account.nonce
-- output.ACCOUNT_A_FEEBIPSAMM = state.accountA.account.feeBipsAMM
+
+- output.STORAGE_A_ADDRESS_ARRAY_0 = 0
+- output.STORAGE_A_TOKENSID_ARRAY_0 = state.accountA.storageArray[0].tokenSID
+- output.STORAGE_A_TOKENBID_ARRAY_0 = state.accountA.storageArray[0].tokenBID
+- output.STORAGE_A_DATA_ARRAY_0 = state.accountA.storageArray[0].data
+- output.STORAGE_A_STORAGEID_ARRAY_0 = state.accountA.storageArray[0].storageID
+- output.STORAGE_A_GASFEE_ARRAY_0 = state.accountA.storageArray[0].gasFee
+- output.STORAGE_A_CANCELLED_ARRAY_0 = state.accountA.storageArray[0].cancelled
+- output.STORAGE_A_FORWARD_ARRAY_0 = state.accountA.storageArray[0].forward
+
+- output.STORAGE_A_ADDRESS_ARRAY_1 = 0
+- output.STORAGE_A_TOKENSID_ARRAY_1 = state.accountA.storageArray[1].tokenSID
+- output.STORAGE_A_TOKENBID_ARRAY_1 = state.accountA.storageArray[1].tokenBID
+- output.STORAGE_A_DATA_ARRAY_1 = state.accountA.storageArray[1].data
+- output.STORAGE_A_STORAGEID_ARRAY_1 = state.accountA.storageArray[1].storageID
+- output.STORAGE_A_GASFEE_ARRAY_1 = state.accountA.storageArray[1].gasFee
+- output.STORAGE_A_CANCELLED_ARRAY_1 = state.accountA.storageArray[1].cancelled
+- output.STORAGE_A_FORWARD_ARRAY_1 = state.accountA.storageArray[1].forward
+
+- output.STORAGE_A_ADDRESS_ARRAY_2 = 0
+- output.STORAGE_A_TOKENSID_ARRAY_2 = state.accountA.storageArray[2].tokenSID
+- output.STORAGE_A_TOKENBID_ARRAY_2 = state.accountA.storageArray[2].tokenBID
+- output.STORAGE_A_DATA_ARRAY_2 = state.accountA.storageArray[2].data
+- output.STORAGE_A_STORAGEID_ARRAY_2 = state.accountA.storageArray[2].storageID
+- output.STORAGE_A_GASFEE_ARRAY_2 = state.accountA.storageArray[2].gasFee
+- output.STORAGE_A_CANCELLED_ARRAY_2 = state.accountA.storageArray[2].cancelled
+- output.STORAGE_A_FORWARD_ARRAY_2 = state.accountA.storageArray[2].forward
 
 - output.STORAGE_B_ADDRESS] = 0
+- output.STORAGE_B_TOKENSID = state.accountB.storage.tokenSID
+- output.STORAGE_B_TOKENBID = state.accountB.storage.tokenBID
 - output.STORAGE_B_DATA = state.accountB.storage.data
 - output.STORAGE_B_STORAGEID = state.accountB.storage.storageID
+- output.TSTORAGE_B_GASFEE = state.accountB.storage.gasFee
+- output.STORAGE_B_FORWARD = state.accountB.storage.forward
 
 - output.BALANCE_B_S_ADDRESS = 0
 - output.BALANCE_B_S_BALANCE = state.accountB.balanceS.balance
+- output.BALANCE_B_B_ADDRESS = 0
 - output.BALANCE_B_B_BALANCE = state.accountB.balanceB.balance
+- output.BALANCE_B_FEE_ADDRESS = 0
+- output.BALANCE_B_FEE_BALANCE = state.accountB.balanceFee.balance
 
 - output.ACCOUNT_B_ADDRESS = 1
 - output.ACCOUNT_B_OWNER = state.accountB.account.owner
@@ -224,11 +474,112 @@ such that the following conditions hold:
 - output.ACCOUNT_B_PUBKEY_Y = state.accountB.account.publicKeyY
 - output.ACCOUNT_B_NONCE = state.accountB.account.nonce
 
-- output.BALANCE_P_A_BALANCE = state.pool.balanceA.balance
-- output.BALANCE_P_B_BALANCE = state.pool.balanceB.balance
+- output.STORAGE_B_ADDRESS_ARRAY_0 = 0
+- output.STORAGE_B_TOKENSID_ARRAY_0 = state.accountB.storageArray[0].tokenSID
+- output.STORAGE_B_TOKENBID_ARRAY_0 = state.accountB.storageArray[0].tokenBID
+- output.STORAGE_B_DATA_ARRAY_0 = state.accountB.storageArray[0].data
+- output.STORAGE_B_STORAGEID_ARRAY_0 = state.accountB.storageArray[0].storageID
+- output.STORAGE_B_GASFEE_ARRAY_0 = state.accountB.storageArray[0].gasFee
+- output.STORAGE_B_CANCELLED_ARRAY_0 = state.accountB.storageArray[0].cancelled
+- output.STORAGE_B_FORWARD_ARRAY_0 = state.accountB.storageArray[0].forward
+
+- output.BALANCE_C_S_ADDRESS = 0
+- output.BALANCE_C_S_BALANCE = state.accountC.balanceS.balance
+- output.BALANCE_C_B_ADDRESS = 0
+- output.BALANCE_C_B_BALANCE = state.accountC.balanceB.balance
+- output.BALANCE_C_FEE_ADDRESS = 0
+- output.BALANCE_C_FEE_BALANCE = state.accountC.balanceFee.balance
+
+- output.ACCOUNT_C_ADDRESS = 1
+- output.ACCOUNT_C_OWNER = state.accountC.account.owner
+- output.ACCOUNT_C_PUBKEY_X = state.accountC.account.publicKeyX
+- output.ACCOUNT_C_PUBKEY_Y = state.accountC.account.publicKeyY
+- output.ACCOUNT_C_NONCE = state.accountC.account.nonce
+
+- output.STORAGE_C_ADDRESS_ARRAY_0 = 0
+- output.STORAGE_C_TOKENSID_ARRAY_0 = state.accountC.storageArray[0].tokenSID
+- output.STORAGE_C_TOKENBID_ARRAY_0 = state.accountC.storageArray[0].tokenBID
+- output.STORAGE_C_DATA_ARRAY_0 = state.accountC.storageArray[0].data
+- output.STORAGE_C_STORAGEID_ARRAY_0 = state.accountC.storageArray[0].storageID
+- output.STORAGE_C_GASFEE_ARRAY_0 = state.accountC.storageArray[0].gasFee
+- output.STORAGE_C_CANCELLED_ARRAY_0 = state.accountC.storageArray[0].cancelled
+- output.STORAGE_C_FORWARD_ARRAY_0 = state.accountC.storageArray[0].forward
+
+- output.BALANCE_D_S_ADDRESS = 0
+- output.BALANCE_D_S_BALANCE = state.accountD.balanceS.balance
+- output.BALANCE_D_B_ADDRESS = 0
+- output.BALANCE_D_B_BALANCE = state.accountD.balanceB.balance
+- output.BALANCE_D_FEE_ADDRESS = 0
+- output.BALANCE_D_FEE_BALANCE = state.accountD.balanceFee.balance
+
+- output.ACCOUNT_D_ADDRESS = 1
+- output.ACCOUNT_D_OWNER = state.accountD.account.owner
+- output.ACCOUNT_D_PUBKEY_X = state.accountD.account.publicKeyX
+- output.ACCOUNT_D_PUBKEY_Y = state.accountD.account.publicKeyY
+- output.ACCOUNT_D_NONCE = state.accountD.account.nonce
+
+- output.STORAGE_D_ADDRESS_ARRAY_0 = 0
+- output.STORAGE_D_TOKENSID_ARRAY_0 = state.accountD.storageArray[0].tokenSID
+- output.STORAGE_D_TOKENBID_ARRAY_0 = state.accountD.storageArray[0].tokenBID
+- output.STORAGE_D_DATA_ARRAY_0 = state.accountD.storageArray[0].data
+- output.STORAGE_D_STORAGEID_ARRAY_0 = state.accountD.storageArray[0].storageID
+- output.STORAGE_D_GASFEE_ARRAY_0 = state.accountD.storageArray[0].gasFee
+- output.STORAGE_D_CANCELLED_ARRAY_0 = state.accountD.storageArray[0].cancelled
+- output.STORAGE_D_FORWARD_ARRAY_0 = state.accountD.storageArray[0].forward
+
+- output.BALANCE_E_S_ADDRESS = 0
+- output.BALANCE_E_S_BALANCE = state.accountE.balanceS.balance
+- output.BALANCE_E_B_ADDRESS = 0
+- output.BALANCE_E_B_BALANCE = state.accountE.balanceB.balance
+- output.BALANCE_E_FEE_ADDRESS = 0
+- output.BALANCE_E_FEE_BALANCE = state.accountE.balanceFee.balance
+
+- output.ACCOUNT_E_ADDRESS = 1
+- output.ACCOUNT_E_OWNER = state.accountE.account.owner
+- output.ACCOUNT_E_PUBKEY_X = state.accountE.account.publicKeyX
+- output.ACCOUNT_E_PUBKEY_Y = state.accountE.account.publicKeyY
+- output.ACCOUNT_E_NONCE = state.accountE.account.nonce
+
+- output.STORAGE_E_ADDRESS_ARRAY_0 = 0
+- output.STORAGE_E_TOKENSID_ARRAY_0 = state.accountE.storageArray[0].tokenSID
+- output.STORAGE_E_TOKENBID_ARRAY_0 = state.accountE.storageArray[0].tokenBID
+- output.STORAGE_E_DATA_ARRAY_0 = state.accountE.storageArray[0].data
+- output.STORAGE_E_STORAGEID_ARRAY_0 = state.accountE.storageArray[0].storageID
+- output.STORAGE_E_GASFEE_ARRAY_0 = state.accountE.storageArray[0].gasFee
+- output.STORAGE_E_CANCELLED_ARRAY_0 = state.accountE.storageArray[0].cancelled
+- output.STORAGE_E_FORWARD_ARRAY_0 = state.accountE.storageArray[0].forward
+
+- output.BALANCE_F_S_ADDRESS = 0
+- output.BALANCE_F_S_BALANCE = state.accountF.balanceS.balance
+- output.BALANCE_F_B_ADDRESS = 0
+- output.BALANCE_F_B_BALANCE = state.accountF.balanceB.balance
+- output.BALANCE_F_FEE_ADDRESS = 0
+- output.BALANCE_F_FEE_BALANCE = state.accountF.balanceFee.balance
+
+- output.ACCOUNT_F_ADDRESS = 1
+- output.ACCOUNT_F_OWNER = state.accountF.account.owner
+- output.ACCOUNT_F_PUBKEY_X = state.accountF.account.publicKeyX
+- output.ACCOUNT_F_PUBKEY_Y = state.accountF.account.publicKeyY
+- output.ACCOUNT_F_NONCE = state.accountF.account.nonce
+
+- output.STORAGE_F_ADDRESS_ARRAY_0 = 0
+- output.STORAGE_F_TOKENSID_ARRAY_0 = state.accountF.storageArray[0].tokenSID
+- output.STORAGE_F_TOKENBID_ARRAY_0 = state.accountF.storageArray[0].tokenBID
+- output.STORAGE_F_DATA_ARRAY_0 = state.accountF.storageArray[0].data
+- output.STORAGE_F_STORAGEID_ARRAY_0 = state.accountF.storageArray[0].storageID
+- output.STORAGE_F_GASFEE_ARRAY_0 = state.accountF.storageArray[0].gasFee
+- output.STORAGE_F_CANCELLED_ARRAY_0 = state.accountF.storageArray[0].cancelled
+- output.STORAGE_F_FORWARD_ARRAY_0 = state.accountF.storageArray[0].forward
+
+- output.BALANCE_O_A_ADDRESS = 0
+- output.BALANCE_O_D_ADDRESS = 0
+- output.BALANCE_O_C_ADDRESS = 0
+- output.BALANCE_O_D_ADDRESS = 0
 
 - output.BALANCE_O_A_BALANCE = state.operator.balanceA.balance
 - output.BALANCE_O_B_BALANCE = state.operator.balanceB.balance
+- output.BALANCE_O_C_BALANCE = state.operator.balanceC.balance
+- output.BALANCE_O_D_BALANCE = state.operator.balanceD.balance
 
 - output.HASH_A = 0
 - output.PUBKEY_X_A = state.accountA.account.publicKeyX
@@ -239,6 +590,36 @@ such that the following conditions hold:
 - output.PUBKEY_X_B = state.accountB.account.publicKeyX
 - output.PUBKEY_Y_B = state.accountB.account.publicKeyY
 - output.SIGNATURE_REQUIRED_B = 1
+
+- output.HASH_A_ARRAY = VariableArrayT(ORDER_SIZE_USER_A - 1, state.constants._0)
+- output.PUBKEY_X_A_ARRAY = VariableArrayT(ORDER_SIZE_USER_A - 1, state.accountA.account.publicKey.x)
+- output.PUBKEY_Y_A_ARRAY = VariableArrayT(ORDER_SIZE_USER_A - 1, state.accountA.account.publicKey.y)
+- output.SIGNATURE_REQUIRED_A_ARRAY = VariableArrayT(ORDER_SIZE_USER_A - 1, state.constants._0)
+
+- output.HASH_B_ARRAY = VariableArrayT(ORDER_SIZE_USER_B - 1, state.constants._0)
+- output.PUBKEY_X_B_ARRAY = VariableArrayT(ORDER_SIZE_USER_B - 1, state.accountA.account.publicKey.x)
+- output.PUBKEY_Y_B_ARRAY = VariableArrayT(ORDER_SIZE_USER_B - 1, state.accountA.account.publicKey.y)
+- output.SIGNATURE_REQUIRED_B_ARRAY = VariableArrayT(ORDER_SIZE_USER_B - 1, state.constants._0)
+
+- output.HASH_C_ARRAY = VariableArrayT(ORDER_SIZE_USER_C - 1, state.constants._0)
+- output.PUBKEY_X_C_ARRAY = VariableArrayT(ORDER_SIZE_USER_C - 1, state.accountA.account.publicKey.x)
+- output.PUBKEY_Y_C_ARRAY = VariableArrayT(ORDER_SIZE_USER_C - 1, state.accountA.account.publicKey.y)
+- output.SIGNATURE_REQUIRED_C_ARRAY = VariableArrayT(ORDER_SIZE_USER_C - 1, state.constants._0)
+
+- output.HASH_D_ARRAY = VariableArrayT(ORDER_SIZE_USER_D - 1, state.constants._0)
+- output.PUBKEY_X_D_ARRAY = VariableArrayT(ORDER_SIZE_USER_D - 1, state.accountA.account.publicKey.x)
+- output.PUBKEY_Y_D_ARRAY = VariableArrayT(ORDER_SIZE_USER_D - 1, state.accountA.account.publicKey.y)
+- output.SIGNATURE_REQUIRED_D_ARRAY = VariableArrayT(ORDER_SIZE_USER_D - 1, state.constants._0)
+
+- output.HASH_E_ARRAY = VariableArrayT(ORDER_SIZE_USER_E - 1, state.constants._0)
+- output.PUBKEY_X_E_ARRAY = VariableArrayT(ORDER_SIZE_USER_E - 1, state.accountA.account.publicKey.x)
+- output.PUBKEY_Y_E_ARRAY = VariableArrayT(ORDER_SIZE_USER_E - 1, state.accountA.account.publicKey.y)
+- output.SIGNATURE_REQUIRED_E_ARRAY = VariableArrayT(ORDER_SIZE_USER_E - 1, state.constants._0)
+
+- output.HASH_F_ARRAY = VariableArrayT(ORDER_SIZE_USER_F - 1, state.constants._0)
+- output.PUBKEY_X_F_ARRAY = VariableArrayT(ORDER_SIZE_USER_F - 1, state.accountA.account.publicKey.x)
+- output.PUBKEY_Y_F_ARRAY = VariableArrayT(ORDER_SIZE_USER_F - 1, state.accountA.account.publicKey.y)
+- output.SIGNATURE_REQUIRED_F_ARRAY = VariableArrayT(ORDER_SIZE_USER_F - 1, state.constants._0)
 
 - output.NUM_CONDITIONAL_TXS = state.numConditionalTransactions
 - output.DA = 0
@@ -373,6 +754,26 @@ Notes:
 - Calculates A - B with underflow checking
 - A and B are limited to n + 1 <= NUM_BITS_FIELD_CAPACITY, so we can be sure to detect underflow with a simple range check on the result.
 - Underflow check is thus detected when the result is a value taking up more than n bits.
+
+## SafeMul statement
+
+A valid instance of an SafeMul statement assures that given an input of:
+
+- valueA: {0..2^n}
+- valueB: {0..2^n}
+
+with circuit parameters:
+
+- n: unsigned int
+
+the prover knows an auxiliary input:
+
+- result: {0..2^n}
+
+such that the following conditions hold:
+
+- result = valueA \* valueB
+- result < 2^n && result >= 0
 
 ## Transfer statement
 
@@ -1194,35 +1595,66 @@ Verifies the Merkle root for the specified path.
 A valid instance of an UpdateAccount statement assures that given an input of:
 
 - root_before: F
+- asset_root_before: F
 - address: {0..2^NUM_BITS_ACCOUNT}
 - before: Account
+- asset_before: Account
 - after: Account
+- asset_after: Account
 
 the prover knows an auxiliary input:
 
 - root_after: F
+- asset_root_after: F
 - proof: F[3 * TREE_DEPTH_ACCOUNTS]
+- asset_proof: F[3 * TREE_DEPTH_ACCOUNTS]
 
 such that the following conditions hold:
 
-- hash_before = PoseidonHash_t7f6p52(
+- hash_before = PoseidonHash_t12f6p53(
+  before.owner,
+  before.publicKeyX,
+  before.publicKeyY,
+  before.appKeyPublicKeyX,
+  before.appKeyPublicKeyY,
+  before.nonce,
+  before.disableAppKeySpotTrade,
+  before.disableAppKeyWithdraw,
+  before.disableAppKeyTransferToOther,
+  before.balancesRoot,
+  before.storageRoot
+  )
+- hash_after = PoseidonHash_t12f6p53(
+  after.owner,
+  after.publicKeyX,
+  after.publicKeyY,
+  after.appKeyPublicKeyX,
+  after.appKeyPublicKeyY,
+  after.nonce,
+  after.disableAppKeySpotTrade,
+  after.disableAppKeyWithdraw,
+  after.disableAppKeyTransferToOther,
+  after.balancesRoot,
+  after.storageRoot
+  )
+- asset_hash_before = PoseidonHash_t6f6p52(
   before.owner,
   before.publicKeyX,
   before.publicKeyY,
   before.nonce,
-  before.feeBipsAMM,
   before.balancesRoot
   )
-- hash_after = PoseidonHash_t7f6p52(
+- asset_hash_after = PoseidonHash_t6f6p52(
   after.owner,
   after.publicKeyX,
   after.publicKeyY,
   after.nonce,
-  after.feeBipsAMM,
   after.balancesRoot
   )
 - MerklePathCheck(TREE_DEPTH_ACCOUNTS, address, hash_before, root_before, proof)
 - root_after = MerklePath(TREE_DEPTH_ACCOUNTS, address, hash_after, proof)
+- MerklePathCheck(TREE_DEPTH_ACCOUNTS, address, asset_hash_before, asset_root_before, asset_proof)
+- asset_root_after = MerklePath(TREE_DEPTH_ACCOUNTS, address, asset_hash_after, asset_proof)
 
 ### Description
 
@@ -1248,14 +1680,10 @@ the prover knows an auxiliary input:
 such that the following conditions hold:
 
 - hash_before = PoseidonHash_t5f6p52(
-  before.balance,
-  before.weightAMM,
-  before.storageRoot
+  before.balance
   )
 - hash_after = PoseidonHash_t5f6p52(
-  after.balance,
-  after.weightAMM,
-  after.storageRoot
+  after.balance
   )
 - MerklePathCheck(TREE_DEPTH_TOKENS, address, hash_before, root_before, proof)
 - root_after = MerklePath(TREE_DEPTH_TOKENS, address, hash_after, proof)
@@ -1287,20 +1715,30 @@ the prover knows an auxiliary input:
 
 such that the following conditions hold:
 
-- hash_before = PoseidonHash_t5f6p52(
+- hash_before = PoseidonHash_t8f6p53(
+  before.tokenSID,
+  before.tokenBID,
   before.data,
-  before.storageID
+  before.storageID,
+  before.gasFee,
+  before.cancelled,
+  before.forward
   )
-- hash_after = PoseidonHash_t5f6p52(
+- hash_after = PoseidonHash_t8f6p53(
+  after.tokenSID,
+  after.tokenBID,
   after.data,
-  after.storageID
+  after.storageID,
+  after.gasFee,
+  after.cancelled,
+  after.forward
   )
 - MerklePathCheck(TREE_DEPTH_STORAGE, address, hash_before, root_before, proof)
 - root_after = MerklePath(TREE_DEPTH_STORAGE, address, hash_after, proof)
 
 Notes:
 
-- Even though the leaf has only two values, we still use PoseidonHash_t5f6p52 (which hashes up to 4 inputs) so we need less Poseidon implementations in our smart contracts.
+- Even though the leaf has only two values, we still use PoseidonHash_t8f6p53 (which hashes up to 4 inputs) so we need less Poseidon implementations in our smart contracts.
 
 ### Description
 
@@ -1324,7 +1762,12 @@ the prover knows an auxiliary input:
 such that the following conditions hold:
 
 - if verify == 1 then storageID >= storage.storageID
+- tokenSID = (storageID == storage.storageID) ? storage.tokenSID : 0
+- tokenBID = (storageID == storage.storageID) ? storage.tokenBID : 0
 - data = (storageID == storage.storageID) ? storage.data : 0
+- gasFee = (storageID == storage.storageID) ? storage.gasFee : 0
+- cancelled = (storageID == storage.storageID) ? storage.cancelled : 0
+- forward = (storageID == storage.storageID) ? storage.forward : 1
 
 ### Description
 
@@ -1340,12 +1783,22 @@ A valid instance of a Nonce statement assures that given an input of:
 
 the prover knows an auxiliary input:
 
+- tokenSID: F
+- tokenBID: F
 - data: F
+- gasFee: F
+- cancelled: F
+- forward: F
 
 such that the following conditions hold:
 
 - data = StorageReader(storage, storageID, verify)
+- if verify == 1 then tokenSID == 0
+- if verify == 1 then tokenBID == 0
 - if verify == 1 then data == 0
+- if verify == 1 then gasFee == 0
+- if verify == 1 then cancelled == 0
+- if verify == 1 then forward == 1
 
 ### Description
 
@@ -1450,31 +1903,6 @@ Notes:
 
 - Based on `PureEdDSA` in ethsnarks (https://github.com/yueawang/ethsnarks/blob/042ad35a8a67a1844e51eac441b310371eba1fe8/src/jubjub/eddsa.cpp#L63), modified to use Poseidon.
 
-## SignatureVerifier statement
-
-A valid instance of a SignatureVerifier statement assures that given an input of:
-
-- publicKeyX: F
-- publicKeyY: F
-- message: F
-- required: {0..2}
-
-the prover knows an auxiliary input:
-
-- result
-- rX: F
-- rY: F
-- s: F[]
-
-The following conditions hold:
-
-- result = EdDSA_Poseidon(publicKeyX, publicKeyY, rX, rY, s, message)
-- if required == 1 then valid == 1
-
-### Description
-
-Verifies a signature for message signed by the specified public key if required is set to one. If required is set to zero no valid signature needs to be provided.
-
 # Matching
 
 ## Order statement
@@ -1489,11 +1917,18 @@ A valid instance of an Order statement assures that given an input of:
 - amountS: {0..2^NUM_BITS_AMOUNT}
 - amountB: {0..2^NUM_BITS_AMOUNT}
 - validUntil: {0..2^NUM_BITS_TIMESTAMP}
-- maxFeeBips: {0..2^NUM_BITS_FEE_BIPS}
+- fee: {0..2^NUM_BITS_FEE_BIPS}
+- maxFee: {0..2^NUM_BITS_FEE_BIPS}
 - fillAmountBorS: {0..2}
 - taker: F
+- feeTokenID: {0..2^NUM_BITS_TOKEN}
 - feeBips: {0..2^NUM_BITS_FEE_BIPS}
-- amm: {0..2}
+- tradingFee: {0..2^NUM_BITS_AMOUNT}
+- type: {0..2^NUM_BITS_TYPE}
+- gridOffset: {0..2^NUM_BITS_AMOUNT}
+- orderOffset: {0..2^NUM_BITS_AMOUNT}
+- maxLevel: {0..2^NUM_BITS_AUTOMARKET_LEVEL}
+- useAppKey: {0..2^NUM_BITS_BYTE}
 
 the prover knows an auxiliary input:
 
@@ -1507,12 +1942,19 @@ such that the following conditions hold:
 - tokenB_bits = tokenB_packed
 - amountS_bits = amountS_packed
 - amountB_bits = amountB_packed
-- maxFeeBips_bits = maxFeeBips_packed
+- fee_bits = fee_packed
+- trading_fee = tradingFee_packed
+- maxFee_bits = maxFee_packed
 - feeBips_bits = feeBips_packed
 - validUntil_bits = validUntil_packed
 - fillAmountBorS_bits = fillAmountBorS_packed
+- feeTokenID_bits = feeTokenID_packed
+- type_bits = type_packed
+- gridOffset_bits = gridOffset_packed
+- orderOffset_bits = orderOffset_packed
+- maxLevel_bits = maxLevel_packed
 
-- hash = PoseidonHash_t12f6p53(
+- hash = PoseidonHash_t18f6p53(
   exchange,
   storageID,
   accountID,
@@ -1523,9 +1965,17 @@ such that the following conditions hold:
   validUntil,
   maxFeeBips,
   fillAmountBorS,
-  taker
+  taker,
+  feeTokenID,
+  type,
+  gridOffset,
+  orderOffset,
+  maxLevel,
+  useAppKey
   )
-- feeBips <= maxFeeBips (RequireLeqGadget)
+- feeBips <= protocolFeeBips (RequireLeqGadget)
+- tradingFee <= calculateTradingFee (RequireLeqGadget)
+- fee <= maxFee (RequireLeqGadget)
 - tokenS != tokenB
 - amountS != 0
 - amountB != 0
@@ -1567,26 +2017,29 @@ The additional requirement for the fill amounts is to make sure rounding errors 
 A valid instance of a FeeCalculator statement assures that given an input of:
 
 - amount: {0..2^NUM_BITS_AMOUNT}
-- protocolFeeBips: {0..2^NUM_BITS_PROTOCOL_FEE_BIPS}
 - feeBips: {0..2^NUM_BITS_FEE_BIPS}
 
 the prover knows an auxiliary input:
 
-- protocolFee: {0..2^NUM_BITS_AMOUNT}
-- fee: {0..2^NUM_BITS_AMOUNT}
+- tradingFee: {0..2^NUM_BITS_AMOUNT}
 
 such that the following conditions hold:
 
-- protocolFee = amount \* protocolFeeBips // 100000
-- fee = amount \* feeBips // 10000
+SpotTrade
+
+- tradingFee = amount \* feeBips // 10000
+
+BatchSpotTrade
+
+- tradingFee <= amount \* feeBips // 10000
 
 Notes:
 
-- While protocolFeeBips is called bips, the unit is actually bips/10
+- While feeBips is called bips
 
 ### Description
 
-Calculates the fee (paid by the user to the operator) and the protocol fee (paid by the operator to the protocol pool). Both fees are a percentage of the amount of tokens bought by the user.
+Calculates the fee (paid by the user to the operator) . Trading fee is a percentage of the amount of tokens bought by the user.
 
 ## RequireValidOrder statement
 
@@ -1681,6 +2134,8 @@ A valid instance of an OrderMatching statement assures that given an input of:
 - orderB: Order
 - ownerA: {0..2^NUM_BITS_ADDRESS}
 - ownerB: {0..2^NUM_BITS_ADDRESS}
+- cancelledA: {0..1}
+- cancelledB: {0..1}
 - filledA: {0..2^NUM_BITS_AMOUNT}
 - filledB: {0..2^NUM_BITS_AMOUNT}
 - fillS_A: {0..2^NUM_BITS_AMOUNT}
@@ -1699,8 +2154,8 @@ such that the following conditions hold:
 - orderA.tokenB == orderB.tokenS
 - ValidateTaker(ownerB, orderA.taker)
 - ValidateTaker(ownerA, orderB.taker)
-- RequireValidOrder(timestamp, orderA)
-- RequireValidOrder(timestamp, orderB)
+- RequireValidOrder(timestamp, cancelledA, orderA)
+- RequireValidOrder(timestamp, cancelledB, orderB)
 
 ### Description
 
@@ -1711,127 +2166,36 @@ Verifies that the given fill amounts fill both orders in a valid way:
 - Valid taker
 - Valid order
 
-## SpotPriceAMM statement
+## BatchOrderMatching statement
 
-A valid instance of a SpotPriceAMM statement assures that given an input of:
+A valid instance of an OrderMatching statement assures that given an input of:
 
-- balanceIn: {0..2^NUM_BITS_AMOUNT}
-- weightIn: {0..2^NUM_BITS_AMOUNT}
-- balanceOut: {0..2^NUM_BITS_AMOUNT}
-- weightOut: {0..2^NUM_BITS_AMOUNT}
-- feeBips: {0..2^NUM_BITS_AMM_BIPS}
-
-the prover knows an auxiliary input:
-
-- result: {0..2^NUM_BITS_AMOUNT}
-- numer: F
-- denom: F
-- ratio: F
-- invFeeBips: F
-
-such that the following conditions hold:
-
-- numer = balanceIn \* weightOut
-- denom = balanceOut \* weightIn
-- ratio = (numer \* BASE_FIXED) / denom
-- ratio < 2^NUM_BITS_AMOUNT (range check)
-- invFeeBips = BASE_BIPS - feeBips
-- result = (ratio \* BASE_BIPS) / invFeeBips
-
-### Description
-
-Formula from balancer (https://docs.balancer.finance/protocol/index#spot-price). Calculates the price as if there would be no slippage.
-
-## CalcOutGivenInAMM statement
-
-A valid instance of a CalcOutGivenInAMM statement assures that given an input of:
-
-- balanceIn: {0..2^NUM_BITS_AMOUNT}
-- weightIn: {0..2^NUM_BITS_AMOUNT}
-- balanceOut: {0..2^NUM_BITS_AMOUNT}
-- weightOut: {0..2^NUM_BITS_AMOUNT}
-- feeBips: {0..2^NUM_BITS_AMM_BIPS}
-- amountIn: {0..2^NUM_BITS_AMOUNT}
+- timestamp: {0..2^NUM_BITS_TIMESTAMP}
+- order: Order
+- filled: {0..2^NUM_BITS_AMOUNT}
+- cancelled: {0..1}
+- deltaFilledS: {0..2^NUM_BITS_AMOUNT}
+- deltaFilledB: {0..2^NUM_BITS_AMOUNT}
+- verify: {0..1}
 
 the prover knows an auxiliary input:
 
-- result: {0..2^NUM_BITS_AMOUNT}
-- weightRatio: {0..2^NUM_BITS_AMOUNT}
-- fee: {0..2^NUM_BITS_AMOUNT}
-- y: {0..2^NUM_BITS_AMOUNT}
-- p: {0..2^NUM_BITS_AMOUNT}
+- filledAfter: {0..2^NUM_BITS_AMOUNT}
 
 such that the following conditions hold:
 
-- weightRatio = (weightIn \* BASE_FIXED) / weightOut
-- weightRatio < 2^NUM_BITS_AMOUNT (range check)
-- fee = amountIn \* feeBips / BASE_BIPS
-- y = (balanceIn \* BASE_FIXED) / (balanceIn + (amountIn - fee))
-- p = power(y, weightRatio)
-- result = balanceOut \* (BASE_FIXED - p) / BASE_FIXED
+- filledAfter = RequireOrderFills(order, filled, deltaFilledS, deltaFilledB, verify)
+- ValidateTaker(order.taker, verify)
+- RequireValidOrder(timestamp, cancelled, order, verify)
 
 ### Description
 
-Formula from balancer (https://docs.balancer.finance/protocol/index#out-given-in). Calculates the maximum amount of tokens that can be sold by the AMM when buying the specified amount of tokens.
+Verifies that the given fill amounts fill both orders in a valid way:
 
-## RequireAMMFills statement
-
-A valid instance of a RequireAMMFills statement assures that given an input of:
-
-- data: OrderMatchingData
-- fillB: {0..2^NUM_BITS_AMOUNT}
-
-the prover knows an auxiliary input:
-
-- ammData: AmmData
-- maxFillS: {0..2^NUM_BITS_AMOUNT}
-- price_before: {0..2^NUM_BITS_AMOUNT}
-- price_after: {0..2^NUM_BITS_AMOUNT}
-
-such that the following conditions hold:
-
-- ammData = (data.amm == 1) ?
-  AmmData(data.balanceBeforeB, data.balanceAfterB, data.weightB, data.balanceBeforeS, data.balanceAfterS, data.weightS, fillB) :
-  AmmData(FIXED_BASE, FIXED_BASE, FIXED_BASE, FIXED_BASE, FIXED_BASE, FIXED_BASE, 0)
-
-- if data.amm == 1 then data.orderFeeBips == 0
-- if data.amm == 1 then ammData.inWeight != 0
-- if data.amm == 1 then ammData.outWeight != 0
-
-- maxFillS = CalcOutGivenInAMM(ammData.inWeight, ammData.outBalanceBefore, ammData.outWeight, data.ammFeeBips, ammData.ammFill)
-- if data.amm == 1 then data.fillS <= maxFillS
-- price_before = SpotPriceAMM(ammData.inBalanceBefore, ammData.inWeight, ammData.outBalanceBefore, ammData.outWeight, data.ammFeeBips)
-- price_after = SpotPriceAMM(ammData.inBalanceAfter, ammData.inWeight, ammData.outBalanceAfter, ammData.outWeight, data.ammFeeBips)
-- if data.amm == 1 price_before <= price_after
-
-### Description
-
-Validates if an AMM order is filled correctly. If the order isn't an AMM order dummy data is used in ammData so that all the following checks pass.
-
-For an AMM order to be usable, both tokens need to have AMM enabled (weigth != 0). An AMM order does not pay any fee to the operator.
-
-An AMM order is correctly filled when the amount of tokens sold by the AMM is less than the maximum allowed as defined by CalcOutGivenInAMM.
-As an additional check against potential rounding errors in the power gadget, we enforce that the AMM price after the trade cannot be lower than before the trade.
-
-## ValidateAMM statement
-
-A valid instance of a ValidateAMM statement assures that given an input of:
-
-- dataA: OrderMatchingData
-- dataB: OrderMatchingData
-
-the prover knows an auxiliary input:
-
--
-
-such that the following conditions hold:
-
-- RequireAMMFills(dataA, dataB.fillS)
-- RequireAMMFills(dataB, dataA.fillS)
-
-### Description
-
-Validates the AMM requirements for both orders.
+- Valid order fills
+- Matching tokens
+- taker must be zero
+- Valid order
 
 # Transactions
 
@@ -1922,14 +2286,14 @@ such that the following conditions hold:
 - state.accountA.account.nonce_bits = state.accountA.account.nonce_packed
 
 - hash = PoseidonHash_t9f6p53(
-  state.exchange,
-  accountID,
-  feeTokenID,
-  maxFee,
-  publicKeyX,
-  publicKeyY,
-  validUntil,
-  nonce
+    state.exchange,
+    accountID,
+    feeTokenID,
+    maxFee,
+    publicKeyX,
+    publicKeyY,
+    validUntil,
+    nonce
   )
 - OwnerValid(state.accountA.account.owner, owner)
 - state.timestamp < validUntil
@@ -1939,7 +2303,7 @@ such that the following conditions hold:
 - RequireAccuracy(uFee, fee)
 
 - output = DefaultTxOutput(state)
-- output.ACCOUNT_A_ADDRESS = accountID
+- output.ACCOUNT_A_ADDRESS = nonce == 0 ? 0 : accountID
 - output.ACCOUNT_A_OWNER = owner
 - output.ACCOUNT_A_PUBKEY_X = publicKeyX
 - output.ACCOUNT_A_PUBKEY_Y = publicKeyY
@@ -1952,13 +2316,13 @@ such that the following conditions hold:
 - output.SIGNATURE_REQUIRED_B = 0
 - output.NUM_CONDITIONAL_TXS = state.numConditionalTransactions + ((type == 0) ? 0 : 1)
 - output.DA = {
-  TransactionType.AccountUpdate,
-  owner,
-  accountID,
-  feeTokenID,
-  fFee,
-  compressedPublicKey,
-  nonce
+    TransactionType.AccountUpdate,
+    owner,
+    accountID,
+    feeTokenID,
+    fFee,
+    compressedPublicKey,
+    nonce
   }
 
 Notes:
@@ -1981,98 +2345,98 @@ The public key can either be set
 - with the help of an on-chain signature. In this case no valid EdDSA signature needs to be provided and numConditionalTransactions is incremented.
 - with the help of an EdDSA signature. In this case a valid signature for the _current_ (not the new ones!) EdDSA public keys stored in the account needs to be provided. numConditionalTransactions is not incremented.
 
-## AmmUpdate statement
+## AppKeyUpdate statement
 
-A valid instance of an AmmUpdate statement assures that given an input of:
+A valid instance of an AccountUpdate statement assures that given an input of:
 
 - state: State
-- owner: {0..2^NUM_BITS_ADDRESS}
 - accountID: {0..2^NUM_BITS_ACCOUNT}
-- tokenID: {0..2^NUM_BITS_TOKEN}
-- feeBips: {0..2^NUM_BITS_AMM_BIPS}
-- tokenWeight: {0..2^NUM_BITS_AMOUNT}
+- validUntil: {0..2^NUM_BITS_TIMESTAMP}
+- appKeyPublicKeyX: F
+- appKeyPublicKeyY: F
+- feeTokenID: {0..2^NUM_BITS_TOKEN}
+- fee: {0..2^NUM_BITS_AMOUNT}
+- maxFee: {0..2^NUM_BITS_AMOUNT}
+- disableAppKeySpotTrade: {0..2^NUM_BITS_BIT}
+- disableAppKeyWithdraw: {0..2^NUM_BITS_BIT}
+- disableAppKeyTransferToOther: {0..2^NUM_BITS_BIT}
 
 the prover knows an auxiliary input:
 
 - output: TxOutput
+- hash: F
+- compressedPublicKey: {0..2^256}
+- fFee: {0..2^16}
+- uFee: F
 
 such that the following conditions hold:
 
+- typeTxPad = 5bits zero
 - owner_bits = owner_packed
 - accountID_bits = accountID_packed
-- tokenID_bits = tokenID_packed
-- feeBips_bits = feeBips_packed
-- tokenWeight_bits = tokenWeight_packed
+- validUntil_bits = validUntil_packed
+- feeTokenID_bits = feeTokenID_packed
+- fee_bits = fee_packed
+- maxFee_bits = maxFee_packed
+- type_bits = type_packed
 - state.accountA.account.nonce_bits = state.accountA.account.nonce_packed
-- state.accountA.balanceS.balance_bits = state.accountA.balanceS.balance_packed
+- disableAppKeySpotTrade_bits = disableAppKeySpotTrade_packed
+- disableAppKeyWithdraw_bits = disableAppKeyWithdraw_packed
+- disableAppKeyTransferToOther_bits = disableAppKeyTransferToOther_packed
+
+- hash = PoseidonHash_t9f6p53(
+    state.exchange,
+    accountID,
+    feeTokenID,
+    maxFee,
+    appKeyPublicKeyX,
+    appKeyPublicKeyY,
+    validUntil,
+    nonce,
+    disableAppKeySpotTrade,
+    disableAppKeyWithdraw,
+    disableAppKeyTransferToOther
+  )
+- OwnerValid(state.accountA.account.owner, owner)
+- state.timestamp < validUntil
+- fee <= maxFee
+- compressedPublicKey = CompressPublicKey(publicKeyX, publicKeyY)
+- uFee = Float(fFee)
+- RequireAccuracy(uFee, fee)
 
 - output = DefaultTxOutput(state)
-- output.ACCOUNT_A_ADDRESS = accountID
+- output.ACCOUNT_A_ADDRESS = nonce == 0 ? 0 : accountID
+- output.ACCOUNT_A_OWNER = owner
+- output.ACCOUNT_A_PUBKEY_X = publicKeyX
+- output.ACCOUNT_A_PUBKEY_Y = publicKeyY
 - output.ACCOUNT_A_NONCE = state.accountA.account.nonce + 1
-- output.BALANCE_A_FEEBIPSAMM = feeBips
-- output.BALANCE_A_S_ADDRESS = tokenID
-- output.BALANCE_A_S_WEIGHTAMM = tokenWeight
-- output.SIGNATURE_REQUIRED_A = 0
+- output.BALANCE_A_S_ADDRESS = feeTokenID
+- output.BALANCE_A_S_BALANCE = state.accountA.balanceS.balance - uFee
+- output.BALANCE_O_B_BALANCE = state.operator.balanceB.balance + uFee
+- output.HASH_A = hash
+- output.SIGNATURE_REQUIRED_A = (type == 0) ? 0 : 1
 - output.SIGNATURE_REQUIRED_B = 0
-- output.NUM_CONDITIONAL_TXS = state.numConditionalTransactions + 1
+- output.NUM_CONDITIONAL_TXS = state.numConditionalTransactions + ((type == 0) ? 0 : 1)
 - output.DA = {
-  TransactionType.AmmUpdate,
-  owner,
-  accountID,
-  tokenID,
-  feeBips,
-  tokenWeight,
-  state.accountA.account.nonce,
-  state.accountA.balanceS.balance
+    TransactionType.AccountUpdate,
+    typeTxPad,
+    accountID,
+    feeTokenID,
+    fFee,
+    nonce
   }
 
 ### Description
 
-- https://github.com/Loopring/protocols/blob/master/packages/loopring_v3/DESIGN.md#amm-update
-
-This gadgets allows setting the feeBipsAMM and tokenWeightAMM parameters on an existing account at accountID.
+This gadgets allows setting the account EdDSA application public key in a new or existing account at accountID. 
 
 The account nonce is used to prevent replay protection.
 
-All AMM updates need to be authorized in the smart contract, so numConditionalTransactions is always incremented.
+A fee is paid to the operator in any token. The operator can choose any fee lower or equal than the maxFee specified by the user.
 
-The nonce and balance are added in the da to make those values available on-chain (which we use in our AMM pool smart contracts).
+The application public key can be set
 
-## SignatureVerification statement
-
-A valid instance of an SignatureVerification statement assures that given an input of:
-
-- state: State
-- owner: {0..2^NUM_BITS_ADDRESS}
-- accountID: {0..2^NUM_BITS_ACCOUNT}
-- data: {0..2^NUM_BITS_FIELD_CAPACITY}
-
-the prover knows an auxiliary input:
-
-- output: TxOutput
-
-such that the following conditions hold:
-
-- owner_bits = owner_packed
-- accountID_bits = accountID_packed
-- data_bits = data_packed
-
-- owner = state.accountA.account.owner
-- output = DefaultTxOutput(state)
-- output.ACCOUNT_A_ADDRESS = accountID
-- output.HASH_A = data
-- output.SIGNATURE_REQUIRED_A = 1
-- output.SIGNATURE_REQUIRED_B = 0
-- output.DA = {
-  TransactionType.SignatureVerification,
-  owner,
-  accountID,
-  data
-  }
-
-### Description
-
-- https://github.com/Loopring/protocols/blob/master/packages/loopring_v3/DESIGN.md#signature-verification
+- with the help of an EdDSA signature. In this case a valid signature for the EdDSA public keys stored in the account needs to be provided. numConditionalTransactions is not incremented.
 
 ## Noop statement
 
@@ -2111,6 +2475,7 @@ A valid instance of a Withdraw statement assures that given an input of:
 - onchainDataHash: {0..2^NUM_BITS_HASH}
 - storageID: {0..2^NUM_BITS_STORAGEID}
 - type: {0..2^NUM_BITS_TYPE}
+- useAppKey: {0..2^NUM_BITS_BYTE}
 
 the prover knows an auxiliary input:
 
@@ -2129,18 +2494,20 @@ such that the following conditions hold:
 - fee_bits = fee_packed
 - maxFee_bits = maxFee_packed
 - type_bits = type_packed
+- useAppKey_bits = useAppKey_packed
 - state.accountA.account.nonce_bits = state.accountA.account.nonce_packed
 
-- hash = PoseidonHash_t10f6p53(
-  state.exchange,
-  accountID,
-  tokenID,
-  amount,
-  feeTokenID,
-  maxFee,
-  onchainDataHash,
-  validUntil,
-  storageID
+- hash = PoseidonHash_t11f6p53(
+    state.exchange,
+    accountID,
+    tokenID,
+    amount,
+    feeTokenID,
+    maxFee,
+    onchainDataHash,
+    validUntil,
+    storageID,
+    useAppKey
   )
 - owner = (accountID == 0) ? 0 : state.accountA.account.owner
 - state.timestamp < validUntil (RequireLtGadget)
@@ -2169,15 +2536,14 @@ such that the following conditions hold:
 - output.STORAGE_A_DATA = (type == 0 || type == 1) ? 1 : state.accountA.storage.data
 - output.STORAGE_A_STORAGEID = (type == 0 || type == 1) ? storageID : state.accountA.storage.storageID
 - output.DA = {
-  TransactionType.Withdraw,
-  owner,
-  accountID,
-  tokenID,
-  amount,
-  feeTokenID,
-  fFee,
-  storageID,
-  onchainDataHash
+    type
+    owner,
+    accountID,
+    tokenID,
+    feeTokenID,
+    fFee,
+    storageID,
+    onchainDataHash
   }
 
 ### Description
@@ -2231,6 +2597,7 @@ A valid instance of a Transfer statement assures that given an input of:
 - payer_to: {0..2^NUM_BITS_ADDRESS}
 - payee_toAccountID: {0..2^NUM_BITS_ACCOUNT}
 - putAddressesInDA: {0..2}
+- useAppKey: {0..2^NUM_BITS_BYTE}
 
 the prover knows an auxiliary input:
 
@@ -2245,6 +2612,7 @@ the prover knows an auxiliary input:
 
 such that the following conditions hold:
 
+- typeTxPad = 5bits zero
 - fromAccountID_bits = fromAccountID_packed
 - toAccountID_bits = toAccountID_packed
 - tokenID_bits = tokenID_packed
@@ -2261,8 +2629,10 @@ such that the following conditions hold:
 - payee_toAccountID_bits = payee_toAccountID_packed
 - maxFee_bits = maxFee_packed
 - putAddressesInDA_bits = putAddressesInDA_packed
+- useAppKey_bits = useAppKey_packed
 
-- hashPayer = PoseidonHash_t13f6p53(
+
+- hashPayer = PoseidonHash_t14f6p53(
   state.exchange,
   fromAccountID,
   payer_toAccountID,
@@ -2274,9 +2644,10 @@ such that the following conditions hold:
   dualAuthorX,
   dualAuthorY,
   validUntil,
-  storageID
+  storageID,
+  useAppKey
   )
-- hashDual = PoseidonHash_t13f6p53(
+- hashDual = PoseidonHash_t14f6p53(
   exchange,
   fromAccountID,
   payee_toAccountID,
@@ -2288,7 +2659,8 @@ such that the following conditions hold:
   dualAuthorX,
   dualAuthorY,
   validUntil,
-  storageID
+  storageID,
+  useAppKey
   )
 - state.timestamp < validUntil (RequireLtGadget)
 - fee <= maxFee (RequireLeqGadget)
@@ -2325,6 +2697,7 @@ such that the following conditions hold:
 - output.STORAGE_A_STORAGEID = storageID
 - output.DA = (
   TransactionType.Transfer,
+  typeTxPad,
   fromAccountID,
   toAccountID,
   tokenID,
@@ -2376,46 +2749,71 @@ such that the following conditions hold:
 
 - orderA = Order(state.exchange)
 - orderB = Order(state.exchange)
+- typeTxPad = 5bit zero
 - uFillS_A = Float(fillS_A)
 - uFillS_B = Float(fillS_B)
 - storageDataA = StorageReader(state.accountA.storage, orderA.storageID, (state.txType == TransactionType.SpotTrade))
 - storageDataB = StorageReader(state.accountB.storage, orderB.storageID, (state.txType == TransactionType.SpotTrade))
-- OrderMatching(state.timestamp, orderA, orderB, state.accountA.account.owner, state.accountB.account.owner, storageDataA, storageDataB, uFillS_A, uFillS_B)
-- (feeA, protocolFeeA) = FeeCalculator(uFillS_B, state.protocolTakerFeeBips, orderA.feeBips)
-- (feeB, protocolFeeB) = FeeCalculator(uFillS_A, state.protocolMakerFeeBips, orderB.feeBips)
+- autoMarketOrderCheckA = AutoMarketOrderCheckA(orderA, storageDataA)
+- autoMarketOrderCheckB = AutoMarketOrderCheckA(orderB, storageDataB)
+- tradeHistoryWithAutoMarket_A = StorageReaderForAutoMarketGadget(storageDataA, autoMarketOrderCheckA.isNewOrder)
+- tradeHistoryWithAutoMarket_B = StorageReaderForAutoMarketGadget(storageDataB, autoMarketOrderCheckB.isNewOrder)
+- OrderMatching(state.timestamp, orderA, orderB, state.accountA.account.owner, state.accountB.account.owner, storageDataA, storageDataB, tradeHistoryWithAutoMarket_A, tradeHistoryWithAutoMarket_B, uFillS_A, uFillS_B)
+- tradingFeeA = FeeCalculator(uFillS_B, orderA.feeBips)
+- tradingFeeB = FeeCalculator(uFillS_A, orderB.feeBips)
+- feeMatchA = GasFeeMatchingGadget(orderA.fee, tradeHistoryWithAutoMarket_A.getGasFee(), orderA.maxFee)
+- feeMatchB = GasFeeMatchingGadget(orderB.fee, tradeHistoryWithAutoMarket_B.getGasFee(), orderB.maxFee)
+- resolvedAAuthorX = orderA.useAppKey ? accountA.appKeyPublicKeyX : accountA.publicKeyX
+- resolvedAAuthorY = orderA.useAppKey ? accountA.appKeyPublicKeyY : accountA.publicKeyY
+- resolvedBAuthorX = orderB.useAppKey ? accountB.appKeyPublicKeyX : accountB.publicKeyX
+- resolvedBAuthorY = orderB.useAppKey ? accountB.appKeyPublicKeyY : accountB.publicKeyY
 
 - output.BALANCE_A_S_ADDRESS = orderA.tokenS
+- output.BALANCE_A_B_ADDRESS = orderA.tokenB
 - output.BALANCE_B_S_ADDRESS = orderB.tokenS
+- output.BALANCE_B_B_ADDRESS = orderB.tokenB
 
 - output.ACCOUNT_A_ADDRESS = orderA.accountID
 - output.ACCOUNT_B_ADDRESS = orderB.accountID
 
 - output.BALANCE_A_S_BALANCE = state.accountA.balanceS.balance - uFillS_A
-- output.BALANCE_A_B_BALANCE = state.accountB.balanceB.balance + uFillS_B - feeA
+- output.BALANCE_A_B_BALANCE = state.accountB.balanceB.balance + uFillS_B - gasFeeA
 - output.BALANCE_B_S_BALANCE = state.accountA.balanceB.balance - uFillS_B
-- output.BALANCE_B_B_BALANCE = state.accountB.balanceB.balance + uFillS_A - feeB
+- output.BALANCE_B_B_BALANCE = state.accountB.balanceB.balance + uFillS_A - gasFeeB
 
-- output.BALANCE_P_A_BALANCE = state.pool.balanceA.balance + protocolFeeA
-- output.BALANCE_P_B_BALANCE = state.pool.balanceB.balance + protocolFeeB
-
-- output.BALANCE_O_A_BALANCE = state.operator.balanceA.balance + feeA - protocolFeeA
-- output.BALANCE_O_B_BALANCE = state.operator.balanceB.balance + feeB - protocolFeeB
+- output.BALANCE_O_A_BALANCE = state.operator.balanceA.balance + gasFeeA
+- output.BALANCE_O_B_BALANCE = state.operator.balanceB.balance + gasFeeB
+- output.BALANCE_O_C_BALANCE = state.operator.balanceC.balance + tradingFeeA
+- output.BALANCE_O_D_BALANCE = state.operator.balanceD.balance + tradingFeeB
 
 - output.STORAGE_A_ADDRESS = orderA.storageID[0..NUM_BITS_STORAGE_ADDRESS]
+- output.TXV_STORAGE_A_TOKENSID = autoMarketOrderCheckA.getTokenSIDForStorageUpdate()
+- output.TXV_STORAGE_A_TOKENBID = autoMarketOrderCheckA.getTokenBIDForStorageUpdate()
 - output.STORAGE_A_DATA = filledAfterA
 - output.STORAGE_A_STORAGEID = orderA.storageID
+- output.TXV_STORAGE_A_GASFEE = feeMatch_A.getFeeSum()
+- output.TXV_STORAGE_A_FORWARD = autoMarketOrderCheckA.getNewForwardForStorageUpdate()
 
 - output.STORAGE_B_ADDRESS = orderB.storageID[0..NUM_BITS_STORAGE_ADDRESS]
+- output.TXV_STORAGE_B_TOKENSID = autoMarketOrderCheckB.getTokenSIDForStorageUpdate()
+- output.TXV_STORAGE_B_TOKENBID = autoMarketOrderCheckB.getTokenBIDForStorageUpdate()
 - output.STORAGE_B_DATA = filledAfterB
 - output.STORAGE_B_STORAGEID = orderB.storageID
+- output.TXV_STORAGE_B_GASFEE = feeMatch_B.getFeeSum()
+- output.TXV_STORAGE_B_FORWARD = autoMarketOrderCheckB.getNewForwardForStorageUpdate()
 
 - output.HASH_A = orderA.hash
 - output.HASH_B = orderB.hash
+- output.TXV_PUBKEY_X_A = resolvedAAuthorX
+- output.TXV_PUBKEY_Y_A = resolvedAAuthorY
+- output.TXV_PUBKEY_X_B = resolvedBAuthorX
+- output.TXV_PUBKEY_Y_B = resolvedBAuthorY
 - output.SIGNATURE_REQUIRED_A = (orderA.amm == 0) ? 1 : 0
 - output.SIGNATURE_REQUIRED_B = (orderB.amm == 0) ? 1 : 0
 
 - output.DA = (
   TransactionType.SpotTrade,
+  typeTxPad,
   orderA.storageID,
   orderB.storageID,
   orderA.accountID,
@@ -2428,47 +2826,160 @@ such that the following conditions hold:
   orderB.fillAmountBorS, 0, orderB.feeBips
   )
 
-- ValidateAMM(
-  OrderMatchingData(
-  orderA.feeBips,
-  uFillS_A,
-  state.accountA.balanceS.balance,
-  state.accountA.balanceB.balance,
-  output.BALANCE_A_S_BALANCE,
-  output.BALANCE_A_B_BALANCE,
-  state.accountA.balanceS.weightAMM,
-  state.accountA.balanceB.weightAMM,
-  state.accountA.account.feeBipsAMM
-  ),
-  OrderMatchingData(
-  orderB.feeBips,
-  uFillS_B,
-  state.accountB.balanceS.balance,
-  state.accountB.balanceB.balance,
-  output.BALANCE_B_S_BALANCE,
-  output.BALANCE_B_B_BALANCE,
-  state.accountB.balanceS.weightAMM,
-  state.accountB.balanceB.weightAMM,
-  state.accountB.account.feeBipsAMM
-  ),
-  )
-
 ### Description
 
 - https://github.com/Loopring/protocols/blob/master/packages/loopring_v3/DESIGN.md#spot-trade
 
 This gadgets allows trading two tokens (tokenS and tokenB) between two accounts (orderA.accountID and orderB.accountID).
 
-A fee is paid to the operator, and this fee is always paid in the tokens bought by the account. Additionally a protocol fee is charged to the operator.
+A fee is paid to the operator, and this fee is always paid in the tokens bought by the account. And the trading fee is also paid to the operator.
 
 The operator is free to pass in any fillS_A and fillS_B, as long as all user requirements are met, the most important ones being:
 
 - For limit orders the price is below the maximum price defined in the order as amountS/amountB
-- For AMM orders the price is above the minimum price as set by the curve defined by the current AMM weights on the account.
 
-Orders need to be signed with EdDSA in all cases, except for AMM orders, which are implicitely authorized by having the tokens being traded have AMM enabled (AMM weight != 0) on the order owner's account.
+Orders need to be signed with EdDSA in all cases, except for AutoMarket orders, which are implicitely authorized by start order.
 
 Trades are never processed on-chain, so numConditionalTransactions is never incremented.
+
+
+## BatchSpotTrade statement
+
+A valid instance of a BatchSpotTrade statement assures that given an input of:
+
+- state: State
+- users: BatchSpotTradeUser[]
+  - orders: Order[]
+
+the prover knows an auxiliary input:
+
+- output: TxOutput
+- storageDataA: F
+- storageDataAArray: F[]
+- storageDataB: F
+- storageDataBArray: F[]
+- storageDataCArray: F[]
+- storageDataDArray: F[]
+- storageDataEArray: F[]
+- storageDataFArray: F[]
+
+such that the following conditions hold:
+
+- userA = BatchUser(state.exchange)
+- userB = BatchUser(state.exchange)
+- userC = BatchUser(state.exchange)
+- userD = BatchUser(state.exchange)
+- userE = BatchUser(state.exchange)
+- userF = BatchUser(state.exchange)
+  - batchOrder = BatchOrder(state.exchange)
+    - order = Order(state.exchange)
+    - storageData = StorageReader(state.account.storage, order.storageID, (state.txType == TransactionType.BatchSpotTrade))
+    - autoMarketOrderCheck = AutoMarketOrderCheckA(order, storageData)
+    - tradeHistoryWithAutoMarket = StorageReaderForAutoMarketGadget(storageData, autoMarketOrderCheck.isNewOrder)
+    - BatchOrderMatching(state.timestamp, order, storageData, tradeHistoryWithAutoMarket, uFillS_A, uFillS_B)
+    - tradingFee = tradingFee_packed <= FeeCalculator(uFillS_B, order.feeBips)
+    - feeMatch = GasFeeMatchingGadget(order.fee, tradeHistoryWithAutoMarket.getGasFee(), order.maxFee)
+    - resolvedAAuthorX = order.useAppKey ? account.appKeyPublicKeyX : account.publicKeyX
+    - resolvedAAuthorY = order.useAppKey ? account.appKeyPublicKeyY : account.publicKeyY
+
+- output.ACCOUNT_A_ADDRESS = userA.accountID
+- output.ACCOUNT_B_ADDRESS = userB.accountID
+- output.ACCOUNT_C_ADDRESS = userC.accountID
+- output.ACCOUNT_D_ADDRESS = userD.accountID
+- output.ACCOUNT_E_ADDRESS = userE.accountID
+- output.ACCOUNT_F_ADDRESS = userF.accountID
+
+- output.DA = (
+  TransactionType.BatchSpotTrade,
+  bindToken,
+  firstToken,
+  secondToken,
+  secondTokenType,
+  thirdTokenType,
+  fourthTokenType,
+  fifthTokenType,
+  sixthTokenType,
+  userB.accountID,
+  userB.firstSelectTokenExchange,
+  userB.secondSelectTokenExchange,
+  userC.accountID,
+  userC.firstSelectTokenExchange,
+  userC.secondSelectTokenExchange,
+  userD.accountID,
+  userD.firstSelectTokenExchange,
+  userD.secondSelectTokenExchange,
+  userE.accountID,
+  userE.firstSelectTokenExchange,
+  userE.secondSelectTokenExchange,
+  userF.accountID,
+  userF.firstSelectTokenExchange,
+  userF.secondSelectTokenExchange,
+  userA.accountID,
+  userA.firstTokenExchange,
+  userA.secondTokenExchange,
+  userA.thirdTokenExchange
+  )
+
+
+## OrderCancel statement
+
+A valid instance of a OrderCancel statement assures that given an input of:
+
+- state: State
+- accountID
+- tokenID
+- storageID
+
+the prover knows an auxiliary input:
+
+- output: TxOutput
+- storageDataA: F
+- typeTxPad: 5bits zero
+
+such that the following conditions hold:
+
+- accountID_bits = accountID_packed
+- tokenID_bits = tokenID_packed
+- feeTokenID_bits = feeTokenID_packed
+- fee_bits = fee_packed
+- storageID_bits = storageID_packed
+- nonce = OrderCancelledNonce(storage, storageID)
+- hash = PoseidonHash_t8f6p53(
+  state.exchange,
+  owner,
+  accountID,
+  tokenID,
+  storageID,
+  maxFee,
+  feeTokenID,
+  useAppKey
+  )
+
+- output.ACCOUNT_A_ADDRESS = accountID
+
+- output.STORAGE_A_CANCELLED = nonce.getCancelled()
+- output.STORAGE_A_STORAGEID = storageID
+
+- output.BALANCE_A_S_ADDRESS = feeTokenID
+- output.BALANCE_A_S_BALANCE = state.accountA.balanceS.balance - fee
+- output.TXV_BALANCE_O_B_Address = feeTokenID
+- output.TXV_BALANCE_O_B_BALANCE = state.oper.balanceB.balance + fee
+
+- output.HASH_A = hash
+- output.SIGNATURE_REQUIRED_A = 1
+- output.SIGNATURE_REQUIRED_B = 0
+
+
+- output.DA = (
+  TransactionType.OrderCancel,
+  typeTxPad,
+  owner, 
+  accountID, 
+  tokenID, 
+  storageID, 
+  feeTokenID, 
+  fee
+  )
 
 # Unvisersal Circuit
 
@@ -2500,8 +3011,7 @@ A valid instance of a Transaction statement assures that given an input of:
 - txType: {0..2^NUM_BITS_TX_TYPE}
 - exchange: {0..2^NUM_BITS_ADDRESS}
 - timestamp: {0..2^NUM_BITS_TIMESTAMP}
-- protocolTakerFeeBips: {0..2^NUM_BITS_PROTOCOL_FEE_BIPS}
-- protocolMakerFeeBips: {0..2^NUM_BITS_PROTOCOL_FEE_BIPS}
+- protocolFeeBips: {0..2^NUM_BITS_PROTOCOL_FEE_BIPS}
 - operatorAccountID: {0..2^NUM_BITS_ACCOUNT}
 - root_old: F
 - protocolBalancesRoot_old: F
@@ -2524,107 +3034,288 @@ such that the following conditions hold:
 - state.txType = txType
 - state.exchange = exchange
 - state.timestamp = timestamp
-- state.protocolTakerFeeBips = protocolTakerFeeBips
-- state.protocolMakerFeeBips = protocolMakerFeeBips
+- state.protocolFeeBips = protocolFeeBips
 - state.operatorAccountID = operatorAccountID
 
 - outputs[0] = Noop(state)
-- outputs[1] = SpotTrade(state)
-- outputs[2] = Deposit(state)
-- outputs[3] = Withdraw(state)
-- outputs[4] = AccountUpdate(state)
-- outputs[5] = Transfer(state)
-- outputs[6] = AmmUpdate(state)
+- outputs[1] = Transfer(state)
+- outputs[2] = SpotTrade(state)
+- outputs[3] = OrderCancel(state)
+- outputs[4] = AppKeyUpdate(state)
+- outputs[5] = BatchSpotTrade(state)
+- outputs[6] = Deposit(state)
+- outputs[7] = AccountUpdate(state)
+- outputs[8] = Withdraw(state)
 - output = SelectTransaction(selector, outputs)
 
 - output.ACCOUNT_A_ADDRESS_bits = output.ACCOUNT_A_ADDRESS_packed
 - output.ACCOUNT_B_ADDRESS_bits = output.ACCOUNT_B_ADDRESS_packed
+- output.ACCOUNT_C_ADDRESS_bits = output.ACCOUNT_C_ADDRESS_packed
+- output.ACCOUNT_D_ADDRESS_bits = output.ACCOUNT_D_ADDRESS_packed
+- output.ACCOUNT_E_ADDRESS_bits = output.ACCOUNT_E_ADDRESS_packed
+- output.ACCOUNT_F_ADDRESS_bits = output.ACCOUNT_F_ADDRESS_packed
 - output.ACCOUNT_A_ADDRESS != 0
 - output.ACCOUNT_B_ADDRESS != 0
+- output.ACCOUNT_C_ADDRESS != 0
+- output.ACCOUNT_D_ADDRESS != 0
+- output.ACCOUNT_E_ADDRESS != 0
+- output.ACCOUNT_F_ADDRESS != 0
 
 - SignatureVerifier(output.PUBKEY_X_A, output.PUBKEY_Y_A, output.HASH_A, output.SIGNATURE_REQUIRED_A)
 - SignatureVerifier(output.PUBKEY_X_B, output.PUBKEY_Y_B, output.HASH_B, output.SIGNATURE_REQUIRED_B)
+- SignatureVerifier[](output.PUBKEY_X_A_ARRAY, output.PUBKEY_Y_A_ARRAY, output.HASH_A_ARRAY, output.SIGNATURE_REQUIRED_A_ARRAY)
+- SignatureVerifier[](output.PUBKEY_X_B_ARRAY, output.PUBKEY_Y_B_ARRAY, output.HASH_B_ARRAY, output.SIGNATURE_REQUIRED_B_ARRAY)
+- SignatureVerifier[](output.PUBKEY_X_C_ARRAY, output.PUBKEY_Y_C_ARRAY, output.HASH_C_ARRAY, output.SIGNATURE_REQUIRED_C_ARRAY)
+- SignatureVerifier[](output.PUBKEY_X_D_ARRAY, output.PUBKEY_Y_D_ARRAY, output.HASH_D_ARRAY, output.SIGNATURE_REQUIRED_D_ARRAY)
+- SignatureVerifier[](output.PUBKEY_X_E_ARRAY, output.PUBKEY_Y_E_ARRAY, output.HASH_E_ARRAY, output.SIGNATURE_REQUIRED_E_ARRAY)
+- SignatureVerifier[](output.PUBKEY_X_F_ARRAY, output.PUBKEY_Y_F_ARRAY, output.HASH_F_ARRAY, output.SIGNATURE_REQUIRED_F_ARRAY)
+- SignatureVerifiers([{output.PUBKEY_X, output.PUBKEY_Y, output.HASH, output.SIGNATURE_REQUIRED}])
 
-- root_updateStorage_A = StorageUpdate(
+* root_updateStorage_A = StorageUpdate(
   state.accountA.balanceS.storageRoot,
   output.STORAGE_A_ADDRESS,
   state.accountA.storage,
-  (output.STORAGE_A_DATA, output.STORAGE_A_STORAGEID)
+  (output.STORAGE_A_TOKENSID, output.STORAGE_A_TOKENBID, output.STORAGE_A_DATA, output.STORAGE_A_STORAGEID, output.STORAGE_A_GASFEE, output.STORAGE_A_CANCELLED, output.STORAGE_A_FORWARD)
   )
-- root_updateBalanceS_A = BalanceUpdate(
+* root_updateStorage_A_batch = BatchStorageAUpdateGadget(
+  state.accountA,
+  updateStorage_A.result(),
+  )
+* root_updateBalanceS_A = BalanceUpdate(
   state.accountA.account.balancesRoot,
   output.BALANCE_A_S_ADDRESS,
   state.accountA.balanceS,
-  (output.BALANCE_A_S_BALANCE, output.BALANCE_A_S_WEIGHTAMM, root_updateStorage_A)
+  (output.BALANCE_A_S_BALANCE)
   )
-- root_updateBalanceB_A = BalanceUpdate(
+* root_updateBalanceB_A = BalanceUpdate(
   root_updateBalanceS_A,
-  output.BALANCE_B_S_ADDRESS,
+  output.BALANCE_A_B_ADDRESS,
   state.accountA.balanceB,
-  (output.BALANCE_A_B_BALANCE, state.accountA.balanceB.weightAMM, state.accountA.balanceB.storageRoot)
+  (output.BALANCE_A_B_BALANCE)
   )
-- root_updateAccount_A = AccountUpdate(
+* root_updateBalanceFee_A = BalanceUpdate(
+  root_updateBalanceB_A,
+  output.BALANCE_A_FEE_ADDRESS,
+  state.accountA.balanceFee,
+  (output.BALANCE_A_FEE_BALANCE)
+  )
+* root_updateAccount_A = AccountUpdate(
   root_old,
   output.ACCOUNT_A_ADDRESS,
   state.accountA.account,
-  (output.ACCOUNT_A_OWNER, output.ACCOUNT_A_PUBKEY_X, output.ACCOUNT_A_PUBKEY_Y, output.ACCOUNT_A_NONCE, output.ACCOUNT_A_FEEBIPSAMM, root_updateBalanceB_A)
+  (output.ACCOUNT_A_OWNER, output.ACCOUNT_A_PUBKEY_X, output.ACCOUNT_A_PUBKEY_Y,  output.ACCOUNT_A_APPKEY_PUBKEY_X, output.ACCOUNT_A_APPKEY_PUBKEY_Y,
+  output.ACCOUNT_A_NONCE, 
+  output.ACCOUNT_A_DISABLE_APPKEY_SPOTTRADE, output.ACCOUNT_A_DISABLE_APPKEY_WITHDRAW_TO_OTHER, output.ACCOUNT_A_DISABLE_APPKEY_TRANSFER_TO_OTHER,
+  updateBalanceFee_A.result(), updateStorage_A_batch.getHashRoot())
   )
 
-- root_updateStorage_B = StorageUpdate(
+* root_updateStorage_B = StorageUpdate(
   state.accountB.balanceS.storageRoot,
   output.STORAGE_B_ADDRESS,
   state.accountB.storage,
-  (output.STORAGE_B_DATA, output.STORAGE_B_STORAGEID)
+  (output.STORAGE_B_TOKENSID, output.STORAGE_B_TOKENBID, output.STORAGE_B_DATA, output.STORAGE_B_STORAGEID, output.STORAGE_B_GASFEE, output.STORAGE_B_CANCELLED, output.STORAGE_B_FORWARD)
   )
-- root_updateBalanceS_B = BalanceUpdate(
+* root_updateStorage_B_batch = BatchStorageBUpdateGadget(
+  state.accountB,
+  updateStorage_B.result(),
+  )
+* root_updateBalanceS_B = BalanceUpdate(
   state.accountB.account.balancesRoot,
   output.BALANCE_B_S_ADDRESS,
   state.accountB.balanceS,
-  (output.BALANCE_B_S_BALANCE, state.accountB.balanceS.weightAMM, root_updateStorage_B)
+  (output.BALANCE_B_S_BALANCE)
   )
-- root_updateBalanceB_B = BalanceUpdate(
+* root_updateBalanceB_B = BalanceUpdate(
   root_updateBalanceS_B,
-  output.BALANCE_A_S_ADDRESS,
+  output.BALANCE_B_B_ADDRESS,
   state.accountB.balanceB,
-  (output.BALANCE_B_B_BALANCE, state.accountB.balanceB.weightAMM, state.accountB.balanceB.storageRoot)
+  (output.BALANCE_B_B_BALANCE)
   )
-- root_updateAccount_B = AccountUpdate(
+* root_updateBalanceB_Fee = BalanceUpdate(
+  root_updateBalanceB_B,
+  output.BALANCE_B_Fee_ADDRESS,
+  state.accountB.balanceFee,
+  (output.BALANCE_B_Fee_BALANCE)
+  )
+* root_updateAccount_B = AccountUpdate(
   root_updateAccount_A,
   output.ACCOUNT_B_ADDRESS,
   state.accountB.account,
-  (output.ACCOUNT_B_OWNER, output.ACCOUNT_B_PUBKEY_X, output.ACCOUNT_B_PUBKEY_Y, output.ACCOUNT_B_NONCE, state.accountB.account.feeBips, root_updateBalanceB_B)
+  (output.ACCOUNT_B_OWNER, output.ACCOUNT_B_PUBKEY_X, output.ACCOUNT_B_PUBKEY_Y,  
+  state.accountB.account.appKeyPublicKey.x, state.accountB.account.appKeyPublicKey.y,
+  output.ACCOUNT_B_NONCE, 
+  state.accountB.account.disableAppKeySpotTrade, state.accountB.account.disableAppKeyWithdraw, state.accountB.account.disableAppKeyTransferToOther,
+  updateBalanceFee_B.result(), updateStorage_B_batch.getHashRoot())
+  )
   )
 
-- root_updateBalanceB_O = BalanceUpdate(
-  state.operator.account.balancesRoot,
-  output.BALANCE_A_S_ADDRESS,
-  state.operator.balanceB,
-  (output.BALANCE_O_B_BALANCE, state.operator.balanceB.weightAMM, state.operator.balanceB.storageRoot)
+* root_updateStorage_C_batch = BatchStorageCUpdateGadget(
+  state.accountC,
+  updateStorage_C.result(),
   )
-- root_updateBalanceA_O = BalanceUpdate(
+* root_updateBalanceS_C = BalanceUpdate(
+  state.accountC.account.balancesRoot,
+  output.BALANCE_C_S_ADDRESS,
+  state.accountC.balanceS,
+  (output.BALANCE_C_S_BALANCE)
+  )
+* root_updateBalanceB_C = BalanceUpdate(
+  root_updateBalanceS_C,
+  output.BALANCE_C_B_ADDRESS,
+  state.accountC.balanceB,
+  (output.BALANCE_C_B_BALANCE)
+  )
+* root_updateBalanceC_Fee = BalanceUpdate(
+  root_updateBalanceB_C,
+  output.BALANCE_C_Fee_ADDRESS,
+  state.accountC.balanceFee,
+  (output.BALANCE_C_Fee_BALANCE)
+  )
+* root_updateAccount_C = AccountUpdate(
+  root_updateAccount_B,
+  output.ACCOUNT_C_ADDRESS,
+  state.accountC.account,
+  (output.ACCOUNT_C_OWNER, output.ACCOUNT_C_PUBKEY_X, output.ACCOUNT_C_PUBKEY_Y,  
+  state.accountC.account.appKeyPublicKey.x, state.accountC.account.appKeyPublicKey.y,
+  output.ACCOUNT_C_NONCE, 
+  state.accountC.account.disableAppKeySpotTrade, state.accountC.account.disableAppKeyWithdraw, state.accountC.account.disableAppKeyTransferToOther,
+  updateBalanceFee_C.result(), updateStorage_C_batch.getHashRoot())
+  )
+  )
+
+* root_updateStorage_D_batch = BatchStorageDUpdateGadget(
+  state.accountD,
+  updateStorage_D.result(),
+  )
+* root_updateBalanceS_D = BalanceUpdate(
+  state.accountD.account.balancesRoot,
+  output.BALANCE_D_S_ADDRESS,
+  state.accountD.balanceS,
+  (output.BALANCE_D_S_BALANCE)
+  )
+* root_updateBalanceB_D = BalanceUpdate(
+  root_updateBalanceS_D,
+  output.BALANCE_D_B_ADDRESS,
+  state.accountD.balanceB,
+  (output.BALANCE_D_B_BALANCE)
+  )
+* root_updateBalanceD_Fee = BalanceUpdate(
+  root_updateBalanceB_D,
+  output.BALANCE_D_Fee_ADDRESS,
+  state.accountD.balanceFee,
+  (output.BALANCE_D_Fee_BALANCE)
+  )
+* root_updateAccount_D = AccountUpdate(
+  root_updateAccount_C,
+  output.ACCOUNT_D_ADDRESS,
+  state.accountD.account,
+  (output.ACCOUNT_D_OWNER, output.ACCOUNT_D_PUBKEY_X, output.ACCOUNT_D_PUBKEY_Y,
+  state.accountD.account.appKeyPublicKey.x, state.accountD.account.appKeyPublicKey.y,
+  output.ACCOUNT_D_NONCE, 
+  state.accountD.account.disableAppKeySpotTrade, state.accountD.account.disableAppKeyWithdraw, state.accountD.account.disableAppKeyTransferToOther,
+  updateBalanceFee_D.result(), updateStorage_D_batch.getHashRoot())
+  )
+  )
+
+
+* root_updateStorage_E_batch = BatchStorageEUpdateGadget(
+  state.accountE,
+  updateStorage_E.result(),
+  )
+* root_updateBalanceS_E = BalanceUpdate(
+  state.accountE.account.balancesRoot,
+  output.BALANCE_E_S_ADDRESS,
+  state.accountE.balanceS,
+  (output.BALANCE_E_S_BALANCE)
+  )
+* root_updateBalanceB_E = BalanceUpdate(
+  root_updateBalanceS_E,
+  output.BALANCE_E_B_ADDRESS,
+  state.accountE.balanceB,
+  (output.BALANCE_E_B_BALANCE)
+  )
+* root_updateBalanceE_Fee = BalanceUpdate(
+  root_updateBalanceB_E,
+  output.BALANCE_E_Fee_ADDRESS,
+  state.accountE.balanceFee,
+  (output.BALANCE_E_Fee_BALANCE)
+  )
+* root_updateAccount_E = AccountUpdate(
+  root_updateAccount_D,
+  output.ACCOUNT_E_ADDRESS,
+  state.accountE.account,
+  (output.ACCOUNT_E_OWNER, output.ACCOUNT_E_PUBKEY_X, output.ACCOUNT_E_PUBKEY_Y,
+  state.accountE.account.appKeyPublicKey.x, state.accountE.account.appKeyPublicKey.y,
+  output.ACCOUNT_E_NONCE, 
+  state.accountE.account.disableAppKeySpotTrade, state.accountE.account.disableAppKeyWithdraw, state.accountE.account.disableAppKeyTransferToOther,
+  updateBalanceFee_E.result(), updateStorage_E_batch.getHashRoot())
+  )
+  )
+
+
+* root_updateStorage_F_batch = BatchStorageFUpdateGadget(
+  state.accountF,
+  updateStorage_F.result(),
+  )
+* root_updateBalanceS_F = BalanceUpdate(
+  state.accountF.account.balancesRoot,
+  output.BALANCE_F_S_ADDRESS,
+  state.accountF.balanceS,
+  (output.BALANCE_F_S_BALANCE)
+  )
+* root_updateBalanceB_F = BalanceUpdate(
+  root_updateBalanceS_F,
+  output.BALANCE_F_B_ADDRESS,
+  state.accountF.balanceB,
+  (output.BALANCE_F_B_BALANCE)
+  )
+* root_updateBalanceF_Fee = BalanceUpdate(
+  root_updateBalanceB_F,
+  output.BALANCE_F_Fee_ADDRESS,
+  state.accountF.balanceFee,
+  (output.BALANCE_F_Fee_BALANCE)
+  )
+* root_updateAccount_F = AccountUpdate(
+  root_updateAccount_E,
+  output.ACCOUNT_F_ADDRESS,
+  state.accountF.account,
+  (output.ACCOUNT_F_OWNER, output.ACCOUNT_F_PUBKEY_X, output.ACCOUNT_F_PUBKEY_Y,
+  state.accountF.account.appKeyPublicKey.x, state.accountF.account.appKeyPublicKey.y,
+  output.ACCOUNT_F_NONCE, 
+  state.accountF.account.disableAppKeySpotTrade, state.accountF.account.disableAppKeyWithdraw, state.accountF.account.disableAppKeyTransferToOther,
+  updateBalanceFee_F.result(), updateStorage_F_batch.getHashRoot())
+  )
+  )
+
+* root_updateBalanceD_O = BalanceUpdate(
+  state.operator.account.balancesRoot,
+  output.BALANCE_O_D_ADDRESS,
+  state.operator.balanceD,
+  (output.BALANCE_O_D_BALANCE)
+  )
+* root_updateBalanceC_O = BalanceUpdate(
+  root_updateBalanceD_O,
+  output.BALANCE_O_C_ADDRESS,
+  state.operator.balanceC,
+  (output.BALANCE_O_C_BALANCE)
+  )
+* root_updateBalanceB_O = BalanceUpdate(
+  root_updateBalanceC_O,
+  output.BALANCE_O_B_ADDRESS,
+  state.operator.balanceB,
+  (output.BALANCE_O_B_BALANCE)
+  )
+* root_updateBalanceA_O = BalanceUpdate(
   root_updateBalanceB_O,
   output.BALANCE_B_S_ADDRESS,
   state.operator.balanceS,
-  (output.BALANCE_O_A_BALANCE, state.operator.balanceS.weightAMM, state.operator.balanceS.storageRoot)
+  (output.BALANCE_O_A_BALANCE)
   )
-- root_new = AccountUpdate(
-  root_updateAccount_B,
+* root_new = AccountUpdate(
+  root_updateAccount_D,
   operatorAccountID,
   state.operator.account,
-  (state.operator.account.owner, state.operator.account.publicKeyX, state.operator.account.publicKeyY, state.operator.account.nonce, state.operator.account.feeBips, root_updateBalanceA_O)
-  )
-
-- root_updateBalanceB_P = BalanceUpdate(
-  protocolBalancesRoot_old,
-  output.BALANCE_A_S_ADDRESS,
-  state.pool.balanceB,
-  (output.BALANCE_P_B_BALANCE, 0, EMPTY_STORAGE_ROOT)
-  )
-- protocolBalancesRoot_new = BalanceUpdate(
-  root_updateBalanceB_P,
-  output.BALANCE_B_S_ADDRESS,
-  state.pool.balanceA,
-  (output.BALANCE_P_A_BALANCE, 0, EMPTY_STORAGE_ROOT)
+  (state.operator.account.owner, state.operator.account.publicKeyX, state.operator.account.publicKeyY, state.operator.account.appKeyPublicKeyX, state.operator.account.appKeyPublicKeyY, state.operator.account.nonce, state.operator.account.disableAppKeySpotTrade, state.operator.account.disableAppKeyWithdraw, state.operator.account.disableAppKeyTransferToOther, root_updateBalanceA_O)
   )
 
 ### Description
@@ -2640,10 +3331,14 @@ A valid instance of a Universal statement assures that given an input of:
 - exchange: {0..2^NUM_BITS_ADDRESS}
 - merkleRootBefore: {0..2^256}
 - merkleRootAfter: {0..2^256}
+- merkleAssetRootBefore: {0..2^256}
+- merkleAssetRootAfter: {0..2^256}
 - timestamp: {0..2^NUM_BITS_TIMESTAMP}
-- protocolTakerFeeBips: {0..2^NUM_BITS_PROTOCOL_FEE_BIPS}
-- protocolMakerFeeBips: {0..2^NUM_BITS_PROTOCOL_FEE_BIPS}
+- protocolFeeBips: {0..2^NUM_BITS_PROTOCOL_FEE_BIPS}
 - operatorAccountID: {0..2^NUM_BITS_ACCOUNT}
+- depositSize: {0..2^NUM_BITS_TX_SIZE}
+- accountUpdateSize: {0..2^NUM_BITS_TX_SIZE}
+- withdrawSize: {0..2^NUM_BITS_TX_SIZE}
 
 the prover knows an auxiliary input:
 
@@ -2657,20 +3352,22 @@ such that the following conditions hold:
 - exchange_bits = exchange_packed
 - merkleRootBefore_bits = merkleRootBefore_packed
 - merkleRootAfter_bits = merkleRootAfter_packed
+- merkleAssetRootBefore_bits = merkleAssetRootBefore_packed
+- merkleAssetRootAfter_bits = merkleAssetRootAfter_packed
 - timestamp_bits = timestamp_packed
-- protocolTakerFeeBips_bits = protocolTakerFeeBips_packed
-- protocolMakerFeeBips_bits = protocolMakerFeeBips_packed
+- protocolFeeBips_bits = protocolFeeBips_packed
 - operatorAccountID_bits = operatorAccountID_packed
 - numConditionalTransactions_bits = numConditionalTransactions_packed
+- depositSize = all deposit size
+- accountUpdateSize = all account update size
+- withdrawSize = all withdraw size
 
 - for i in {0..N}: transactions[i] = Transaction(
   exchange,
   (i == 0) ? merkleRootBefore : transactions[i-1].root_new,
   timestamp,
-  protocolTakerFeeBips,
-  protocolMakerFeeBips,
+  protocolFeeBips,
   operatorAccountID,
-  (i == 0) ? accountBefore_P.balancesRoot : transactions[i-1].protocolBalancesRoot_new,
   (i == 0) ? 0 : transactions[i-1].output.NUM_CONDITIONAL_TXS
   )
 
@@ -2680,11 +3377,15 @@ such that the following conditions hold:
   exchange,
   merkleRootBefore,
   merkleRootAfter,
+  merkleAssetRootBefore,
+  merkleAssetRootAfter,
   timestamp,
-  protocolTakerFeeBips,
-  protocolMakerFeeBips,
+  protocolFeeBips,
   numConditionalTransactions,
   operatorAccountID,
+  depositSize,
+  accountUpdateSize,
+  withdrawSize,
   concat(for i in {0..N}: transactions[i].output.DA[0..29\*8], for i in {0..N}: transactions[i].output.DA[29\*8..68\*8])
   )
 - publicInput = PublicData(publicData)
@@ -2698,16 +3399,17 @@ such that the following conditions hold:
 - root_P = UpdateAccount(
   transactions[N-1].root_new,
   0,
-  (accountP.owner, accountP.publicKey.x, accountP.publicKey.y, accountP.nonce, accountP.feeBipsAMM, accountP.balancesRoot),
-  (accountP.owner, accountP.publicKey.x, accountP.publicKey.y, accountP.nonce, accountP.feeBipsAMM, transactions[N-1].protocolBalancesRoot_new)
+  (accountP.owner, accountP.publicKey.x, accountP.publicKey.y, accountP.appKeyPublicKey.x, accountP.appKeyPublicKey.y, accountP.nonce, accountP.disableAppKeySpotTrade, accountP.disableAppKeyWithdraw, accountP.disableAppKeyTransferToOther, accountP.balancesRoot, accountP.storageRoot),
+  (accountP.owner, accountP.publicKey.x, accountP.publicKey.y, accountP.appKeyPublicKey.x, accountP.appKeyPublicKey.y, accountP.nonce, accountP.disableAppKeySpotTrade, accountP.disableAppKeyWithdraw, accountP.disableAppKeyTransferToOther, accountP.storageRoot)
   )
 - root_O = UpdateAccount(
   root_P,
   operatorAccountID,
-  (accountO.owner, accountO.publicKey.x, accountO.publicKey.y, accountO.nonce, accountO.feeBipsAMM, accountO.balancesRoot),
-  (accountO.owner, accountO.publicKey.x, accountO.publicKey.y, accountO.nonce + 1, accountO.feeBipsAMM, accountO.balancesRoot)
+  (accountO.owner, accountO.publicKey.x, accountO.publicKey.y, accountO.appKeyPublicKey.x, accountO.appKeyPublicKey.y, accountO.nonce, accountO.disableAppKeySpotTrade, accountO.disableAppKeyWithdraw, accountO.disableAppKeyTransferToOther, accountO.balancesRoot, accountO.storageRoot),
+  (accountO.owner, accountO.publicKey.x, accountO.publicKey.y, accountO.appKeyPublicKey.x, accountO.appKeyPublicKey.y, accountO.nonce + 1, accountO.disableAppKeySpotTrade, accountO.disableAppKeyWithdraw, accountO.disableAppKeyTransferToOther, accountO.balancesRoot, accountO.storageRoot)
   )
-- merkleRootAfter = root_O
+- merkleRootAfter = root_O.result()
+- merkleAssetRootAfter = root_O.assetResult()
 
 ### Description
 

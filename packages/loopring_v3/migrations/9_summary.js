@@ -3,11 +3,11 @@ const GTOToken = artifacts.require("./test/tokens/GTO.sol");
 const WETHToken = artifacts.require("./test/tokens/WETH.sol");
 
 const ProtocolFeeVault = artifacts.require("ProtocolFeeVault");
-const UserStakingPool = artifacts.require("UserStakingPool");
+// const UserStakingPool = artifacts.require("UserStakingPool");
 const UniswapTokenSeller = artifacts.require("UniswapTokenSeller");
 const BatchVerifier = artifacts.require("BatchVerifier");
 const BlockVerifier = artifacts.require("BlockVerifier");
-const AgentRegistry = artifacts.require("AgentRegistry");
+// const AgentRegistry = artifacts.require("AgentRegistry");
 const FastWithdrawalAgent = artifacts.require("FastWithdrawalAgent");
 
 const ExchangeAdmins = artifacts.require("ExchangeAdmins");
@@ -22,10 +22,6 @@ const DefaultDepositContract = artifacts.require("DefaultDepositContract");
 const LoopringIOExchangeOwner = artifacts.require("LoopringIOExchangeOwner");
 
 const LoopringV3 = artifacts.require("LoopringV3");
-const LoopringAmmPool = artifacts.require("LoopringAmmPool");
-const LoopringAmmSharedConfig = artifacts.require("LoopringAmmSharedConfig");
-
-const LoopringAmmPoolCopy = artifacts.require("LoopringAmmPoolCopy");
 
 module.exports = function(deployer, network, accounts) {
   console.log(">>> deployed to network: " + network);
@@ -33,11 +29,11 @@ module.exports = function(deployer, network, accounts) {
   console.log("- GTOToken:", GTOToken.address);
   console.log("- WETHToken:", WETHToken.address);
   console.log("- ProtocolFeeVault:", ProtocolFeeVault.address);
-  console.log("- UserStakingPool:", UserStakingPool.address);
+  // console.log("- UserStakingPool:", UserStakingPool.address);
   // console.log("- UniswapTokenSeller:", UniswapTokenSeller.address);
   console.log("- BatchVerifier:", BatchVerifier.address);
   console.log("- BlockVerifier:", BlockVerifier.address);
-  console.log("- AgentRegistry:", AgentRegistry.address);
+  // console.log("- AgentRegistry:", AgentRegistry.address);
   console.log("- FastWithdrawalAgent:", FastWithdrawalAgent.address);
 
   console.log("- LoopringV3:", LoopringV3.address);
@@ -51,7 +47,4 @@ module.exports = function(deployer, network, accounts) {
   console.log("- ExchangeV3:", ExchangeV3.address);
   console.log("- DefaultDepositContract:", DefaultDepositContract.address);
   console.log("- LoopringIOExchangeOwner:", LoopringIOExchangeOwner.address);
-  console.log("- LoopringAmmSharedConfig:", LoopringAmmSharedConfig.address);
-  console.log("- LoopringAmmPool:", LoopringAmmPool.address);
-  console.log("- LoopringAmmPoolCopy:", LoopringAmmPoolCopy.address);
 };

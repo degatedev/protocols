@@ -11,7 +11,8 @@ using namespace libsnark;
 using namespace ethsnarks;
 using namespace Loopring;
 
-static const char *TEST_DATA_PATH = "./circuit/test/data/";
+// static const char *TEST_DATA_PATH = "./circuit/test/data/";
+static const char *TEST_DATA_PATH = "";
 static BigInt SNARK_SCALAR_FIELD = BigInt("2188824287183927522224640574525727508854836440041603434369820418657"
                                           "5808495617");
 
@@ -143,7 +144,14 @@ static Block getBlock()
 static UniversalTransaction getSpotTrade(const Block &block)
 {
     REQUIRE(block.transactions.size() > 0);
-    const UniversalTransaction &tx = block.transactions[2];
+    const UniversalTransaction &tx = block.transactions[8];
+    return tx;
+}
+
+static UniversalTransaction getAccountUpdate(const Block &block)
+{
+    REQUIRE(block.transactions.size() > 0);
+    const UniversalTransaction &tx = block.transactions[4];
     return tx;
 }
 

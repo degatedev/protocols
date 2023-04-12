@@ -28,6 +28,7 @@ namespace Loopring
 class WithdrawCircuit : public BaseTransactionCircuit
 {
   public:
+    // DualVariableGadget typeTx;
     // Inputs
     DualVariableGadget accountID;
     DualVariableGadget tokenID;
@@ -39,6 +40,13 @@ class WithdrawCircuit : public BaseTransactionCircuit
     DualVariableGadget maxFee;
     DualVariableGadget storageID;
     DualVariableGadget type;
+    DualVariableGadget useAppKey;
+
+    DualVariableGadget minGas;
+    DualVariableGadget to;
+    // DualVariableGadget extraData;
+
+    ToBitsGadget disableAppKeyWithdraw;
 
     // Special case protocol fee withdrawal
     EqualGadget isWithdrawalTx;
@@ -46,12 +54,23 @@ class WithdrawCircuit : public BaseTransactionCircuit
     TernaryGadget ownerValue;
     ToBitsGadget owner;
 
+    // choose verify key
+    TernaryGadget resolvedAuthorX;
+    TernaryGadget resolvedAuthorY;
+
+    // check appKey author
+    IfThenRequireEqualGadget ifUseAppKey_then_require_enable_switch;
+
     // Signature
-    Poseidon_9 hash;
+    OnChainDataHashGadget onchainDataHashCalculate;
+    // Poseidon_9 hash;
+    Poseidon_10 hash;
 
     // Validate
     RequireLtGadget requireValidUntil;
     RequireLeqGadget requireValidFee;
+    std::unique_ptr<IfThenRequireEqualGadget> requireValidOnChainDataHash;
+
 
     // Type
     IsNonZero isConditional;
@@ -59,7 +78,8 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
     // Balances
     DynamicBalanceGadget balanceS_A;
-    DynamicBalanceGadget balanceB_P;
+    // DynamicBalanceGadget balanceB_P;
+    DynamicBalanceGadget balanceD_O;
 
     // Check how much should be withdrawn
     TernaryGadget fullBalance;
@@ -73,6 +93,7 @@ class WithdrawCircuit : public BaseTransactionCircuit
     // Fee balances
     DynamicBalanceGadget balanceB_A;
     DynamicBalanceGadget balanceA_O;
+    StorageReaderGadget storageReader;
     // Fee as float
     FloatGadget fFee;
     RequireAccuracyGadget requireAccuracyFee;
@@ -83,7 +104,8 @@ class WithdrawCircuit : public BaseTransactionCircuit
     TernaryGadget amountA;
     TernaryGadget amountP;
     SubGadget balanceA_after;
-    SubGadget balanceP_after;
+    // SubGadget balanceP_after;
+    SubGadget balanceO_after;
     ArrayTernaryGadget merkleTreeAccountA;
 
     // Update the nonce storage (unless it's a forced withdrawal)
@@ -93,11 +115,11 @@ class WithdrawCircuit : public BaseTransactionCircuit
     NonceGadget nonce;
     TernaryGadget storageDataValue;
     TernaryGadget storageIdValue;
-
-    // Disable AMM for the token when doing a forced withdrawal
-    NotGadget isNotProtocolFeeWithdrawal;
-    AndGadget doUpdateTokenWeight;
-    TernaryGadget newTokenWeight;
+    TernaryGadget tokenSIDValue;
+    TernaryGadget tokenBIDValue;
+    TernaryGadget gasFeeValue;
+    TernaryGadget cancelledValue;
+    TernaryGadget forwardValue;
 
     // Increase the number of conditional transactions
     UnsafeAddGadget numConditionalTransactionsAfter;
@@ -108,10 +130,12 @@ class WithdrawCircuit : public BaseTransactionCircuit
       const std::string &prefix)
         : BaseTransactionCircuit(pb, state, prefix),
 
+          // typeTx(pb, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
           // Inputs
           accountID(pb, NUM_BITS_ACCOUNT, FMT(prefix, ".accountID")),
           tokenID(pb, NUM_BITS_TOKEN, FMT(prefix, ".tokenID")),
-          amount(pb, NUM_BITS_AMOUNT, FMT(prefix, ".amount")),
+          // 248bits for withdraw
+          amount(pb, NUM_BITS_AMOUNT_WITHDRAW, FMT(prefix, ".amount")),
           feeTokenID(pb, NUM_BITS_TOKEN, FMT(prefix, ".feeTokenID")),
           fee(pb, NUM_BITS_AMOUNT, FMT(prefix, ".fee")),
           validUntil(pb, NUM_BITS_TIMESTAMP, FMT(prefix, ".validUntil")),
@@ -119,6 +143,13 @@ class WithdrawCircuit : public BaseTransactionCircuit
           maxFee(pb, NUM_BITS_AMOUNT, FMT(prefix, ".maxFee")),
           storageID(pb, NUM_BITS_STORAGEID, FMT(prefix, ".storageID")),
           type(pb, NUM_BITS_TYPE, FMT(prefix, ".type")),
+          useAppKey(pb, NUM_BITS_BYTE, FMT(prefix, ".useAppKey")),
+
+          minGas(pb, NUM_BITS_MIN_GAS, FMT(prefix, ".minGas")),
+          to(pb, NUM_BITS_ADDRESS, FMT(prefix, ".to")),
+          // extraData(pb, NUM_BITS_EXTRA, FMT(prefix, ".extraData")),
+
+          disableAppKeyWithdraw(pb, state.accountA.account.disableAppKeyWithdraw, 1, FMT(prefix, ".disableAppKeyWithdraw")),
 
           // Special case protocol fee withdrawal
           isWithdrawalTx( //
@@ -139,7 +170,29 @@ class WithdrawCircuit : public BaseTransactionCircuit
             FMT(prefix, ".ownerValue")),
           owner(pb, ownerValue.result(), NUM_BITS_ADDRESS, FMT(prefix, ".owner")),
 
+          resolvedAuthorX(
+            pb,
+            useAppKey.packed,
+            state.accountA.account.appKeyPublicKey.x,
+            state.accountA.account.publicKey.x,
+            FMT(prefix, ".resolvedAuthorX")),
+          resolvedAuthorY(
+            pb,
+            useAppKey.packed,
+            state.accountA.account.appKeyPublicKey.y,
+            state.accountA.account.publicKey.y,
+            FMT(prefix, ".resolvedAuthorY")),
+
+          ifUseAppKey_then_require_enable_switch(
+            pb,
+            useAppKey.packed,
+            disableAppKeyWithdraw.packed,
+            state.constants._0,
+            FMT(prefix, ".ifUseAppKey_then_require_enable_switch")),
           // Signature
+          onchainDataHashCalculate(
+            pb,
+            FMT(prefix, ".onchainDataHashCalculate")),
           hash(
             pb,
             var_array(
@@ -151,7 +204,9 @@ class WithdrawCircuit : public BaseTransactionCircuit
                maxFee.packed,
                onchainDataHash.packed,
                validUntil.packed,
-               storageID.packed}),
+               storageID.packed,
+               useAppKey.packed
+              }),
             FMT(this->annotation_prefix, ".hash")),
 
           // Validate
@@ -169,13 +224,15 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
           // Balances
           balanceS_A(pb, state.accountA.balanceS, FMT(prefix, ".balanceS_A")),
-          balanceB_P(pb, state.pool.balanceB, FMT(prefix, ".balanceB_P")),
+          // balanceB_P(pb, state.pool.balanceB, FMT(prefix, ".balanceB_P")),
+          balanceD_O(pb, state.oper.balanceD, FMT(prefix, ".balanceD_O")),
 
           // Check how much should be withdrawn
           fullBalance(
             pb,
             isProtocolFeeWithdrawal.result(),
-            balanceB_P.balance(),
+            // balanceB_P.balance(),
+            balanceD_O.balance(),
             balanceS_A.balance(),
             FMT(prefix, ".fullBalance")),
           amountIsZero(pb, amount.packed, state.constants._0, FMT(prefix, ".amountIsZero")),
@@ -196,6 +253,13 @@ class WithdrawCircuit : public BaseTransactionCircuit
           // Fee balances
           balanceB_A(pb, state.accountA.balanceB, FMT(prefix, ".balanceB_A")),
           balanceA_O(pb, state.oper.balanceA, FMT(prefix, ".balanceA_O")),
+          storageReader(
+            pb,
+            state.constants,
+            state.accountA.storage,
+            storageID,
+            isWithdrawalTx.result(),
+            FMT(prefix, ".storageReader")),
           // Fee as float
           fFee(pb, state.constants, Float16Encoding, FMT(prefix, ".fFee")),
           requireAccuracyFee(
@@ -211,8 +275,9 @@ class WithdrawCircuit : public BaseTransactionCircuit
           // Calculate the new balance
           amountA(pb, isProtocolFeeWithdrawal.result(), state.constants._0, amount.packed, FMT(prefix, ".amountA")),
           amountP(pb, isProtocolFeeWithdrawal.result(), amount.packed, state.constants._0, FMT(prefix, ".amountP")),
-          balanceA_after(pb, balanceS_A.balance(), amountA.result(), NUM_BITS_AMOUNT, FMT(prefix, ".balanceA_after")),
-          balanceP_after(pb, balanceB_P.balance(), amountP.result(), NUM_BITS_AMOUNT, FMT(prefix, ".balanceP_after")),
+          balanceA_after(pb, balanceS_A.balance(), amountA.result(), NUM_BITS_AMOUNT_WITHDRAW, FMT(prefix, ".balanceA_after")),
+          // balanceP_after(pb, balanceB_P.balance(), amountP.result(), NUM_BITS_AMOUNT, FMT(prefix, ".balanceP_after")),
+          balanceO_after(pb, balanceD_O.balance(), amountP.result(), NUM_BITS_AMOUNT_WITHDRAW, FMT(prefix, ".balanceO_after")),
           merkleTreeAccountA(
             pb,
             isProtocolFeeWithdrawal.result(),
@@ -246,23 +311,36 @@ class WithdrawCircuit : public BaseTransactionCircuit
             state.accountA.storage.storageID,
             storageID.packed,
             FMT(prefix, ".storageIdValue")),
-
-          // Disable AMM for the token when doing a forced withdrawal
-          // (but not if it's a protocol fee withdrawal)
-          isNotProtocolFeeWithdrawal( //
+          tokenSIDValue(
             pb,
-            isProtocolFeeWithdrawal.result(),
-            FMT(prefix, ".isNotProtocolFeeWithdrawal")),
-          doUpdateTokenWeight(
+            isForcedWithdrawal.result(),
+            state.accountA.storage.tokenSID,
+            tokenID.packed,
+            FMT(prefix, ".tokenSIDValue")),
+          tokenBIDValue(
             pb,
-            {isNotProtocolFeeWithdrawal.result(), validFullWithdrawalType.result()},
-            FMT(prefix, ".doUpdateTokenWeight")),
-          newTokenWeight(
+            isForcedWithdrawal.result(),
+            state.accountA.storage.tokenBID,
+            storageReader.getTokenBID(),
+            FMT(prefix, ".tokenBIDValue")),
+          gasFeeValue(
             pb,
-            doUpdateTokenWeight.result(),
-            state.constants._0,
-            state.accountA.balanceS.weightAMM,
-            FMT(prefix, ".newTokenWeightAMM")),
+            isForcedWithdrawal.result(),
+            state.accountA.storage.gasFee,
+            storageReader.getGasFee(),
+            FMT(prefix, ".gasFeeValue")),
+          cancelledValue(
+            pb,
+            isForcedWithdrawal.result(),
+            state.accountA.storage.cancelled,
+            storageReader.getCancelled(),
+            FMT(prefix, ".cancelledValue")),
+          forwardValue(
+            pb,
+            isForcedWithdrawal.result(),
+            state.accountA.storage.forward,
+            storageReader.getForward(),
+            FMT(prefix, ".forwardValue")),
 
           // Increase the number of conditional transactions
           numConditionalTransactionsAfter(
@@ -271,25 +349,32 @@ class WithdrawCircuit : public BaseTransactionCircuit
             state.constants._1,
             FMT(prefix, ".numConditionalTransactionsAfter"))
     {
+        LOG(LogDebug, "in WithdrawCircuit", "");
         // Set the account
         setArrayOutput(TXV_ACCOUNT_A_ADDRESS, merkleTreeAccountA.result());
 
         // Update the account balances (withdrawal + fee)
         setArrayOutput(TXV_BALANCE_A_S_ADDRESS, tokenID.bits);
         setOutput(TXV_BALANCE_A_S_BALANCE, balanceA_after.result());
-        setOutput(TXV_BALANCE_A_S_WEIGHTAMM, newTokenWeight.result());
-        setArrayOutput(TXV_BALANCE_B_S_ADDRESS, feeTokenID.bits);
+        // setArrayOutput(TXV_BALANCE_B_S_ADDRESS, feeTokenID.bits);
+        setArrayOutput(TXV_BALANCE_A_B_ADDRESS, feeTokenID.bits);
         setOutput(TXV_BALANCE_A_B_BALANCE, balanceB_A.balance());
 
         // Update the protocol fee pool balance when withdrawing from the protocol
         // pool
-        setOutput(TXV_BALANCE_P_B_BALANCE, balanceP_after.result());
+        // setOutput(TXV_BALANCE_P_B_BALANCE, balanceP_after.result());
+        setOutput(TXV_BALANCE_O_D_BALANCE, balanceO_after.result());
+        setArrayOutput(TXV_BALANCE_O_D_Address, tokenID.bits);
 
         // Update the operator balance for the fee payment
+        // DEG-127 split trading fee and gas fee
+        setArrayOutput(TXV_BALANCE_O_A_Address, feeTokenID.bits);
         setOutput(TXV_BALANCE_O_A_BALANCE, balanceA_O.balance());
 
         // Verify a single signature of the account owner (if not conditional)
         setOutput(TXV_HASH_A, hash.result());
+        setOutput(TXV_PUBKEY_X_A, resolvedAuthorX.result());
+        setOutput(TXV_PUBKEY_Y_A, resolvedAuthorY.result());
         setOutput(TXV_SIGNATURE_REQUIRED_A, needsSignature.result());
         setOutput(TXV_SIGNATURE_REQUIRED_B, state.constants._0);
 
@@ -298,12 +383,20 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
         // Nonce
         setArrayOutput(TXV_STORAGE_A_ADDRESS, subArray(storageID.bits, 0, NUM_BITS_STORAGE_ADDRESS));
+        // DEG-347 Storage move
+        setOutput(TXV_STORAGE_A_TOKENSID, tokenSIDValue.result());
+        setOutput(TXV_STORAGE_A_TOKENBID, tokenBIDValue.result());
         setOutput(TXV_STORAGE_A_DATA, storageDataValue.result());
         setOutput(TXV_STORAGE_A_STORAGEID, storageIdValue.result());
+        setOutput(TXV_STORAGE_A_GASFEE, gasFeeValue.result());
+        setOutput(TXV_STORAGE_A_CANCELLED, cancelledValue.result());
+        setOutput(TXV_STORAGE_A_FORWARD, forwardValue.result());
     }
 
     void generate_r1cs_witness(const Withdrawal &withdrawal)
     {
+        LOG(LogDebug, "in WithdrawCircuit", "generate_r1cs_witness");
+        // typeTx.generate_r1cs_witness(pb, ethsnarks::FieldT(int(Loopring::TransactionType::Withdrawal)));
         // Inputs
         accountID.generate_r1cs_witness(pb, withdrawal.accountID);
         tokenID.generate_r1cs_witness(pb, withdrawal.tokenID);
@@ -315,6 +408,13 @@ class WithdrawCircuit : public BaseTransactionCircuit
         maxFee.generate_r1cs_witness(pb, withdrawal.maxFee);
         storageID.generate_r1cs_witness(pb, withdrawal.storageID);
         type.generate_r1cs_witness(pb, withdrawal.type);
+        useAppKey.generate_r1cs_witness(pb, withdrawal.useAppKey);
+
+        minGas.generate_r1cs_witness(pb, withdrawal.minGas);
+        to.generate_r1cs_witness(pb, withdrawal.to);
+        // extraData.generate_r1cs_witness(pb, withdrawal.extraData);
+
+        disableAppKeyWithdraw.generate_r1cs_witness();
 
         // Special case protocol fee withdrawal
         isWithdrawalTx.generate_r1cs_witness();
@@ -322,12 +422,26 @@ class WithdrawCircuit : public BaseTransactionCircuit
         ownerValue.generate_r1cs_witness();
         owner.generate_r1cs_witness();
 
+        resolvedAuthorX.generate_r1cs_witness();
+        resolvedAuthorY.generate_r1cs_witness();
+
+        ifUseAppKey_then_require_enable_switch.generate_r1cs_witness();
+
         // Signature
+        onchainDataHashCalculate.generate_r1cs_witness();
         hash.generate_r1cs_witness();
 
         // Validate
         requireValidUntil.generate_r1cs_witness();
         requireValidFee.generate_r1cs_witness();
+        LOG(LogDebug, "in WithdrawCircuit minGas", pb.val(minGas.packed));
+        LOG(LogDebug, "in WithdrawCircuit to", pb.val(to.packed));
+        LOG(LogDebug, "in WithdrawCircuit amount", pb.val(amount.packed));
+        // std::cout << "in WithdrawCircuit extraData:" << pb.val(extraData.packed) << std::endl;
+
+        LOG(LogDebug, "in WithdrawCircuit onchainDataHashCalculate", pb.val(onchainDataHashCalculate.result()));
+        LOG(LogDebug, "in WithdrawCircuit onchainDataHash", pb.val(onchainDataHash.packed));
+        requireValidOnChainDataHash->generate_r1cs_witness();
 
         // Type
         isConditional.generate_r1cs_witness();
@@ -335,7 +449,8 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
         // Balances
         balanceS_A.generate_r1cs_witness();
-        balanceB_P.generate_r1cs_witness();
+        // balanceB_P.generate_r1cs_witness();
+        balanceD_O.generate_r1cs_witness();
 
         // Check how much should be withdrawn
         fullBalance.generate_r1cs_witness();
@@ -349,6 +464,7 @@ class WithdrawCircuit : public BaseTransactionCircuit
         // Fee balances
         balanceB_A.generate_r1cs_witness();
         balanceA_O.generate_r1cs_witness();
+        storageReader.generate_r1cs_witness();
         // Fee as float
         fFee.generate_r1cs_witness(toFloat(withdrawal.fee, Float16Encoding));
         requireAccuracyFee.generate_r1cs_witness();
@@ -359,7 +475,8 @@ class WithdrawCircuit : public BaseTransactionCircuit
         amountA.generate_r1cs_witness();
         amountP.generate_r1cs_witness();
         balanceA_after.generate_r1cs_witness();
-        balanceP_after.generate_r1cs_witness();
+        // balanceP_after.generate_r1cs_witness();
+        balanceO_after.generate_r1cs_witness();
         merkleTreeAccountA.generate_r1cs_witness();
 
         // Update the nonce storage (unless it's a forced withdrawal)
@@ -369,11 +486,11 @@ class WithdrawCircuit : public BaseTransactionCircuit
         nonce.generate_r1cs_witness();
         storageDataValue.generate_r1cs_witness();
         storageIdValue.generate_r1cs_witness();
-
-        // Disable AMM for the token when doing a forced withdrawal
-        isNotProtocolFeeWithdrawal.generate_r1cs_witness();
-        doUpdateTokenWeight.generate_r1cs_witness();
-        newTokenWeight.generate_r1cs_witness();
+        tokenSIDValue.generate_r1cs_witness();
+        tokenBIDValue.generate_r1cs_witness();
+        gasFeeValue.generate_r1cs_witness();
+        cancelledValue.generate_r1cs_witness();
+        forwardValue.generate_r1cs_witness();
 
         // Increase the number of conditional transactions
         numConditionalTransactionsAfter.generate_r1cs_witness();
@@ -381,6 +498,8 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
     void generate_r1cs_constraints()
     {
+        LOG(LogDebug, "in WithdrawCircuit: generate_r1cs_constraints", "");
+        // typeTx.generate_r1cs_constraints(true);
         // Inputs
         accountID.generate_r1cs_constraints(true);
         tokenID.generate_r1cs_constraints(true);
@@ -392,6 +511,13 @@ class WithdrawCircuit : public BaseTransactionCircuit
         maxFee.generate_r1cs_constraints(true);
         storageID.generate_r1cs_constraints(true);
         type.generate_r1cs_constraints(true);
+        useAppKey.generate_r1cs_constraints(true);
+
+        minGas.generate_r1cs_constraints(true);
+        to.generate_r1cs_constraints(true);
+        // extraData.generate_r1cs_constraints(true);
+
+        disableAppKeyWithdraw.generate_r1cs_constraints();
 
         // Special case protocol fee withdrawal
         isWithdrawalTx.generate_r1cs_constraints();
@@ -399,12 +525,25 @@ class WithdrawCircuit : public BaseTransactionCircuit
         ownerValue.generate_r1cs_constraints();
         owner.generate_r1cs_constraints();
 
+        resolvedAuthorX.generate_r1cs_constraints();
+        resolvedAuthorY.generate_r1cs_constraints();
+
+        ifUseAppKey_then_require_enable_switch.generate_r1cs_constraints();
+        
         // Signature
+        onchainDataHashCalculate.add(minGas.bits);
+        onchainDataHashCalculate.add(to.bits);
+        onchainDataHashCalculate.add(amount.bits);
+        // onchainDataHashCalculate.add(extraData.bits);
+        onchainDataHashCalculate.generate_r1cs_constraints();
         hash.generate_r1cs_constraints();
 
         // Validate
         requireValidUntil.generate_r1cs_constraints();
         requireValidFee.generate_r1cs_constraints();
+
+        requireValidOnChainDataHash.reset(new IfThenRequireEqualGadget(pb, isWithdrawalTx.result(), onchainDataHash.packed, onchainDataHashCalculate.result(), FMT(annotation_prefix, ".requireValidOnChainDataHash"))),
+        requireValidOnChainDataHash->generate_r1cs_constraints();
 
         // Type
         isConditional.generate_r1cs_constraints();
@@ -412,7 +551,8 @@ class WithdrawCircuit : public BaseTransactionCircuit
 
         // Balances
         balanceS_A.generate_r1cs_constraints();
-        balanceB_P.generate_r1cs_constraints();
+        // balanceB_P.generate_r1cs_constraints();
+        balanceD_O.generate_r1cs_constraints();
 
         // Check how much should be withdrawn
         fullBalance.generate_r1cs_constraints();
@@ -426,6 +566,7 @@ class WithdrawCircuit : public BaseTransactionCircuit
         // Fee balances
         balanceB_A.generate_r1cs_constraints();
         balanceA_O.generate_r1cs_constraints();
+        storageReader.generate_r1cs_constraints();
         // Fee as float
         fFee.generate_r1cs_constraints();
         requireAccuracyFee.generate_r1cs_constraints();
@@ -436,7 +577,8 @@ class WithdrawCircuit : public BaseTransactionCircuit
         amountA.generate_r1cs_constraints();
         amountP.generate_r1cs_constraints();
         balanceA_after.generate_r1cs_constraints();
-        balanceP_after.generate_r1cs_constraints();
+        // balanceP_after.generate_r1cs_constraints();
+        balanceO_after.generate_r1cs_constraints();
         merkleTreeAccountA.generate_r1cs_constraints();
 
         // Update the nonce storage (unless it's a forced withdrawal)
@@ -446,11 +588,11 @@ class WithdrawCircuit : public BaseTransactionCircuit
         nonce.generate_r1cs_constraints();
         storageDataValue.generate_r1cs_constraints();
         storageIdValue.generate_r1cs_constraints();
-
-        // Disable AMM for the token when doing a forced withdrawal
-        isNotProtocolFeeWithdrawal.generate_r1cs_constraints();
-        doUpdateTokenWeight.generate_r1cs_constraints();
-        newTokenWeight.generate_r1cs_constraints();
+        tokenSIDValue.generate_r1cs_constraints();
+        tokenBIDValue.generate_r1cs_constraints();
+        gasFeeValue.generate_r1cs_constraints();
+        cancelledValue.generate_r1cs_constraints();
+        forwardValue.generate_r1cs_constraints();
 
         // Increase the number of conditional transactions
         numConditionalTransactionsAfter.generate_r1cs_constraints();
@@ -459,15 +601,19 @@ class WithdrawCircuit : public BaseTransactionCircuit
     const VariableArrayT getPublicData() const
     {
         return flattenReverse(
-          {type.bits,
+          {
+            // typeTx.bits,
+           type.bits,
            owner.bits,
            accountID.bits,
            tokenID.bits,
-           amount.bits,
+          //  // put amount into onChainData
+          // //  amount.bits,
            feeTokenID.bits,
            fFee.bits(),
            storageID.bits,
-           onchainDataHash.bits});
+           onchainDataHash.bits
+           });
     }
 };
 

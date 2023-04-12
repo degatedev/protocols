@@ -29,7 +29,7 @@ abstract contract IExchangeV3 is Claimable
 
     event TokenRegistered(
         address token,
-        uint16  tokenId
+        uint32  tokenId
     );
 
     event Shutdown(
@@ -50,8 +50,8 @@ abstract contract IExchangeV3 is Claimable
         address from,
         address to,
         address token,
-        uint16  tokenId,
-        uint96  amount
+        uint32  tokenId,
+        uint248  amount
     );
 
     event ForcedWithdrawalRequested(
@@ -77,10 +77,8 @@ abstract contract IExchangeV3 is Claimable
     );
 
     event ProtocolFeesUpdated(
-        uint8 takerFeeBips,
-        uint8 makerFeeBips,
-        uint8 previousTakerFeeBips,
-        uint8 previousMakerFeeBips
+        uint8 protocolFeeBips,
+        uint8 previousProtocolFeeBips
     );
 
     event TransactionApproved(
@@ -88,34 +86,62 @@ abstract contract IExchangeV3 is Claimable
         bytes32 transactionHash
     );
 
+    event TransactionsApproved(
+        address[] owners, 
+        bytes32[] transactionHashes
+    );
+
+    event BlockVerifierRefreshed(address blockVerifier);
+    event DepositContractUpdate(address depositContract);
+    event WithdrawExchangeFees(address token, address recipient);
+
+    event WithdrawalRecipientUpdate(
+        address from,
+        address to,
+        address token,
+        uint248 amount,
+        uint32 storageID,
+        address newRecipient
+    );
+
+    event DepositParamsUpdate(
+        uint256 freeDepositMax,
+        uint256 freeDepositRemained,
+        uint256 freeSlotPerBlock,
+        uint256 depositFee
+    );
+
+    event AllowOnchainTransferFrom(bool value);
 
     // -- Initialization --
     /// @dev Initializes this exchange. This method can only be called once.
     /// @param  loopring The LoopringV3 contract address.
     /// @param  owner The owner of this exchange.
     /// @param  genesisMerkleRoot The initial Merkle tree state.
+    /// @param  genesisMerkleAssetRoot The initial Asset Merkle tree state.
     function initialize(
         address loopring,
         address owner,
-        bytes32 genesisMerkleRoot
+        bytes32 genesisMerkleRoot,
+        bytes32 genesisMerkleAssetRoot
         )
         virtual
         external;
 
-    /// @dev Initialized the agent registry contract used by the exchange.
-    ///      Can only be called by the exchange owner once.
-    /// @param agentRegistry The agent registry contract to be used
-    function setAgentRegistry(address agentRegistry)
-        external
-        virtual;
+    // /// @dev Initialized the agent registry contract used by the exchange.
+    // ///      Can only be called by the exchange owner once.
+    // /// @param agentRegistry The agent registry contract to be used
+    // function setAgentRegistry(address agentRegistry)
+    //     external
+    //     virtual;
 
-    /// @dev Gets the agent registry contract used by the exchange.
-    /// @return the agent registry contract
-    function getAgentRegistry()
-        external
-        virtual
-        view
-        returns (IAgentRegistry);
+    // /// @dev Gets the agent registry contract used by the exchange.
+    // /// @return the agent registry contract
+    // function getAgentRegistry()
+    //     external
+    //     virtual
+    //     view
+    //     returns (IAgentRegistry);
 
     ///      Can only be called by the exchange owner once.
     /// @param depositContract The deposit contract to be used
@@ -135,6 +161,18 @@ abstract contract IExchangeV3 is Claimable
         virtual
         view
         returns (IDepositContract);
+
+    // @dev Exchange owner set params for deposit.
+    // @param freeDepositMax Max slots for free deposit 
+    // @param freeDepositRemained Remained free deposit
+    // @param freeSlotPerBlock Free slot for every block
+    // @param depositFee Deposit fee in ETH
+    function setDepositParams(
+        uint256 freeDepositMax,
+        uint256 freeDepositRemained,
+        uint256 freeSlotPerBlock,
+        uint256 depositFee
+    ) external virtual;
 
     // @dev Exchange owner withdraws fees from the exchange.
     // @param token Fee token address
@@ -188,7 +226,7 @@ abstract contract IExchangeV3 is Claimable
         )
         external
         virtual
-        returns (uint16 tokenID);
+        returns (uint32 tokenID);
 
     /// @dev Returns the id of a registered token.
     /// @param  tokenAddress The token's address
@@ -199,13 +237,13 @@ abstract contract IExchangeV3 is Claimable
         external
         virtual
         view
-        returns (uint16 tokenID);
+        returns (uint32 tokenID);
 
     /// @dev Returns the address of a registered token.
     /// @param  tokenID The token's ID in this exchanges.
     /// @return tokenAddress The token's address
     function getTokenAddress(
-        uint16 tokenID
+        uint32 tokenID
         )
         external
         virtual
@@ -255,6 +293,14 @@ abstract contract IExchangeV3 is Claimable
     /// @dev Gets the current Merkle root of this exchange's virtual blockchain.
     /// @return The current Merkle root.
     function getMerkleRoot()
+        external
+        virtual
+        view
+        returns (bytes32);
+
+    /// @dev Gets the current Asset Merkle root of this exchange's virtual blockchain.
+    /// @return The current Asset Merkle root.
+    function getMerkleAssetRoot()
         external
         virtual
         view
@@ -323,7 +369,7 @@ abstract contract IExchangeV3 is Claimable
         address from,
         address to,
         address tokenAddress,
-        uint96  amount,
+        uint248  amount,
         bytes   calldata auxiliaryData
         )
         external
@@ -341,7 +387,7 @@ abstract contract IExchangeV3 is Claimable
         external
         virtual
         view
-        returns (uint96);
+        returns (uint248);
 
     // -- Withdrawals --
     /// @dev Submits an onchain request to force withdraw Ether or ERC20 tokens.
@@ -519,7 +565,7 @@ abstract contract IExchangeV3 is Claimable
         address from,
         address to,
         address token,
-        uint96  amount,
+        uint248  amount,
         uint32  storageID,
         address newRecipient
         )
@@ -537,7 +583,7 @@ abstract contract IExchangeV3 is Claimable
         address from,
         address to,
         address token,
-        uint96  amount,
+        uint248  amount,
         uint32  storageID
         )
         external
@@ -643,20 +689,16 @@ abstract contract IExchangeV3 is Claimable
 
     /// @dev Gets the protocol fees for this exchange.
     /// @return syncedAt The timestamp the protocol fees were last updated
-    /// @return takerFeeBips The protocol taker fee
-    /// @return makerFeeBips The protocol maker fee
-    /// @return previousTakerFeeBips The previous protocol taker fee
-    /// @return previousMakerFeeBips The previous protocol maker fee
+    /// @return protocolFeeBips The protocol fee
+    /// @return previousProtocolFeeBips The previous protocol fee
     function getProtocolFeeValues()
         external
         virtual
         view
         returns (
             uint32 syncedAt,
-            uint8 takerFeeBips,
-            uint8 makerFeeBips,
-            uint8 previousTakerFeeBips,
-            uint8 previousMakerFeeBips
+            uint8 protocolFeeBips,
+            uint8 previousProtocolFeeBips
         );
 
     /// @dev Gets the domain separator used in this exchange.
@@ -666,15 +708,32 @@ abstract contract IExchangeV3 is Claimable
         view
         returns (bytes32);
 
-    /// @dev set amm pool feeBips value.
-    function setAmmFeeBips(uint8 _feeBips)
-        external
-        virtual;
-
-    /// @dev get amm pool feeBips value.
-    function getAmmFeeBips()
+    /// @dev Gets the uncomfirmed balance in DepositContract, which can be used for DepositTransaction.
+    /// @param tokenAddress The address of the token, use `0x0` for Ether.
+    /// @return Unconfirmed balance of the token
+    function getUnconfirmedBalance(
+        address tokenAddress
+        )
         external
         virtual
         view
-        returns (uint8);
+        returns (uint256);
+
+    /// @dev Gets free deposit slots
+    function getFreeDepositRemained()
+        external
+        virtual
+        view
+        returns (uint256);
+
+    /// @dev Gets token deposit balance 
+    /// @param tokenAddress The address of the token, use `0x0` for Ether.
+    /// @return deposit balance of the token
+    function getDepositBalance(
+        address tokenAddress
+        )
+        external
+        virtual
+        view
+        returns (uint248);
 }

@@ -30,7 +30,25 @@
 #define ASSERT(condition, message)                                                                                     \
     do                                                                                                                 \
     {                                                                                                                  \
+        if (!(condition))                                                                                              \
+        {                                                                                                              \
+            std::cerr << "Assertion `" #condition "` failed in " << __FILE__ << " line " << __LINE__ << ": "           \
+                      << message << std::endl;                                                                         \
+            std::terminate();                                                                                          \
+        }                                                                                                              \
     } while (false)
+#endif
+
+
+#ifndef NDEBUG
+#define LOG(level, message, val)                                                                                       \
+    std::cout << level << ":" << message << ":" << val << std::endl;                                                   
+#else
+#define LOG(level, message, val)                                                                                       \
+    if ("Error" == level || "Info" == level)                                                                           \
+    {                                                                                                                  \
+        std::cout << level << ":" << message << ":" << val << std::endl;                                               \
+    }                                                                                                        
 #endif
 
 using namespace ethsnarks;
@@ -113,9 +131,44 @@ static const VariableArrayT subArray(const VariableArrayT &bits, unsigned int st
     return result;
 }
 
+static const std::vector<VariableT> subVector(const std::vector<VariableT> &bits, unsigned int start, unsigned int length)
+{
+    std::vector<VariableT> result;
+
+    for (int i = start; i < start + length; i++)
+    {
+        result.push_back(bits[i]);
+    }
+
+    return result;
+}
+
 static const VariableArrayT var_array(const std::vector<VariableT> &inputs)
 {
     return VariableArrayT(inputs.begin(), inputs.end());
+}
+
+static const std::vector<VariableT> array_to_vector(const VariableArrayT &inputs)
+{
+    std::vector<VariableT> result;
+
+    for (int i = 0; i < inputs.size(); i++)
+    {
+        result.push_back(inputs[i]);
+    }
+
+    return result;
+}
+
+static const std::vector<VariableT> threeVariable_to_vector(const VariableT &one, const VariableT &two, const VariableT &three)
+{
+    std::vector<VariableT> result;
+
+    result.push_back(one);
+    result.push_back(two);
+    result.push_back(three);
+
+    return result;
 }
 
 static BigInt toBigInt(ethsnarks::FieldT _value, bool sign = true)

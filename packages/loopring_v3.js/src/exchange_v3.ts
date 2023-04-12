@@ -27,10 +27,11 @@ import {
 import { DepositProcessor } from "./request_processors/deposit_processor";
 import { AccountUpdateProcessor } from "./request_processors/account_update_processor";
 import { SpotTradeProcessor } from "./request_processors/spot_trade_processor";
+import { BatchSpotTradeProcessor } from "./request_processors/batch_spot_trade_processor";
 import { TransferProcessor } from "./request_processors/transfer_processor";
 import { WithdrawalProcessor } from "./request_processors/withdrawal_processor";
-import { AmmUpdateProcessor } from "./request_processors/amm_update_processor";
-import { SignatureVerificationProcessor } from "./request_processors/signature_verification_processor";
+import { OrderCancelProcessor } from "./request_processors/order_cancel_processor";
+import { AppKeyUpdateProcessor } from "./request_processors/appkey_update_processor";
 import * as log from "./logs";
 
 /**
@@ -60,6 +61,7 @@ export class ExchangeV3 {
   private blocks: Block[] = [];
 
   private merkleTree: SparseMerkleTree;
+  private merkleAssetTree: SparseMerkleTree;
 
   private genesisMerkleRoot: string;
 
@@ -93,6 +95,11 @@ export class ExchangeV3 {
       16
     ).toString(10);
 
+    const genesisMerkleAssetRoot = new BN(
+      (await this.exchange.methods.getMerkleAssetRoot().call()).slice(2),
+      16
+    ).toString(10);
+
     this.shutdown = false;
     this.shutdownStartTime = 0;
     this.inWithdrawalMode = false;
@@ -118,6 +125,7 @@ export class ExchangeV3 {
       blockFee: new BN(0),
 
       merkleRoot: genesisMerkleRoot,
+      merkleAssetRoot: genesisMerkleAssetRoot,
       timestamp: exchangeCreationTimestamp,
 
       numRequestsProcessed: 0,
@@ -133,10 +141,10 @@ export class ExchangeV3 {
       .call();
     this.protocolFees = {
       exchange: exchangeAddress,
-      takerFeeBips: parseInt(protocolFeeValues.takerFeeBips),
-      makerFeeBips: parseInt(protocolFeeValues.makerFeeBips),
-      previousTakerFeeBips: parseInt(protocolFeeValues.previousTakerFeeBips),
-      previousMakerFeeBips: parseInt(protocolFeeValues.previousMakerFeeBips)
+      protocolFeeBips: parseInt(protocolFeeValues.protocolFeeBips),
+      previousProtocolFeeBips: parseInt(
+        protocolFeeValues.previousProtocolFeeBips
+      )
     };
   }
 
@@ -202,74 +210,228 @@ export class ExchangeV3 {
    * Builds the Merkle tree on the current state
    */
   public buildMerkleTree() {
-    const hasher = poseidon.createHash(5, 6, 52);
-    const accountHasher = poseidon.createHash(7, 6, 52);
+    const balanceHasher = poseidon.createHash(5, 6, 52);
+    const accountHasher = poseidon.createHash(12, 6, 53);
+    const accountAssetHasher = poseidon.createHash(6, 6, 52);
+    const storageHasher = poseidon.createHash(8, 6, 53);
 
     // Make empty trees so we have all necessary default values
     const storageMerkleTree = new SparseMerkleTree(
       Constants.BINARY_TREE_DEPTH_STORAGE / 2
     );
-    storageMerkleTree.newTree(hasher([0, 0]).toString(10));
+    // # DEG-146:order cancel
+    // storageMerkleTree.newTree(hasher([0, 0]).toString(10));
+    storageMerkleTree.newTree(
+      storageHasher([0, 0, 0, 0, 0, 0, 1]).toString(10)
+    );
+    console.log(
+      "Empty storage tree in buildMerkleTree:",
+      storageMerkleTree.getRoot()
+    );
+
     const balancesMerkleTree = new SparseMerkleTree(
       Constants.BINARY_TREE_DEPTH_TOKENS / 2
     );
     balancesMerkleTree.newTree(
-      hasher([0, 0, storageMerkleTree.getRoot()]).toString(10)
+      // hasher([0, 0, storageMerkleTree.getRoot()]).toString(10)
+      balanceHasher([0]).toString(10)
     );
+
+    console.log(
+      "Empty balances tree in buildMerkleTree:",
+      balancesMerkleTree.getRoot()
+    );
+
     this.merkleTree = new SparseMerkleTree(
       Constants.BINARY_TREE_DEPTH_ACCOUNTS / 2
     );
+
     this.merkleTree.newTree(
-      accountHasher([0, 0, 0, 0, 0, balancesMerkleTree.getRoot()]).toString(10)
+      // accountHasher([0, 0, 0, 0, 0, balancesMerkleTree.getRoot()]).toString(10)
+      accountHasher([
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        balancesMerkleTree.getRoot(),
+        storageMerkleTree.getRoot()
+      ]).toString(10)
+    );
+
+    console.log(
+      "empty merkle tree in buildMerkleTree: " + this.merkleTree.getRoot()
+    );
+
+    this.merkleAssetTree = new SparseMerkleTree(
+      Constants.BINARY_TREE_DEPTH_ACCOUNTS / 2
+    );
+
+    this.merkleAssetTree.newTree(
+      accountAssetHasher([0, 0, 0, 0, balancesMerkleTree.getRoot()]).toString(
+        10
+      )
+    );
+
+    console.log(
+      "empty asset merkle tree in buildMerkleTree: " +
+        this.merkleAssetTree.getRoot()
     );
 
     // Run over all account data and build the Merkle tree
     for (const account of this.state.accounts) {
+      console.log("this.state.accounts account.owner: ", account.owner);
+
       account.balancesMerkleTree = new SparseMerkleTree(
         Constants.BINARY_TREE_DEPTH_TOKENS / 2
       );
       account.balancesMerkleTree.newTree(
-        hasher([0, 0, storageMerkleTree.getRoot()]).toString(10)
+        // hasher([0, 0, storageMerkleTree.getRoot()]).toString(10)
+        balanceHasher([0]).toString(10)
       );
-      for (const tokenID of Object.keys(account.balances)) {
-        const balanceValue = account.balances[Number(tokenID)];
-        balanceValue.storageTree = new SparseMerkleTree(
-          Constants.BINARY_TREE_DEPTH_STORAGE / 2
-        );
-        balanceValue.storageTree.newTree(hasher([0, 0]).toString(10));
-        for (const orderID of Object.keys(balanceValue.storage)) {
-          const storageValue = balanceValue.storage[Number(orderID)];
-          balanceValue.storageTree.update(
-            Number(orderID),
-            hasher([storageValue.data, storageValue.storageID]).toString(10)
-          );
-        }
-        account.balancesMerkleTree.update(
-          Number(tokenID),
-          hasher([
-            balanceValue.balance,
-            balanceValue.weightAMM,
-            balanceValue.storageTree.getRoot()
+
+      account.storageTree = new SparseMerkleTree(
+        Constants.BINARY_TREE_DEPTH_STORAGE / 2
+      );
+      account.storageTree.newTree(
+        storageHasher([0, 0, 0, 0, 0, 0, 1]).toString(10)
+      );
+
+      for (const orderID of Object.keys(account.storage)) {
+        const storageValue = account.storage[Number(orderID)];
+        account.storageTree.update(
+          Number(orderID),
+          storageHasher([
+            storageValue.tokenSID,
+            storageValue.tokenBID,
+            storageValue.data,
+            storageValue.storageID,
+            storageValue.gasFee,
+            storageValue.cancelled,
+            storageValue.forward
           ]).toString(10)
         );
+
+        console.log("orderID: ", orderID);
+
+        let storageLeafhasher = storageHasher([
+          storageValue.tokenSID,
+          storageValue.tokenBID,
+          storageValue.data,
+          storageValue.storageID,
+          storageValue.gasFee,
+          storageValue.cancelled,
+          storageValue.forward
+        ]).toString(10);
+        console.log("storageLeafhasher: ", storageLeafhasher);
       }
+
+      for (const tokenID of Object.keys(account.balances)) {
+        const balanceValue = account.balances[Number(tokenID)];
+
+        account.balancesMerkleTree.update(
+          Number(tokenID),
+          balanceHasher([
+            balanceValue.balance
+            // balanceValue.storageTree.getRoot()
+          ]).toString(10)
+        );
+
+        console.log(
+          "balanceValue: ",
+          tokenID,
+          balanceValue.balance.toString(10)
+        );
+
+        let tokenIDBalanceLeafhasher = balanceHasher([
+          balanceValue.balance
+        ]).toString(10);
+        console.log("tokenIDBalanceLeafhasher: ", tokenIDBalanceLeafhasher);
+      }
+
       this.merkleTree.update(
         account.accountId,
         accountHasher([
           account.owner,
           account.publicKeyX,
           account.publicKeyY,
+          account.appKeyPublicKeyX,
+          account.appKeyPublicKeyY,
           account.nonce,
-          account.feeBipsAMM,
+          account.disableAppKeySpotTrade,
+          account.disableAppKeyWithdraw,
+          account.disableAppKeyTransferToOther,
+          account.balancesMerkleTree.getRoot(),
+          account.storageTree.getRoot()
+        ]).toString(10)
+      );
+
+      this.merkleAssetTree.update(
+        account.accountId,
+        accountAssetHasher([
+          account.owner,
+          account.publicKeyX,
+          account.publicKeyY,
+          account.nonce,
           account.balancesMerkleTree.getRoot()
         ]).toString(10)
       );
+
+      console.log("account: ", account);
+      console.log(
+        "account.balancesMerkleTree: ",
+        account.balancesMerkleTree.getRoot()
+      );
+      console.log("account.storageTree: ", account.storageTree.getRoot());
+
+      let accountIdLeafHasher = accountHasher([
+        account.owner,
+        account.publicKeyX,
+        account.publicKeyY,
+        account.appKeyPublicKeyX,
+        account.appKeyPublicKeyY,
+        account.nonce,
+        account.disableAppKeySpotTrade,
+        account.disableAppKeyWithdraw,
+        account.disableAppKeyTransferToOther,
+        account.balancesMerkleTree.getRoot(),
+        account.storageTree.getRoot()
+      ]).toString(10);
+
+      console.log("accountIdLeafHasher: ", accountIdLeafHasher);
+      console.log("this.merkleTree.getRoot: " + this.merkleTree.getRoot());
+      console.log(
+        "this.merkleAssetTree.getRoot: " + this.merkleAssetTree.getRoot()
+      );
+
+      console.log("==================  next account ================== ");
     }
-    // console.log("Merkle root: " + this.merkleTree.getRoot());
+
+    // console.log("this.merkleTree", this.merkleTree);
+    // console.log("this.state", this.state);
+
+    console.log(
+      "buildMerkleTree merkleTree.getRoot: " + this.merkleTree.getRoot()
+    );
+    console.log(
+      "buildMerkleTree merkleAssetTree.getRoot: " +
+        this.merkleAssetTree.getRoot()
+    );
+
     assert.equal(
       this.merkleTree.getRoot(),
       this.blocks[this.blocks.length - 1].merkleRoot,
       "Merkle tree root inconsistent"
+    );
+
+    assert.equal(
+      this.merkleAssetTree.getRoot(),
+      this.blocks[this.blocks.length - 1].merkleAssetRoot,
+      "Merkle asset tree root inconsistent"
     );
   }
 
@@ -293,31 +455,35 @@ export class ExchangeV3 {
     assert(tokenID < this.tokens.length, "invalid token ID");
 
     const account = this.state.accounts[accountID];
-    const accountMerkleProof = this.merkleTree.createProof(accountID);
+    const accountMerkleProof = this.merkleAssetTree.createProof(accountID);
     const balanceMerkleProof = account.balancesMerkleTree.createProof(tokenID);
 
-    const hasher = poseidon.createHash(5, 6, 52);
+    // const hasher = poseidon.createHash(5, 6, 52);
+    const storageHasher = poseidon.createHash(8, 6, 53);
+
     const storageTree = new SparseMerkleTree(
       Constants.BINARY_TREE_DEPTH_STORAGE / 2
     );
-    storageTree.newTree(hasher([0, 0]).toString(10));
+    storageTree.newTree(storageHasher([0, 0, 0, 0, 0, 0, 1]).toString(10));
 
     const accountLeaf: OnchainAccountLeaf = {
       accountID: account.accountId,
       owner: account.owner,
       pubKeyX: account.publicKeyX,
       pubKeyY: account.publicKeyY,
-      nonce: account.nonce,
-      feeBipsAMM: account.feeBipsAMM
+      nonce: account.nonce
+      // storageRoot:
+      //   account.storageTree !== undefined
+      //     ? account.storageTree.getRoot()
+      //     : storageTree.getRoot()
     };
     const balanceLeaf: OnchainBalanceLeaf = {
       tokenID,
-      balance: account.getBalance(tokenID).balance.toString(10),
-      weightAMM: account.getBalance(tokenID).weightAMM.toString(10),
-      storageRoot:
-        account.getBalance(tokenID).storageTree !== undefined
-          ? account.getBalance(tokenID).storageTree.getRoot()
-          : storageTree.getRoot()
+      balance: account.getBalance(tokenID).balance.toString(10)
+      // storageRoot:
+      //   account.getBalance(tokenID).storageTree !== undefined
+      //     ? account.getBalance(tokenID).storageTree.getRoot()
+      //     : storageTree.getRoot()
     };
     const withdrawFromMerkleTreeData: WithdrawFromMerkleTreeData = {
       accountLeaf,
@@ -698,7 +864,12 @@ export class ExchangeV3 {
         }
 
         const merkleRoot = bs.extractUint(20 + 32).toString(10);
-        // console.log("merkleRoot: " + merkleRoot);
+        console.log("processBlockSubmitted merkleRoot: " + merkleRoot);
+
+        const merkleAssetRoot = bs.extractUint(20 + 32 + 32 + 32).toString(10);
+        console.log(
+          "processBlockSubmitted merkleAssetRoot: " + merkleAssetRoot
+        );
 
         // Get the previous block
         const lastBlock = this.blocks[this.blocks.length - 1];
@@ -720,6 +891,7 @@ export class ExchangeV3 {
           blockFee: new BN(event.returnValues.blockFee),
 
           merkleRoot,
+          merkleAssetRoot,
 
           timestamp,
 
@@ -822,13 +994,11 @@ export class ExchangeV3 {
   }
 
   private async processProtocolFeesUpdated(event: any) {
-    this.protocolFees.takerFeeBips = parseInt(event.returnValues.takerFeeBips);
-    this.protocolFees.makerFeeBips = parseInt(event.returnValues.makerFeeBips);
-    this.protocolFees.previousTakerFeeBips = parseInt(
-      event.returnValues.previousTakerFeeBips
+    this.protocolFees.protocolFeeBips = parseInt(
+      event.returnValues.protocolFeeBips
     );
-    this.protocolFees.previousMakerFeeBips = parseInt(
-      event.returnValues.previousMakerFeeBips
+    this.protocolFees.previousProtocolFeeBips = parseInt(
+      event.returnValues.previousProtocolFeeBips
     );
   }
 
@@ -841,29 +1011,37 @@ export class ExchangeV3 {
   private processBlock(block: Block) {
     let requests: any[] = [];
 
+    console.log("processBlock: ", block.data);
+
     let data = new Bitstream(block.data);
     let offset = 0;
 
-    // General data
-    offset += 20 + 32 + 32 + 4;
-    const protocolFeeTakerBips = data.extractUint8(offset);
+    // General data( exchange + merkleRootBefore + merkleRootAfter + merkleAssetRootBefore + merkleAssetRootAfter + timestamp)
+    offset += 20 + 32 + 32 + 32 + 32 + 4;
+    const protocolFeeBips = data.extractUint8(offset);
     offset += 1;
-    const protocolFeeMakerBips = data.extractUint8(offset);
-    offset += 1;
+
     const numConditionalTransactions = data.extractUint32(offset);
     offset += 4;
     const operatorAccountID = data.extractUint32(offset);
     offset += 4;
 
+    const depositSize = data.extractUint16(offset);
+    offset += 2; // depositSize
+    const accountUpdateSize = data.extractUint16(offset);
+    offset += 2; // accountUpdateSize
+    const withdrawSize = data.extractUint16(offset);
+    offset += 2; // withdrawSize
+
     const ctx: BlockContext = {
-      protocolFeeTakerBips,
-      protocolFeeMakerBips,
+      protocolFeeBips,
       operatorAccountID
     };
 
     for (let i = 0; i < block.blockSize; i++) {
-      const size1 = 29;
-      const size2 = 39;
+      const size1 = Constants.TX_DATA_AVAILABILITY_SIZE_PART_1;
+      const size2 = Constants.TX_DATA_AVAILABILITY_SIZE_PART_2;
+
       const txData1 = data.extractData(offset + i * size1, size1);
       const txData2 = data.extractData(
         offset + block.blockSize * size1 + i * size2,
@@ -871,7 +1049,23 @@ export class ExchangeV3 {
       );
       const txData = new Bitstream(txData1 + txData2);
 
-      const txType = txData.extractUint8(0);
+      let txType = TransactionType.NOOP;
+      if (i < depositSize) {
+        txType = TransactionType.DEPOSIT;
+      } else if (i < depositSize + accountUpdateSize) {
+        txType = TransactionType.ACCOUNT_UPDATE;
+      } else if (i < block.blockSize - withdrawSize) {
+        // extract tx type
+        let dataInString = txData.getData();
+        let txTypeString = dataInString.slice(0, 3);
+        txType = parseInt(txTypeString, 16);
+      } else {
+        txType = TransactionType.WITHDRAWAL;
+      }
+
+      // const txType = txData.extractUint8(0);
+      console.log("txType:", txType);
+      console.log("txData", txData.getData());
 
       let request: any;
       if (txType === TransactionType.NOOP) {
@@ -880,20 +1074,19 @@ export class ExchangeV3 {
         request = DepositProcessor.process(this.state, ctx, txData);
       } else if (txType === TransactionType.SPOT_TRADE) {
         request = SpotTradeProcessor.process(this.state, ctx, txData);
+      } else if (txType === TransactionType.BATCH_SPOT_TRADE) {
+        request = BatchSpotTradeProcessor.process(this.state, ctx, txData);
       } else if (txType === TransactionType.TRANSFER) {
         request = TransferProcessor.process(this.state, ctx, txData);
       } else if (txType === TransactionType.WITHDRAWAL) {
         request = WithdrawalProcessor.process(this.state, ctx, txData);
       } else if (txType === TransactionType.ACCOUNT_UPDATE) {
         request = AccountUpdateProcessor.process(this.state, ctx, txData);
-      } else if (txType === TransactionType.AMM_UPDATE) {
-        request = AmmUpdateProcessor.process(this.state, ctx, txData);
-      } else if (txType === TransactionType.SIGNATURE_VERIFICATION) {
-        request = SignatureVerificationProcessor.process(
-          this.state,
-          ctx,
-          txData
-        );
+      } else if (txType == TransactionType.ORDER_CANCEL) {
+        // DEG-146:order cancel
+        request = OrderCancelProcessor.process(this.state, ctx, txData);
+      } else if (txType === TransactionType.APPKEY_UPDATE) {
+        request = AppKeyUpdateProcessor.process(this.state, ctx, txData);
       } else {
         assert(false, "unknown transaction type: " + txType);
       }

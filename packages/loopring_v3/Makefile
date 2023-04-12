@@ -2,8 +2,12 @@ ROOT_DIR := $(shell dirname $(realpath $(MAKEFILE_LIST)))
 PYTHON=python3
 
 # CMAKE_TYPE := cmake-release
-CMAKE_TYPE := cmake-openmp-performance
-#CMAKE_TYPE := cmake-openmp-debug
+# CMAKE_TYPE := cmake-openmp-performance
+CMAKE_TYPE := cmake-openmp-debug
+
+ifeq ($(ZKP_WORKER_MODE), 1)
+    CMAKE_TYPE := cmake-openmp-release
+endif
 
 ifeq ($(OS),Windows_NT)
 	detected_OS := Windows
@@ -16,7 +20,7 @@ else
 		export LIBRARY_PATH := /usr/local/opt/gmp/lib:$(LIBRARY_PATH)
 		export CPATH := /usr/local/opt/openssl/include:/usr/local/opt/gmp/include:/usr/local/opt/boost/include:$(CPATH)
 		export PKG_CONFIG_PATH := /usr/local/opt/openssl/lib/pkgconfig:$(PKG_CONFIG_PATH)
-		CMAKE_TYPE := cmake-release
+		CMAKE_TYPE := cmake-openmp-debug
 	else
 		DLL_EXT := .so
 	endif
@@ -35,13 +39,13 @@ cmake-debug:
 	mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug ..
 
 cmake-release:
-	mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release ..
+	mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DZKP_WORKER_MODE=1 ..
 
 cmake-openmp-debug:
-	mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug -DMULTICORE=1 ..
+	mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug ..
 
 cmake-openmp-release:
-	mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DMULTICORE=1 ..
+	mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DMULTICORE=1 -DZKP_WORKER_MODE=1 ..
 
 cmake-openmp-performance:
 	mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DMULTICORE=1 -DPERFORMANCE=1 ..

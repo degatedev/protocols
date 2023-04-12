@@ -14,13 +14,17 @@ export enum BlockType {
  */
 export enum TransactionType {
   NOOP = 0,
-  DEPOSIT,
-  WITHDRAWAL,
   TRANSFER,
   SPOT_TRADE,
+  // DEG-146:order cancel
+  ORDER_CANCEL,
+  // // DEG-170 auto market - config add
+  // AUTO_MARKET_UPDATE
+  APPKEY_UPDATE,
+  BATCH_SPOT_TRADE,
+  DEPOSIT,
   ACCOUNT_UPDATE,
-  AMM_UPDATE,
-  SIGNATURE_VERIFICATION
+  WITHDRAWAL
 }
 
 /**
@@ -63,6 +67,9 @@ export interface Block {
 
   /** The Merkle root of the Merkle tree after doing all requests in the block. */
   merkleRoot: string;
+
+  /** The Merkle root of the Merkle Asset tree after doing all requests in the block. */
+  merkleAssetRoot: string;
 
   /** The time the block was submitted. */
   timestamp: number;
@@ -278,12 +285,6 @@ export interface Storage {
 export interface Balance {
   /** How amount of tokens the account owner has for a token. */
   balance: BN;
-  /** The weight of the token for AMM. */
-  weightAMM: BN;
-  /** The storage. */
-  storage: { [key: number]: Storage };
-
-  storageTree?: SparseMerkleTree;
 }
 
 /**
@@ -303,8 +304,6 @@ export interface Account {
   publicKeyY: string;
   /** The nonce value of the account. */
   nonce: number;
-  /** The fee received for AMM. */
-  feeBipsAMM: number;
 
   balancesMerkleTree?: SparseMerkleTree;
 }
@@ -316,14 +315,11 @@ export interface ProtocolFees {
   /** The exchange with these fees. */
   exchange: string;
 
-  /** The fee charged (in bips of amount bought) for taker orders. */
-  takerFeeBips: number;
-  /** The fee charged (in bips of amount bought) for maker orders. */
-  makerFeeBips: number;
-  /** The previous fee charged (in bips of amount bought) for taker orders. */
-  previousTakerFeeBips: number;
-  /** The previous fee charged (in bips of amount bought) for maker orders. */
-  previousMakerFeeBips: number;
+  /** The fee charged (in bips of amount bought) for orders. */
+  protocolFeeBips: number;
+
+  /** The previous fee charged (in bips of amount bought) for orders. */
+  previousProtocolFeeBips: number;
 }
 
 /**
@@ -340,18 +336,15 @@ export interface OnchainAccountLeaf {
   pubKeyY: string;
   /** The current nonce value of the account. */
   nonce: number;
-  /** The fee received for AMM. */
-  feeBipsAMM: number;
+  // storageRoot: string;
 }
 export interface OnchainBalanceLeaf {
   /** The ID of the token. */
   tokenID: number;
   /** The current balance the account has for the requested token. */
   balance: string;
-  /** The weight of the token for AMM. */
-  weightAMM: string;
-  /** The storage root of the balance leaf. */
-  storageRoot: string;
+  // /** The storage root of the balance leaf. */
+  // storageRoot: string;
 }
 export interface WithdrawFromMerkleTreeData {
   /** The account leaf. */
@@ -390,43 +383,51 @@ export interface Signature {
 export class StorageLeaf implements Storage {
   data: BN;
   storageID: number;
+  gasFee: number;
+  cancelled: number;
+  tokenSID: number;
+  tokenBID: number;
+  forward: number;
 
+  // #trading fegas feegas
+  // # DEG-146:order cancel
   constructor() {
     this.data = new BN(0);
     this.storageID = 0;
+    this.gasFee = 0;
+    this.cancelled = 0;
+    this.tokenSID = 0;
+    this.tokenBID = 0;
+    this.forward = 1; // default 1?
   }
 }
 
 export class BalanceLeaf implements Balance {
   balance: BN;
-  weightAMM: BN;
-  storage: { [key: number]: StorageLeaf };
+  // storage: { [key: number]: StorageLeaf };
 
-  storageTree?: SparseMerkleTree;
+  // storageTree?: SparseMerkleTree;
 
   constructor() {
     this.balance = new BN(0);
-    this.weightAMM = new BN(0);
-    this.storage = {};
+    // this.storage = {};
   }
 
   public init(
-    balance: BN,
-    weightAMM: BN,
-    storage: { [key: number]: StorageLeaf }
+    balance: BN
+    // storage: { [key: number]: StorageLeaf }
   ) {
     this.balance = new BN(balance.toString(10));
-    this.weightAMM = new BN(weightAMM.toString(10));
-    this.storage = storage;
+    // this.storage = storage;
   }
 
-  public getStorage(storageID: number) {
-    const address = storageID % 2 ** Constants.BINARY_TREE_DEPTH_STORAGE;
-    if (this.storage[address] === undefined) {
-      this.storage[address] = new StorageLeaf();
-    }
-    return this.storage[address];
-  }
+  // public getStorage(storageID: number) {
+  //   const address = storageID % 2 ** Constants.BINARY_TREE_DEPTH_STORAGE;
+  //   if (this.storage[address] === undefined) {
+  //     this.storage[address] = new StorageLeaf();
+  //   }
+  //   return this.storage[address];
+  // }
 }
 
 export class AccountLeaf implements Account {
@@ -436,11 +437,21 @@ export class AccountLeaf implements Account {
   owner: string;
   publicKeyX: string;
   publicKeyY: string;
+  appKeyPublicKeyX: string;
+  appKeyPublicKeyY: string;
+
+  disableAppKeySpotTrade: number;
+  disableAppKeyWithdraw: number;
+  disableAppKeyTransferToOther: number;
+
   nonce: number;
-  feeBipsAMM: number;
   balances: { [key: number]: BalanceLeaf };
 
   balancesMerkleTree?: SparseMerkleTree;
+
+  storage: { [key: number]: StorageLeaf };
+
+  storageTree?: SparseMerkleTree;
 
   constructor(accountId: number) {
     this.exchange = Constants.zeroAddress;
@@ -448,27 +459,36 @@ export class AccountLeaf implements Account {
     this.owner = Constants.zeroAddress;
     this.publicKeyX = "0";
     this.publicKeyY = "0";
+    this.appKeyPublicKeyX = "0";
+    this.appKeyPublicKeyY = "0";
+    this.disableAppKeySpotTrade = 0;
+    this.disableAppKeyWithdraw = 0;
+    this.disableAppKeyTransferToOther = 0;
     this.nonce = 0;
-    this.feeBipsAMM = 0;
     this.balances = {};
+    this.storage = {};
   }
 
   public init(
     owner: string,
     publicKeyX: string,
     publicKeyY: string,
+    appKeyPublicKeyX: string,
+    appKeyPublicKeyY: string,
     nonce: number,
-    feeBipsAMM: number,
-    balances: { [key: number]: BalanceLeaf } = {}
+    balances: { [key: number]: BalanceLeaf } = {},
+    storage: { [key: number]: StorageLeaf } = {}
   ) {
     this.exchange = Constants.zeroAddress;
     this.accountId = 0;
     this.owner = owner;
     this.publicKeyX = publicKeyX;
     this.publicKeyY = publicKeyY;
+    this.appKeyPublicKeyX = appKeyPublicKeyX;
+    this.appKeyPublicKeyY = appKeyPublicKeyY;
     this.nonce = nonce;
-    this.feeBipsAMM = feeBipsAMM;
     this.balances = balances;
+    this.storage = storage;
   }
 
   public getBalance(tokenID: number) {
@@ -476,6 +496,14 @@ export class AccountLeaf implements Account {
       this.balances[tokenID] = new BalanceLeaf();
     }
     return this.balances[tokenID];
+  }
+
+  public getStorage(storageID: number) {
+    const address = storageID % 2 ** Constants.BINARY_TREE_DEPTH_STORAGE;
+    if (this.storage[address] === undefined) {
+      this.storage[address] = new StorageLeaf();
+    }
+    return this.storage[address];
   }
 }
 
@@ -516,7 +544,6 @@ export class ExchangeState {
 }
 
 export interface BlockContext {
-  protocolFeeTakerBips: number;
-  protocolFeeMakerBips: number;
+  protocolFeeBips: number;
   operatorAccountID: number;
 }

@@ -16,7 +16,7 @@ import "./ILoopringV3.sol";
 /// @author Brecht Devos - <brecht@loopring.org>
 library ExchangeData
 {
-    // -- Enums --
+    // -- Enums -- types.ts
     enum TransactionType
     {
         NOOP,
@@ -25,8 +25,9 @@ library ExchangeData
         TRANSFER,
         SPOT_TRADE,
         ACCOUNT_UPDATE,
-        AMM_UPDATE,
-        SIGNATURE_VERIFICATION
+        ORDER_CANCEL, 
+        BATCH_SPOT_TRADE,
+        APPKEY_UPDATE
     }
 
     // -- Structs --
@@ -38,17 +39,15 @@ library ExchangeData
     struct ProtocolFeeData
     {
         uint32 syncedAt; // only valid before 2105 (85 years to go)
-        uint8  takerFeeBips;
-        uint8  makerFeeBips;
-        uint8  previousTakerFeeBips;
-        uint8  previousMakerFeeBips;
+        uint8  protocolFeeBips;
+        uint8  previousProtocolFeeBips;
     }
 
     // General auxiliary data for each conditional transaction
     struct AuxiliaryData
     {
-        uint  txIndex;
-        bool  approved;
+        // uint  txIndex;
+        // bool  approved;
         bytes data;
     }
 
@@ -86,7 +85,7 @@ library ExchangeData
     // Represents an onchain deposit request.
     struct Deposit
     {
-        uint96 amount;
+        uint248 amount;
         uint64 timestamp;
     }
 
@@ -111,6 +110,7 @@ library ExchangeData
         uint MIN_TIME_IN_SHUTDOWN;
         uint TX_DATA_AVAILABILITY_SIZE;
         uint MAX_AGE_DEPOSIT_UNTIL_WITHDRAWABLE_UPPERBOUND;
+        uint MAX_FORCED_WITHDRAWAL_FEE;
     }
 
     // This is the prime number that is used for the alt_bn128 elliptic curve, see EIP-196.
@@ -119,8 +119,17 @@ library ExchangeData
     uint public constant MAX_OPEN_FORCED_REQUESTS = 4096;
     uint public constant MAX_AGE_FORCED_REQUEST_UNTIL_WITHDRAW_MODE = 15 days;
     uint public constant TIMESTAMP_HALF_WINDOW_SIZE_IN_SECONDS = 7 days;
-    uint public constant MAX_NUM_ACCOUNTS = 2 ** 32;
-    uint public constant MAX_NUM_TOKENS = 2 ** 16;
+    
+    uint public constant BINARY_TREE_DEPTH_ACCOUNTS = 32;
+    uint public constant MAX_NUM_ACCOUNTS = 2 ** BINARY_TREE_DEPTH_ACCOUNTS;
+    // DEG token deep to 16
+    // uint public constant MAX_NUM_TOKENS = 2 ** 16;
+    uint public constant BINARY_TREE_DEPTH_TOKENS = 32;
+    uint public constant MAX_NUM_TOKENS = 2 ** BINARY_TREE_DEPTH_TOKENS;
+    uint public constant MAX_NUM_RESERVED_TOKENS = 32;
+    uint public constant MAX_NUM_NORMAL_TOKENS = 2 ** BINARY_TREE_DEPTH_TOKENS - 32;
+
+
     uint public constant MIN_AGE_PROTOCOL_FEES_UNTIL_UPDATED = 7 days;
     uint public constant MIN_TIME_IN_SHUTDOWN = 30 days;
     // The amount of bytes each rollup transaction uses in the block data for data-availability.
@@ -128,9 +137,13 @@ library ExchangeData
     uint32 public constant MAX_AGE_DEPOSIT_UNTIL_WITHDRAWABLE_UPPERBOUND = 15 days;
     uint32 public constant ACCOUNTID_PROTOCOLFEE = 0;
 
-    uint public constant TX_DATA_AVAILABILITY_SIZE = 68;
-    uint public constant TX_DATA_AVAILABILITY_SIZE_PART_1 = 29;
-    uint public constant TX_DATA_AVAILABILITY_SIZE_PART_2 = 39;
+    uint public constant TX_DATA_AVAILABILITY_SIZE = 83;
+    
+
+    uint public constant TX_DATA_AVAILABILITY_SIZE_PART_1 = 80;
+    uint public constant TX_DATA_AVAILABILITY_SIZE_PART_2 = 3;
+
+    uint public constant MAX_FORCED_WITHDRAWAL_FEE = 0.25 ether;
 
     struct AccountLeaf
     {
@@ -138,16 +151,16 @@ library ExchangeData
         address  owner;
         uint     pubKeyX;
         uint     pubKeyY;
+        // uint     appKeyPubKeyX;
+        // uint     appKeyPubKeyY;
         uint32   nonce;
-        uint     feeBipsAMM;
+        // uint     storageRoot;
     }
 
     struct BalanceLeaf
     {
-        uint16   tokenID;
-        uint96   balance;
-        uint96   weightAMM;
-        uint     storageRoot;
+        uint32   tokenID;
+        uint248   balance;
     }
 
     struct MerkleProof
@@ -155,7 +168,7 @@ library ExchangeData
         ExchangeData.AccountLeaf accountLeaf;
         ExchangeData.BalanceLeaf balanceLeaf;
         uint[48]                 accountMerkleProof;
-        uint[24]                 balanceMerkleProof;
+        uint[48]                 balanceMerkleProof;
     }
 
     struct BlockContext
@@ -164,6 +177,22 @@ library ExchangeData
         uint32  timestamp;
     }
 
+   struct DepositState {
+        uint256 freeDepositMax;
+        uint256 freeDepositRemained;
+        uint256 lastDepositBlockNum;
+        uint256 freeSlotPerBlock;
+        uint256 depositFee;
+    }
+
+    struct ModeTime {
+        // Time when the exchange was shutdown
+        uint shutdownModeStartTime;
+
+        // Time when the exchange has entered withdrawal mode
+        uint withdrawalModeStartTime;
+    }
+    
     // Represents the entire exchange state except the owner of the exchange.
     struct State
     {
@@ -174,40 +203,45 @@ library ExchangeData
         IBlockVerifier   blockVerifier;
         IAgentRegistry   agentRegistry;
         IDepositContract depositContract;
-
-
+        DepositState depositState;
         // The merkle root of the offchain data stored in a Merkle tree. The Merkle tree
         // stores balances for users using an account model.
         bytes32 merkleRoot;
+        bytes32 merkleAssetRoot;
 
         // List of all blocks
         mapping(uint => BlockInfo) blocks;
         uint  numBlocks;
 
         // List of all tokens
-        Token[] tokens;
+        Token[] reservedTokens;
+        Token[] normalTokens;
+
+        // A map from a tokenID to deposit balance
+        mapping(uint32 => uint248) tokenIdToDepositBalance;  
 
         // A map from a token to its tokenID + 1
-        mapping (address => uint16) tokenToTokenId;
+        mapping (address => uint32) tokenToTokenId;
+        mapping (uint32 => address) tokenIdToToken;
 
         // A map from an accountID to a tokenID to if the balance is withdrawn
-        mapping (uint32 => mapping (uint16 => bool)) withdrawnInWithdrawMode;
+        mapping (uint32 => mapping (uint32 => bool)) withdrawnInWithdrawMode;
 
         // A map from an account to a token to the amount withdrawable for that account.
         // This is only used when the automatic distribution of the withdrawal failed.
-        mapping (address => mapping (uint16 => uint)) amountWithdrawable;
+        mapping (address => mapping (uint32 => uint248)) amountWithdrawable;
 
         // A map from an account to a token to the forced withdrawal (always full balance)
-        mapping (uint32 => mapping (uint16 => ForcedWithdrawal)) pendingForcedWithdrawals;
+        mapping (uint32 => mapping (uint32 => ForcedWithdrawal)) pendingForcedWithdrawals;
 
         // A map from an address to a token to a deposit
-        mapping (address => mapping (uint16 => Deposit)) pendingDeposits;
+        mapping (address => mapping (uint32 => Deposit)) pendingDeposits;
 
         // A map from an account owner to an approved transaction hash to if the transaction is approved or not
         mapping (address => mapping (bytes32 => bool)) approvedTx;
 
         // A map from an account owner to a destination address to a tokenID to an amount to a storageID to a new recipient address
-        mapping (address => mapping (address => mapping (uint16 => mapping (uint => mapping (uint32 => address))))) withdrawalRecipient;
+        mapping (address => mapping (address => mapping (uint32 => mapping (uint => mapping (uint32 => address))))) withdrawalRecipient;
 
 
         // Counter to keep track of how many of forced requests are open so we can limit the work that needs to be done by the owner
@@ -216,11 +250,7 @@ library ExchangeData
         // Cached data for the protocol fee
         ProtocolFeeData protocolFeeData;
 
-        // Time when the exchange was shutdown
-        uint shutdownModeStartTime;
-
-        // Time when the exchange has entered withdrawal mode
-        uint withdrawalModeStartTime;
+        ModeTime modeTime;
 
         // Last time the protocol fee was withdrawn for a specific token
         mapping (address => uint) protocolFeeLastWithdrawnTime;

@@ -18,36 +18,79 @@ namespace Loopring
 
 struct StorageState
 {
+    // DEG-347 Storage move
+    VariableT tokenSID;
+    VariableT tokenBID;
     VariableT data;
     VariableT storageID;
+    // split trading fee and gas fee - add up gas
+    VariableT gasFee;
+    // DEG-146:order cancel
+    VariableT cancelled;
+    // DEG-347 Storage move
+    VariableT forward;
 };
 
 static void printStorage(const ProtoboardT &pb, const StorageState &state)
 {
+    // DEG-347 Storage move
+    std::cout << "- tokenSID: " << pb.val(state.tokenSID) << std::endl;
+    std::cout << "- tokenBID: " << pb.val(state.tokenBID) << std::endl;
     std::cout << "- data: " << pb.val(state.data) << std::endl;
     std::cout << "- storageID: " << pb.val(state.storageID) << std::endl;
+    // split trading fee and gas fee - add up gas
+    std::cout << "- gasFee: " << pb.val(state.gasFee) << std::endl;
+    // DEG-146:order cancel
+    std::cout << "- cancelled: " << pb.val(state.cancelled) << std::endl;
+    // DEG-347 Storage move
+    std::cout << "- forward: " << pb.val(state.forward) << std::endl;
 }
 
 class StorageGadget : public GadgetT
 {
   public:
+    // DEG-347 Storage move
+    VariableT tokenSID;
+    VariableT tokenBID;
     VariableT data;
     VariableT storageID;
+    // split trading fee and gas fee - add up gas
+    VariableT gasFee;
+    // DEG-146:order cancel
+    VariableT cancelled;
+    // DEG-347 Storage move
+    VariableT forward;
 
     StorageGadget( //
       ProtoboardT &pb,
       const std::string &prefix)
         : GadgetT(pb, prefix),
-
+          // DEG-347 Storage move
+          tokenSID(make_variable(pb, FMT(prefix, ".tokenSID"))),
+          tokenBID(make_variable(pb, FMT(prefix, ".tokenBID"))),
           data(make_variable(pb, FMT(prefix, ".data"))),
-          storageID(make_variable(pb, FMT(prefix, ".storageID")))
+          storageID(make_variable(pb, FMT(prefix, ".storageID"))),
+          // split trading fee and gas fee - add up gas
+          gasFee(make_variable(pb, FMT(prefix, ".gasFee"))),
+          // DEG-146:order cancel
+          cancelled(make_variable(pb, FMT(prefix, ".cancelled"))),
+          // DEG-347 Storage move
+          forward(make_variable(pb, FMT(prefix, ".forward")))
     {
     }
 
     void generate_r1cs_witness(const StorageLeaf &storageLeaf)
     {
+        pb.val(tokenSID) = storageLeaf.tokenSID;
+        pb.val(tokenBID) = storageLeaf.tokenBID;
         pb.val(data) = storageLeaf.data;
         pb.val(storageID) = storageLeaf.storageID;
+        // split trading fee and gas fee - add up gas
+        pb.val(gasFee) = storageLeaf.gasFee;
+        // DEG-146:order cancel
+        pb.val(cancelled) = storageLeaf.cancelled;
+        pb.val(forward) = storageLeaf.forward;
+        std::cout << "in StorageGadget: data =========:" << pb.val(data) << std::endl;
     }
 };
 
@@ -76,8 +119,15 @@ class UpdateStorageGadget : public GadgetT
           valuesBefore(before),
           valuesAfter(after),
 
-          leafBefore(pb, var_array({before.data, before.storageID}), FMT(prefix, ".leafBefore")),
-          leafAfter(pb, var_array({after.data, after.storageID}), FMT(prefix, ".leafAfter")),
+          // split trading fee and gas fee - add up gas
+          // DEG-146:order cancel
+          // DEG-347 Storage move
+          leafBefore(pb, 
+          var_array({before.tokenSID, before.tokenBID, before.data, before.storageID, before.gasFee, before.cancelled, before.forward}), 
+          FMT(prefix, ".leafBefore")),
+          leafAfter(pb, 
+          var_array({after.tokenSID, after.tokenBID, after.data, after.storageID, after.gasFee, after.cancelled, after.forward}), 
+          FMT(prefix, ".leafAfter")),
 
           proof(make_var_array(pb, TREE_DEPTH_STORAGE * 3, FMT(prefix, ".proof"))),
           proofVerifierBefore(
@@ -90,10 +140,28 @@ class UpdateStorageGadget : public GadgetT
             FMT(prefix, ".pathBefore")),
           rootCalculatorAfter(pb, TREE_DEPTH_STORAGE, slotID, leafAfter.result(), proof, FMT(prefix, ".pathAfter"))
     {
+        std::cout << "in UpdateStorageGadget" << std::endl;
     }
 
     void generate_r1cs_witness(const StorageUpdate &update)
     {
+        std::cout << "in storage update: json data before:" << std::endl;
+        std::cout << "in storage update: == storageID:" << update.before.storageID << std::endl;
+        std::cout << "in storage update: == TokenSID:" << update.before.tokenSID << std::endl;
+        std::cout << "in storage update: == tokenBID:" << update.before.tokenBID << std::endl;
+        std::cout << "in storage update: == data:" << update.before.data << std::endl;
+        std::cout << "in storage update: == gasFee:" << update.before.gasFee << std::endl;
+        std::cout << "in storage update: == cancelled:" << update.before.cancelled << std::endl;
+        std::cout << "in storage update: == forward:" << update.before.forward << std::endl;
+
+        std::cout << "in storage update: json data after:" << std::endl;
+        std::cout << "in storage update: == storageID:" << update.after.storageID << std::endl;
+        std::cout << "in storage update: == TokenSID:" << update.after.tokenSID << std::endl;
+        std::cout << "in storage update: == tokenBID:" << update.after.tokenBID << std::endl;
+        std::cout << "in storage update: == data:" << update.after.data << std::endl;
+        std::cout << "in storage update: == gasFee:" << update.after.gasFee << std::endl;
+        std::cout << "in storage update: == cancelled:" << update.after.cancelled << std::endl;
+        std::cout << "in storage update: == forward:" << update.after.forward << std::endl;
         leafBefore.generate_r1cs_witness();
         leafAfter.generate_r1cs_witness();
 
@@ -132,7 +200,14 @@ class StorageReaderGadget : public GadgetT
     LeqGadget storageID_leq_leafStorageID;
     IfThenRequireGadget requireValidStorageID;
 
+    TernaryGadget tokenSID;
+    TernaryGadget tokenBID;
     TernaryGadget data;
+    // split trading fee and gas fee - add up gas
+    TernaryGadget gasFee;
+    // DEG-146:order cancel
+    TernaryGadget cancelled;
+    TernaryGadget forward;
 
   public:
     StorageReaderGadget(
@@ -152,7 +227,15 @@ class StorageReaderGadget : public GadgetT
             FMT(prefix, ".storageID_leq_leafStorageID")),
           requireValidStorageID(pb, verify, storageID_leq_leafStorageID.gte(), FMT(prefix, ".requireValidStorageID")),
 
-          data(pb, storageID_leq_leafStorageID.eq(), storage.data, constants._0, FMT(prefix, ".data"))
+          tokenSID(pb, storageID_leq_leafStorageID.eq(), storage.tokenSID, constants._0, FMT(prefix, ".tokenSID")),
+          tokenBID(pb, storageID_leq_leafStorageID.eq(), storage.tokenBID, constants._0, FMT(prefix, ".tokenBID")),
+          data(pb, storageID_leq_leafStorageID.eq(), storage.data, constants._0, FMT(prefix, ".data")),
+          // split trading fee and gas fee - add up gas
+          gasFee(pb, storageID_leq_leafStorageID.eq(), storage.gasFee, constants._0, FMT(prefix, ".gasFee")),
+          // DEG-146:order cancel
+          cancelled(pb, storageID_leq_leafStorageID.eq(), storage.cancelled, constants._0, FMT(prefix, ".cancelled")),
+
+          forward(pb, storageID_leq_leafStorageID.eq(), storage.forward, constants._1, FMT(prefix, ".forward"))
     {
     }
 
@@ -161,7 +244,17 @@ class StorageReaderGadget : public GadgetT
         storageID_leq_leafStorageID.generate_r1cs_witness();
         requireValidStorageID.generate_r1cs_witness();
 
+        tokenSID.generate_r1cs_witness();
+        tokenBID.generate_r1cs_witness();
         data.generate_r1cs_witness();
+        // split trading fee and gas fee - add up gas
+        gasFee.generate_r1cs_witness();
+        // DEG-146:order cancel
+        cancelled.generate_r1cs_witness();
+        forward.generate_r1cs_witness();
+        LOG(LogDebug, "in StorageReaderGadget:cancelled", pb.val(cancelled.result()))
+        std::cout << "in StorageReaderGadget: data:" << pb.val(data.result()) << std::endl;
+        std::cout << "in StorageReaderGadget: forward:" << pb.val(forward.result()) << std::endl;
     }
 
     void generate_r1cs_constraints()
@@ -169,12 +262,84 @@ class StorageReaderGadget : public GadgetT
         storageID_leq_leafStorageID.generate_r1cs_constraints();
         requireValidStorageID.generate_r1cs_constraints();
 
+        tokenSID.generate_r1cs_constraints();
+        tokenBID.generate_r1cs_constraints();
         data.generate_r1cs_constraints();
+        // split trading fee and gas fee - add up gas
+        gasFee.generate_r1cs_constraints();
+        // DEG-146:order cancel
+        cancelled.generate_r1cs_constraints();
+        forward.generate_r1cs_constraints();
+    }
+
+    const VariableT &getTokenSID() const
+    {
+        return tokenSID.result();
+    }
+
+    const VariableT &getTokenBID() const
+    {
+        return tokenBID.result();
     }
 
     const VariableT &getData() const
     {
+        std::cout << "in StorageReaderGadget: in getData:" << pb.val(data.result()) << std::endl;
         return data.result();
+    }
+    // split trading fee and gas fee - add up gas
+    const VariableT &getGasFee() const
+    {
+        return gasFee.result();
+    }
+    // DEG-146:order cancel
+    const VariableT &getCancelled() const
+    {
+        return cancelled.result();
+    }
+    const VariableT &getForward() const
+    {
+        return forward.result();
+    }
+};
+// If it is a new order from automarket, the data and gasfee need to be reset to 0, and the cancelled field remains unchanged. 
+// If it is cancelled, it cannot be traded
+class StorageReaderForAutoMarketGadget : public GadgetT 
+{
+  public:
+    TernaryGadget data;
+    TernaryGadget gasFee;
+    StorageReaderForAutoMarketGadget(
+      ProtoboardT &pb,
+      const Constants &_constants,
+      const StorageReaderGadget &storage,
+      const VariableT &isNewOrder,
+      const std::string &prefix)
+        : GadgetT(pb, prefix),
+          data(pb, isNewOrder, _constants._0, storage.getData(), FMT(prefix, ".data")),
+          gasFee(pb, isNewOrder, _constants._0, storage.getGasFee(), FMT(prefix, ".gasFee"))
+    {
+
+    }
+    void generate_r1cs_witness()
+    {
+        data.generate_r1cs_witness();
+        gasFee.generate_r1cs_witness();
+    }
+
+    void generate_r1cs_constraints()
+    {
+        data.generate_r1cs_constraints();
+        gasFee.generate_r1cs_constraints();
+    }
+    const VariableT &getData() const
+    {
+        return data.result();
+    }
+    // split trading fee and gas fee - add up gas
+    const VariableT &getGasFee() const
+    {
+        return gasFee.result();
     }
 };
 
@@ -184,7 +349,14 @@ class NonceGadget : public GadgetT
     const DualVariableGadget &storageID;
 
     StorageReaderGadget storageReader;
+    IfThenRequireEqualGadget requireTokenSIDZero;
+    IfThenRequireEqualGadget requireTokenBIDZero;
     IfThenRequireEqualGadget requireDataZero;
+    // DEG-148 Review fix
+    IfThenRequireEqualGadget requireGasFeeZero;
+    IfThenRequireEqualGadget requireCancelledZero;
+    IfThenRequireEqualGadget requireForwardOne;
+
 
   public:
     NonceGadget(
@@ -200,23 +372,91 @@ class NonceGadget : public GadgetT
           storageID(_storageID),
 
           storageReader(pb, constants, storage, storageID, verify, FMT(prefix, ".storageReader")),
-          requireDataZero(pb, verify, storageReader.getData(), constants._0, FMT(prefix, ".requireDataZero"))
+          requireTokenSIDZero(pb, verify, storageReader.getTokenSID(), constants._0, FMT(prefix, ".requireTokenSIDZero")),
+          requireTokenBIDZero(pb, verify, storageReader.getTokenBID(), constants._0, FMT(prefix, ".requireTokenBIDZero")),
+          // DEG-148 Review fix
+          requireGasFeeZero(pb, verify, storageReader.getGasFee(), constants._0, FMT(prefix, ".requireGasFeeZero")),
+          requireCancelledZero(pb, verify, storageReader.getCancelled(), constants._0, FMT(prefix, ".requireCancelledZero")),
+          requireDataZero(pb, verify, storageReader.getData(), constants._0, FMT(prefix, ".requireDataZero")),
+          requireForwardOne(pb, verify, storageReader.getForward(), constants._1, FMT(prefix, ".requireForwardOne"))
     {
     }
 
     void generate_r1cs_witness()
     {
         storageReader.generate_r1cs_witness();
+        requireTokenSIDZero.generate_r1cs_witness();
+        requireTokenBIDZero.generate_r1cs_witness();
+        // DEG-148 Review fix
+        requireGasFeeZero.generate_r1cs_witness();
+        requireCancelledZero.generate_r1cs_witness();
         requireDataZero.generate_r1cs_witness();
+        requireForwardOne.generate_r1cs_witness();
     }
 
     void generate_r1cs_constraints()
     {
         storageReader.generate_r1cs_constraints();
+        requireTokenSIDZero.generate_r1cs_constraints();
+        requireTokenBIDZero.generate_r1cs_constraints();
+        // DEG-148 Review fix
+        requireGasFeeZero.generate_r1cs_constraints();
+        requireCancelledZero.generate_r1cs_constraints();
         requireDataZero.generate_r1cs_constraints();
+        requireForwardOne.generate_r1cs_constraints();
     }
 
     const VariableT &getData() const
+    {
+        return constants._1;
+    }
+};
+
+// DEG-148 Review fix
+class OrderCancelledNonceGadget : public GadgetT
+{
+    const Constants &constants;
+    const DualVariableGadget &storageID;
+
+    StorageReaderGadget storageReader;
+    IfThenRequireEqualGadget requireCancelledZero;
+
+  public:
+    OrderCancelledNonceGadget(
+      ProtoboardT &pb,
+      const Constants &_constants,
+      const StorageGadget &storage,
+      const DualVariableGadget &_storageID,
+      const VariableT &verify,
+      const std::string &prefix)
+        : GadgetT(pb, prefix),
+
+          constants(_constants),
+          storageID(_storageID),
+
+          storageReader(pb, constants, storage, storageID, verify, FMT(prefix, ".storageReader")),
+          requireCancelledZero(
+            pb,
+            verify,
+            storageReader.getCancelled(),
+            constants._0,
+            FMT(prefix, ".requireCancelledZero"))
+    {
+    }
+
+    void generate_r1cs_witness()
+    {
+        storageReader.generate_r1cs_witness();
+        requireCancelledZero.generate_r1cs_witness();
+    }
+
+    void generate_r1cs_constraints()
+    {
+        storageReader.generate_r1cs_constraints();
+        requireCancelledZero.generate_r1cs_constraints();
+    }
+
+    const VariableT &getCancelled() const
     {
         return constants._1;
     }

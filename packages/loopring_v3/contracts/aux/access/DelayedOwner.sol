@@ -12,12 +12,19 @@ contract DelayedOwner is DelayedTransaction, Claimable
 {
     address public defaultContract;
 
+    event FunctionDelayUpdate(
+        bytes4  functionSelector,
+        uint    delay
+    );
+
     constructor(
         address _defaultContract,
         uint    _timeToLive
         )
         DelayedTransaction(_timeToLive)
     {
+        require(_defaultContract != address(0), "INVALID_ADDRESS");
+
         defaultContract = _defaultContract;
     }
 
@@ -57,5 +64,7 @@ contract DelayedOwner is DelayedTransaction, Claimable
         internal
     {
         setFunctionDelay(defaultContract, functionSelector, delay);
+
+        emit FunctionDelayUpdate(functionSelector, delay);
     }
 }

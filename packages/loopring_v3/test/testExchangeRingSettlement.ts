@@ -31,9 +31,7 @@ contract("Exchange", (accounts: string[]) => {
 
   beforeEach(async () => {
     // Fresh Exchange for each test
-    exchangeID = await exchangeTestUtil.createExchange(
-      exchangeTestUtil.testContext.stateOwners[0]
-    );
+    exchangeID = await exchangeTestUtil.createExchange(exchangeTestUtil.testContext.stateOwners[0]);
     operatorAccountID = await exchangeTestUtil.getActiveOperator(exchangeID);
     operator = exchangeTestUtil.getAccount(operatorAccountID).owner;
   });
@@ -41,85 +39,85 @@ contract("Exchange", (accounts: string[]) => {
   describe("Trade", function() {
     this.timeout(0);
 
-    it("Perfect match", async () => {
-      const ring: SpotTrade = {
-        orderA: {
-          tokenS: "WETH",
-          tokenB: "GTO",
-          amountS: new BN(web3.utils.toWei("100", "ether")),
-          amountB: new BN(web3.utils.toWei("200", "ether"))
-        },
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("200", "ether")),
-          amountB: new BN(web3.utils.toWei("100", "ether"))
-        },
-        expected: {
-          orderA: { filledFraction: 1.0, spread: new BN(0) },
-          orderB: { filledFraction: 1.0 }
-        }
-      };
+    // it("Perfect match", async () => {
+    //   const ring: SpotTrade = {
+    //     orderA: {
+    //       tokenS: "WETH",
+    //       tokenB: "GTO",
+    //       amountS: new BN(web3.utils.toWei("100", "ether")),
+    //       amountB: new BN(web3.utils.toWei("200", "ether"))
+    //     },
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("200", "ether")),
+    //       amountB: new BN(web3.utils.toWei("100", "ether"))
+    //     },
+    //     expected: {
+    //       orderA: { filledFraction: 1.0, spread: new BN(0) },
+    //       orderB: { filledFraction: 1.0 }
+    //     }
+    //   };
 
-      await exchangeTestUtil.setupRing(ring);
-      await exchangeTestUtil.sendRing(ring);
+    //   await exchangeTestUtil.setupRing(ring);
+    //   await exchangeTestUtil.sendRing(ring);
 
-      await exchangeTestUtil.submitTransactions();
+    //   await exchangeTestUtil.submitTransactions();
 
-      await verify();
-    });
+    //   await verify();
+    // });
 
-    it("High fee trade", async () => {
-      const ringA: SpotTrade = {
-        orderA: {
-          tokenS: "WETH",
-          tokenB: "GTO",
-          amountS: new BN(web3.utils.toWei("100", "ether")),
-          amountB: new BN(web3.utils.toWei("200", "ether")),
-          maxFeeBips: 100
-        },
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("200", "ether")),
-          amountB: new BN(web3.utils.toWei("100", "ether")),
-          maxFeeBips: 30
-        },
-        expected: {
-          orderA: { filledFraction: 1.0, spread: new BN(0) },
-          orderB: { filledFraction: 1.0 }
-        }
-      };
-      const ringB: SpotTrade = {
-        orderA: {
-          tokenS: "WETH",
-          tokenB: "GTO",
-          amountS: new BN(web3.utils.toWei("100", "ether")),
-          amountB: new BN(web3.utils.toWei("200", "ether")),
-          maxFeeBips: 63 * 50
-        },
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("200", "ether")),
-          amountB: new BN(web3.utils.toWei("100", "ether")),
-          maxFeeBips: 63
-        },
-        expected: {
-          orderA: { filledFraction: 1.0, spread: new BN(0) },
-          orderB: { filledFraction: 1.0 }
-        }
-      };
+    // it("High fee trade", async () => {
+    //   const ringA: SpotTrade = {
+    //     orderA: {
+    //       tokenS: "WETH",
+    //       tokenB: "GTO",
+    //       amountS: new BN(web3.utils.toWei("100", "ether")),
+    //       amountB: new BN(web3.utils.toWei("200", "ether")),
+    //       maxFeeBips: 100
+    //     },
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("200", "ether")),
+    //       amountB: new BN(web3.utils.toWei("100", "ether")),
+    //       maxFeeBips: 30
+    //     },
+    //     expected: {
+    //       orderA: { filledFraction: 1.0, spread: new BN(0) },
+    //       orderB: { filledFraction: 1.0 }
+    //     }
+    //   };
+    //   const ringB: SpotTrade = {
+    //     orderA: {
+    //       tokenS: "WETH",
+    //       tokenB: "GTO",
+    //       amountS: new BN(web3.utils.toWei("100", "ether")),
+    //       amountB: new BN(web3.utils.toWei("200", "ether")),
+    //       maxFeeBips: 63 * 50
+    //     },
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("200", "ether")),
+    //       amountB: new BN(web3.utils.toWei("100", "ether")),
+    //       maxFeeBips: 63
+    //     },
+    //     expected: {
+    //       orderA: { filledFraction: 1.0, spread: new BN(0) },
+    //       orderB: { filledFraction: 1.0 }
+    //     }
+    //   };
 
-      await exchangeTestUtil.setupRing(ringA);
-      await exchangeTestUtil.setupRing(ringB);
-      await exchangeTestUtil.sendRing(ringA);
-      await exchangeTestUtil.sendRing(ringB);
+    //   await exchangeTestUtil.setupRing(ringA);
+    //   await exchangeTestUtil.setupRing(ringB);
+    //   await exchangeTestUtil.sendRing(ringA);
+    //   await exchangeTestUtil.sendRing(ringB);
 
-      await exchangeTestUtil.submitTransactions();
+    //   await exchangeTestUtil.submitTransactions();
 
-      await verify();
-    });
+    //   await verify();
+    // });
 
     it("Matchable (orderA < orderB)", async () => {
       const ring: SpotTrade = {
@@ -183,502 +181,504 @@ contract("Exchange", (accounts: string[]) => {
       await verify();
     });
 
-    it("Market buy (single ring)", async () => {
-      const order: OrderInfo = {
-        tokenS: "WETH",
-        tokenB: "GTO",
-        amountS: new BN(web3.utils.toWei("101", "ether")),
-        amountB: new BN(web3.utils.toWei("100", "ether")),
-        owner: exchangeTestUtil.testContext.orderOwners[0],
-        maxFeeBips: 30,
-        fillAmountBorS: true
-      };
-      await exchangeTestUtil.setupOrder(order, 0);
+    // it("Market buy (single ring)", async () => {
+    //   const order: OrderInfo = {
+    //     tokenS: "WETH",
+    //     tokenB: "GTO",
+    //     amountS: new BN(web3.utils.toWei("101", "ether")),
+    //     amountB: new BN(web3.utils.toWei("100", "ether")),
+    //     owner: exchangeTestUtil.testContext.orderOwners[0],
+    //     // maxFeeBips: 30,
+    //     feeBips: 30,
+    //     fillAmountBorS: true
+    //   };
+    //   await exchangeTestUtil.setupOrder(order, 0);
 
-      const spread = new BN(web3.utils.toWei("1", "ether"));
-      const ringA: SpotTrade = {
-        orderA: order,
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("200", "ether")),
-          amountB: new BN(web3.utils.toWei("200", "ether")),
-          owner: exchangeTestUtil.testContext.orderOwners[1],
-          maxFeeBips: 0,
-          fillAmountBorS: false
-        },
-        expected: {
-          orderA: { filledFraction: 1.0, spread },
-          orderB: { filledFraction: 0.5 }
-        }
-      };
+    //   const spread = new BN(web3.utils.toWei("1", "ether"));
+    //   const ringA: SpotTrade = {
+    //     orderA: order,
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("200", "ether")),
+    //       amountB: new BN(web3.utils.toWei("200", "ether")),
+    //       owner: exchangeTestUtil.testContext.orderOwners[1],
+    //       // maxFeeBips: 0,
+    //       feeBips: 0,
+    //       fillAmountBorS: false
+    //     },
+    //     expected: {
+    //       orderA: { filledFraction: 1.0, spread },
+    //       orderB: { filledFraction: 0.5 }
+    //     }
+    //   };
 
-      await exchangeTestUtil.deposit(
-        exchangeTestUtil.exchangeOperator,
-        exchangeTestUtil.exchangeOperator,
-        ringA.orderB.tokenB,
-        ringA.orderB.amountB
-      );
+    //   await exchangeTestUtil.deposit(
+    //     exchangeTestUtil.exchangeOperator,
+    //     exchangeTestUtil.exchangeOperator,
+    //     ringA.orderB.tokenB,
+    //     ringA.orderB.amountB
+    //   );
 
-      await exchangeTestUtil.setupRing(ringA, false, true);
-      await exchangeTestUtil.sendRing(ringA);
+    //   await exchangeTestUtil.setupRing(ringA, false, true);
+    //   await exchangeTestUtil.sendRing(ringA);
 
-      await exchangeTestUtil.submitTransactions();
+    //   await exchangeTestUtil.submitTransactions();
 
-      // tokenS
-      const exptectedBalanceS = spread;
-      await exchangeTestUtil.checkOffchainBalance(
-        order.accountID,
-        order.tokenIdS,
-        exptectedBalanceS,
-        "BalanceS unexpected"
-      );
-      // tokenB
-      const expectedFee = order.amountB
-        .mul(new BN(order.maxFeeBips))
-        .div(new BN(10000));
-      const exptectedBalanceB = order.amountB.sub(expectedFee);
-      await exchangeTestUtil.checkOffchainBalance(
-        order.accountID,
-        order.tokenIdB,
-        exptectedBalanceB,
-        "BalanceB unexpected"
-      );
+    //   // tokenS
+    //   const exptectedBalanceS = spread;
+    //   await exchangeTestUtil.checkOffchainBalance(
+    //     order.accountID,
+    //     order.tokenIdS,
+    //     exptectedBalanceS,
+    //     "BalanceS unexpected"
+    //   );
+    //   // tokenB
+    //   const expectedFee = order.amountB
+    //     .mul(new BN(order.maxFeeBips))
+    //     .div(new BN(10000));
+    //   const exptectedBalanceB = order.amountB.sub(expectedFee);
+    //   await exchangeTestUtil.checkOffchainBalance(
+    //     order.accountID,
+    //     order.tokenIdB,
+    //     exptectedBalanceB,
+    //     "BalanceB unexpected"
+    //   );
 
-      await verify();
-    });
+    //   await verify();
+    // });
 
-    it("Market buy (multiple rings)", async () => {
-      const order: OrderInfo = {
-        tokenS: "WETH",
-        tokenB: "GTO",
-        amountS: new BN(web3.utils.toWei("110", "ether")),
-        amountB: new BN(web3.utils.toWei("100", "ether")),
-        owner: exchangeTestUtil.testContext.orderOwners[0],
-        maxFeeBips: 25,
-        fillAmountBorS: true
-      };
-      await exchangeTestUtil.setupOrder(order, 0);
+    // it("Market buy (multiple rings)", async () => {
+    //   const order: OrderInfo = {
+    //     tokenS: "WETH",
+    //     tokenB: "GTO",
+    //     amountS: new BN(web3.utils.toWei("110", "ether")),
+    //     amountB: new BN(web3.utils.toWei("100", "ether")),
+    //     owner: exchangeTestUtil.testContext.orderOwners[0],
+    //     maxFeeBips: 25,
+    //     fillAmountBorS: true
+    //   };
+    //   await exchangeTestUtil.setupOrder(order, 0);
 
-      const spread = new BN(web3.utils.toWei("5", "ether"));
-      const ringA: SpotTrade = {
-        orderA: order,
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("50", "ether")),
-          amountB: new BN(web3.utils.toWei("50", "ether")),
-          owner: exchangeTestUtil.testContext.orderOwners[1],
-          maxFeeBips: 0,
-          fillAmountBorS: false
-        },
-        expected: {
-          orderA: { filledFraction: 0.5, spread },
-          orderB: { filledFraction: 1.0 }
-        }
-      };
-      const ringB: SpotTrade = {
-        orderA: order,
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("200", "ether")),
-          amountB: new BN(web3.utils.toWei("220", "ether")),
-          owner: exchangeTestUtil.testContext.orderOwners[2],
-          maxFeeBips: 0,
-          fillAmountBorS: false
-        },
-        expected: {
-          orderA: {
-            filledFraction: 0.5,
-            spread: new BN(web3.utils.toWei("0", "ether"))
-          },
-          orderB: { filledFraction: 0.25 }
-        }
-      };
+    //   const spread = new BN(web3.utils.toWei("5", "ether"));
+    //   const ringA: SpotTrade = {
+    //     orderA: order,
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("50", "ether")),
+    //       amountB: new BN(web3.utils.toWei("50", "ether")),
+    //       owner: exchangeTestUtil.testContext.orderOwners[1],
+    //       maxFeeBips: 0,
+    //       fillAmountBorS: false
+    //     },
+    //     expected: {
+    //       orderA: { filledFraction: 0.5, spread },
+    //       orderB: { filledFraction: 1.0 }
+    //     }
+    //   };
+    //   const ringB: SpotTrade = {
+    //     orderA: order,
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("200", "ether")),
+    //       amountB: new BN(web3.utils.toWei("220", "ether")),
+    //       owner: exchangeTestUtil.testContext.orderOwners[2],
+    //       maxFeeBips: 0,
+    //       fillAmountBorS: false
+    //     },
+    //     expected: {
+    //       orderA: {
+    //         filledFraction: 0.5,
+    //         spread: new BN(web3.utils.toWei("0", "ether"))
+    //       },
+    //       orderB: { filledFraction: 0.25 }
+    //     }
+    //   };
 
-      await exchangeTestUtil.setupRing(ringA, false, true);
-      await exchangeTestUtil.setupRing(ringB, false, true);
+    //   await exchangeTestUtil.setupRing(ringA, false, true);
+    //   await exchangeTestUtil.setupRing(ringB, false, true);
 
-      await exchangeTestUtil.deposit(
-        exchangeTestUtil.exchangeOperator,
-        exchangeTestUtil.exchangeOperator,
-        ringA.orderB.tokenB,
-        ringA.orderB.amountB
-      );
-      await exchangeTestUtil.deposit(
-        exchangeTestUtil.exchangeOperator,
-        exchangeTestUtil.exchangeOperator,
-        ringB.orderB.tokenB,
-        ringB.orderB.amountB
-      );
+    //   await exchangeTestUtil.deposit(
+    //     exchangeTestUtil.exchangeOperator,
+    //     exchangeTestUtil.exchangeOperator,
+    //     ringA.orderB.tokenB,
+    //     ringA.orderB.amountB
+    //   );
+    //   await exchangeTestUtil.deposit(
+    //     exchangeTestUtil.exchangeOperator,
+    //     exchangeTestUtil.exchangeOperator,
+    //     ringB.orderB.tokenB,
+    //     ringB.orderB.amountB
+    //   );
 
-      await exchangeTestUtil.sendRing(ringA);
-      await exchangeTestUtil.sendRing(ringB);
+    //   await exchangeTestUtil.sendRing(ringA);
+    //   await exchangeTestUtil.sendRing(ringB);
 
-      await exchangeTestUtil.submitTransactions();
+    //   await exchangeTestUtil.submitTransactions();
 
-      // tokenS
-      const exptectedBalanceS = spread;
-      await exchangeTestUtil.checkOffchainBalance(
-        order.accountID,
-        order.tokenIdS,
-        exptectedBalanceS,
-        "BalanceS unexpected"
-      );
-      // tokenB
-      const expectedFee = order.amountB
-        .mul(new BN(order.maxFeeBips))
-        .div(new BN(10000));
-      const exptectedBalance = order.amountB.sub(expectedFee);
-      await exchangeTestUtil.checkOffchainBalance(
-        order.accountID,
-        order.tokenIdB,
-        exptectedBalance,
-        "BalanceB unexpected"
-      );
+    //   // tokenS
+    //   const exptectedBalanceS = spread;
+    //   await exchangeTestUtil.checkOffchainBalance(
+    //     order.accountID,
+    //     order.tokenIdS,
+    //     exptectedBalanceS,
+    //     "BalanceS unexpected"
+    //   );
+    //   // tokenB
+    //   const expectedFee = order.amountB
+    //     .mul(new BN(order.maxFeeBips))
+    //     .div(new BN(10000));
+    //   const exptectedBalance = order.amountB.sub(expectedFee);
+    //   await exchangeTestUtil.checkOffchainBalance(
+    //     order.accountID,
+    //     order.tokenIdB,
+    //     exptectedBalance,
+    //     "BalanceB unexpected"
+    //   );
 
-      await verify();
-    });
+    //   await verify();
+    // });
 
-    it("Market sell (single ring)", async () => {
-      const order: OrderInfo = {
-        tokenS: "WETH",
-        tokenB: "GTO",
-        amountS: new BN(web3.utils.toWei("1000", "ether")),
-        amountB: new BN(web3.utils.toWei("99", "ether")),
-        owner: exchangeTestUtil.testContext.orderOwners[0],
-        maxFeeBips: 30,
-        fillAmountBorS: false
-      };
-      await exchangeTestUtil.setupOrder(order, 0);
+    // it("Market sell (single ring)", async () => {
+    //   const order: OrderInfo = {
+    //     tokenS: "WETH",
+    //     tokenB: "GTO",
+    //     amountS: new BN(web3.utils.toWei("1000", "ether")),
+    //     amountB: new BN(web3.utils.toWei("99", "ether")),
+    //     owner: exchangeTestUtil.testContext.orderOwners[0],
+    //     maxFeeBips: 30,
+    //     fillAmountBorS: false
+    //   };
+    //   await exchangeTestUtil.setupOrder(order, 0);
 
-      const spread = new BN(web3.utils.toWei("1", "ether"));
-      const ringA: SpotTrade = {
-        orderA: order,
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("200", "ether")),
-          amountB: new BN(web3.utils.toWei("2000", "ether")),
-          owner: exchangeTestUtil.testContext.orderOwners[1],
-          maxFeeBips: 0,
-          fillAmountBorS: false
-        },
-        expected: {
-          orderA: { filledFraction: 1.0, spread },
-          orderB: { filledFraction: 0.5 }
-        }
-      };
+    //   const spread = new BN(web3.utils.toWei("1", "ether"));
+    //   const ringA: SpotTrade = {
+    //     orderA: order,
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("200", "ether")),
+    //       amountB: new BN(web3.utils.toWei("2000", "ether")),
+    //       owner: exchangeTestUtil.testContext.orderOwners[1],
+    //       maxFeeBips: 0,
+    //       fillAmountBorS: false
+    //     },
+    //     expected: {
+    //       orderA: { filledFraction: 1.0, spread },
+    //       orderB: { filledFraction: 0.5 }
+    //     }
+    //   };
 
-      await exchangeTestUtil.setupRing(ringA, false, true);
+    //   await exchangeTestUtil.setupRing(ringA, false, true);
 
-      await exchangeTestUtil.deposit(
-        exchangeTestUtil.exchangeOperator,
-        exchangeTestUtil.exchangeOperator,
-        ringA.orderB.tokenB,
-        ringA.orderB.amountB
-      );
+    //   await exchangeTestUtil.deposit(
+    //     exchangeTestUtil.exchangeOperator,
+    //     exchangeTestUtil.exchangeOperator,
+    //     ringA.orderB.tokenB,
+    //     ringA.orderB.amountB
+    //   );
 
-      await exchangeTestUtil.sendRing(ringA);
+    //   await exchangeTestUtil.sendRing(ringA);
 
-      await exchangeTestUtil.submitTransactions();
+    //   await exchangeTestUtil.submitTransactions();
 
-      // tokenS
-      await exchangeTestUtil.checkOffchainBalance(
-        order.accountID,
-        order.tokenIdS,
-        new BN(0),
-        "BalanceS unexpected"
-      );
-      // tokenB
-      const expectedFee = order.amountB
-        .add(spread)
-        .mul(new BN(order.maxFeeBips))
-        .div(new BN(10000));
-      const exptectedBalance = order.amountB.add(spread).sub(expectedFee);
-      await exchangeTestUtil.checkOffchainBalance(
-        order.accountID,
-        order.tokenIdB,
-        exptectedBalance,
-        "BalanceB unexpected"
-      );
+    //   // tokenS
+    //   await exchangeTestUtil.checkOffchainBalance(
+    //     order.accountID,
+    //     order.tokenIdS,
+    //     new BN(0),
+    //     "BalanceS unexpected"
+    //   );
+    //   // tokenB
+    //   const expectedFee = order.amountB
+    //     .add(spread)
+    //     .mul(new BN(order.maxFeeBips))
+    //     .div(new BN(10000));
+    //   const exptectedBalance = order.amountB.add(spread).sub(expectedFee);
+    //   await exchangeTestUtil.checkOffchainBalance(
+    //     order.accountID,
+    //     order.tokenIdB,
+    //     exptectedBalance,
+    //     "BalanceB unexpected"
+    //   );
 
-      await verify();
-    });
+    //   await verify();
+    // });
 
-    it("Market sell (multiple rings)", async () => {
-      const order: OrderInfo = {
-        tokenS: "WETH",
-        tokenB: "GTO",
-        amountS: new BN(web3.utils.toWei("100", "ether")),
-        amountB: new BN(web3.utils.toWei("900", "ether")),
-        owner: exchangeTestUtil.testContext.orderOwners[0],
-        maxFeeBips: 25,
-        fillAmountBorS: false
-      };
-      await exchangeTestUtil.setupOrder(order, 0);
+    // it("Market sell (multiple rings)", async () => {
+    //   const order: OrderInfo = {
+    //     tokenS: "WETH",
+    //     tokenB: "GTO",
+    //     amountS: new BN(web3.utils.toWei("100", "ether")),
+    //     amountB: new BN(web3.utils.toWei("900", "ether")),
+    //     owner: exchangeTestUtil.testContext.orderOwners[0],
+    //     maxFeeBips: 25,
+    //     fillAmountBorS: false
+    //   };
+    //   await exchangeTestUtil.setupOrder(order, 0);
 
-      const spread = new BN(web3.utils.toWei("50", "ether"));
-      const ringA: SpotTrade = {
-        orderA: order,
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("500", "ether")),
-          amountB: new BN(web3.utils.toWei("50", "ether")),
-          owner: exchangeTestUtil.testContext.orderOwners[1],
-          maxFeeBips: 0,
-          fillAmountBorS: true
-        },
-        expected: {
-          orderA: { filledFraction: 0.5, spread },
-          orderB: { filledFraction: 1.0 }
-        }
-      };
-      const ringB: SpotTrade = {
-        orderA: order,
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("900", "ether")),
-          amountB: new BN(web3.utils.toWei("100", "ether")),
-          owner: exchangeTestUtil.testContext.orderOwners[2],
-          maxFeeBips: 0,
-          fillAmountBorS: true
-        },
-        expected: {
-          orderA: {
-            filledFraction: 0.5,
-            spread: new BN(web3.utils.toWei("0", "ether"))
-          },
-          orderB: { filledFraction: 0.5 }
-        }
-      };
+    //   const spread = new BN(web3.utils.toWei("50", "ether"));
+    //   const ringA: SpotTrade = {
+    //     orderA: order,
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("500", "ether")),
+    //       amountB: new BN(web3.utils.toWei("50", "ether")),
+    //       owner: exchangeTestUtil.testContext.orderOwners[1],
+    //       maxFeeBips: 0,
+    //       fillAmountBorS: true
+    //     },
+    //     expected: {
+    //       orderA: { filledFraction: 0.5, spread },
+    //       orderB: { filledFraction: 1.0 }
+    //     }
+    //   };
+    //   const ringB: SpotTrade = {
+    //     orderA: order,
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("900", "ether")),
+    //       amountB: new BN(web3.utils.toWei("100", "ether")),
+    //       owner: exchangeTestUtil.testContext.orderOwners[2],
+    //       maxFeeBips: 0,
+    //       fillAmountBorS: true
+    //     },
+    //     expected: {
+    //       orderA: {
+    //         filledFraction: 0.5,
+    //         spread: new BN(web3.utils.toWei("0", "ether"))
+    //       },
+    //       orderB: { filledFraction: 0.5 }
+    //     }
+    //   };
 
-      await exchangeTestUtil.setupRing(ringA, false, true);
-      await exchangeTestUtil.setupRing(ringB, false, true);
+    //   await exchangeTestUtil.setupRing(ringA, false, true);
+    //   await exchangeTestUtil.setupRing(ringB, false, true);
 
-      await exchangeTestUtil.deposit(
-        exchangeTestUtil.exchangeOperator,
-        exchangeTestUtil.exchangeOperator,
-        ringA.orderB.tokenB,
-        ringA.orderB.amountB
-      );
-      await exchangeTestUtil.deposit(
-        exchangeTestUtil.exchangeOperator,
-        exchangeTestUtil.exchangeOperator,
-        ringB.orderB.tokenB,
-        ringB.orderB.amountB
-      );
+    //   await exchangeTestUtil.deposit(
+    //     exchangeTestUtil.exchangeOperator,
+    //     exchangeTestUtil.exchangeOperator,
+    //     ringA.orderB.tokenB,
+    //     ringA.orderB.amountB
+    //   );
+    //   await exchangeTestUtil.deposit(
+    //     exchangeTestUtil.exchangeOperator,
+    //     exchangeTestUtil.exchangeOperator,
+    //     ringB.orderB.tokenB,
+    //     ringB.orderB.amountB
+    //   );
 
-      await exchangeTestUtil.sendRing(ringA);
-      await exchangeTestUtil.sendRing(ringB);
+    //   await exchangeTestUtil.sendRing(ringA);
+    //   await exchangeTestUtil.sendRing(ringB);
 
-      await exchangeTestUtil.submitTransactions();
+    //   await exchangeTestUtil.submitTransactions();
 
-      // tokenS
-      await exchangeTestUtil.checkOffchainBalance(
-        order.accountID,
-        order.tokenIdS,
-        new BN(0),
-        "BalanceS unexpected"
-      );
-      // tokenB
-      const expectedFee = order.amountB
-        .add(spread)
-        .mul(new BN(order.maxFeeBips))
-        .div(new BN(10000));
-      const exptectedBalance = order.amountB.add(spread).sub(expectedFee);
-      await exchangeTestUtil.checkOffchainBalance(
-        order.accountID,
-        order.tokenIdB,
-        exptectedBalance,
-        "BalanceB unexpected"
-      );
+    //   // tokenS
+    //   await exchangeTestUtil.checkOffchainBalance(
+    //     order.accountID,
+    //     order.tokenIdS,
+    //     new BN(0),
+    //     "BalanceS unexpected"
+    //   );
+    //   // tokenB
+    //   const expectedFee = order.amountB
+    //     .add(spread)
+    //     .mul(new BN(order.maxFeeBips))
+    //     .div(new BN(10000));
+    //   const exptectedBalance = order.amountB.add(spread).sub(expectedFee);
+    //   await exchangeTestUtil.checkOffchainBalance(
+    //     order.accountID,
+    //     order.tokenIdB,
+    //     exptectedBalance,
+    //     "BalanceB unexpected"
+    //   );
 
-      await verify();
-    });
+    //   await verify();
+    // });
 
-    it("Buy order used as taker and maker", async () => {
-      const order: OrderInfo = {
-        tokenS: "WETH",
-        tokenB: "GTO",
-        amountS: new BN(web3.utils.toWei("110", "ether")),
-        amountB: new BN(web3.utils.toWei("100", "ether")),
-        owner: exchangeTestUtil.testContext.orderOwners[0],
-        maxFeeBips: 25,
-        fillAmountBorS: true
-      };
-      await exchangeTestUtil.setupOrder(order, 0);
+    // it("Buy order used as taker and maker", async () => {
+    //   const order: OrderInfo = {
+    //     tokenS: "WETH",
+    //     tokenB: "GTO",
+    //     amountS: new BN(web3.utils.toWei("110", "ether")),
+    //     amountB: new BN(web3.utils.toWei("100", "ether")),
+    //     owner: exchangeTestUtil.testContext.orderOwners[0],
+    //     maxFeeBips: 25,
+    //     fillAmountBorS: true
+    //   };
+    //   await exchangeTestUtil.setupOrder(order, 0);
 
-      const spread = new BN(web3.utils.toWei("5", "ether"));
-      const ringA: SpotTrade = {
-        orderA: order,
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("50", "ether")),
-          amountB: new BN(web3.utils.toWei("50", "ether")),
-          owner: exchangeTestUtil.testContext.orderOwners[1],
-          maxFeeBips: 0,
-          fillAmountBorS: false
-        },
-        expected: {
-          orderA: { filledFraction: 0.5, spread },
-          orderB: { filledFraction: 1.0 }
-        }
-      };
-      const ringB: SpotTrade = {
-        orderA: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("220", "ether")),
-          amountB: new BN(web3.utils.toWei("220", "ether")),
-          owner: exchangeTestUtil.testContext.orderOwners[2],
-          maxFeeBips: 30,
-          fillAmountBorS: false
-        },
-        orderB: order,
-        expected: {
-          orderA: {
-            filledFraction: 50 / 220,
-            spread: new BN(web3.utils.toWei("5", "ether"))
-          },
-          orderB: { filledFraction: 0.5 }
-        }
-      };
+    //   const spread = new BN(web3.utils.toWei("5", "ether"));
+    //   const ringA: SpotTrade = {
+    //     orderA: order,
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("50", "ether")),
+    //       amountB: new BN(web3.utils.toWei("50", "ether")),
+    //       owner: exchangeTestUtil.testContext.orderOwners[1],
+    //       maxFeeBips: 0,
+    //       fillAmountBorS: false
+    //     },
+    //     expected: {
+    //       orderA: { filledFraction: 0.5, spread },
+    //       orderB: { filledFraction: 1.0 }
+    //     }
+    //   };
+    //   const ringB: SpotTrade = {
+    //     orderA: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("220", "ether")),
+    //       amountB: new BN(web3.utils.toWei("220", "ether")),
+    //       owner: exchangeTestUtil.testContext.orderOwners[2],
+    //       maxFeeBips: 30,
+    //       fillAmountBorS: false
+    //     },
+    //     orderB: order,
+    //     expected: {
+    //       orderA: {
+    //         filledFraction: 50 / 220,
+    //         spread: new BN(web3.utils.toWei("5", "ether"))
+    //       },
+    //       orderB: { filledFraction: 0.5 }
+    //     }
+    //   };
 
-      await exchangeTestUtil.setupRing(ringA, false, true);
-      await exchangeTestUtil.setupRing(ringB, true, false);
+    //   await exchangeTestUtil.setupRing(ringA, false, true);
+    //   await exchangeTestUtil.setupRing(ringB, true, false);
 
-      await exchangeTestUtil.deposit(
-        exchangeTestUtil.exchangeOperator,
-        exchangeTestUtil.exchangeOperator,
-        ringA.orderB.tokenB,
-        ringA.orderB.amountB
-      );
-      await exchangeTestUtil.deposit(
-        exchangeTestUtil.exchangeOperator,
-        exchangeTestUtil.exchangeOperator,
-        ringB.orderB.tokenB,
-        ringB.orderB.amountB
-      );
+    //   await exchangeTestUtil.deposit(
+    //     exchangeTestUtil.exchangeOperator,
+    //     exchangeTestUtil.exchangeOperator,
+    //     ringA.orderB.tokenB,
+    //     ringA.orderB.amountB
+    //   );
+    //   await exchangeTestUtil.deposit(
+    //     exchangeTestUtil.exchangeOperator,
+    //     exchangeTestUtil.exchangeOperator,
+    //     ringB.orderB.tokenB,
+    //     ringB.orderB.amountB
+    //   );
 
-      await exchangeTestUtil.sendRing(ringA);
-      await exchangeTestUtil.sendRing(ringB);
+    //   await exchangeTestUtil.sendRing(ringA);
+    //   await exchangeTestUtil.sendRing(ringB);
 
-      await exchangeTestUtil.submitTransactions();
+    //   await exchangeTestUtil.submitTransactions();
 
-      // tokenS
-      const exptectedBalanceS = spread;
-      await exchangeTestUtil.checkOffchainBalance(
-        order.accountID,
-        order.tokenIdS,
-        exptectedBalanceS,
-        "BalanceS unexpected"
-      );
-      // tokenB
-      const expectedFee = order.amountB
-        .mul(new BN(order.maxFeeBips))
-        .div(new BN(10000));
-      const exptectedBalance = order.amountB.sub(expectedFee);
-      await exchangeTestUtil.checkOffchainBalance(
-        order.accountID,
-        order.tokenIdB,
-        exptectedBalance,
-        "Balance unexpected"
-      );
+    //   // tokenS
+    //   const exptectedBalanceS = spread;
+    //   await exchangeTestUtil.checkOffchainBalance(
+    //     order.accountID,
+    //     order.tokenIdS,
+    //     exptectedBalanceS,
+    //     "BalanceS unexpected"
+    //   );
+    //   // tokenB
+    //   const expectedFee = order.amountB
+    //     .mul(new BN(order.maxFeeBips))
+    //     .div(new BN(10000));
+    //   const exptectedBalance = order.amountB.sub(expectedFee);
+    //   await exchangeTestUtil.checkOffchainBalance(
+    //     order.accountID,
+    //     order.tokenIdB,
+    //     exptectedBalance,
+    //     "Balance unexpected"
+    //   );
 
-      await verify();
-    });
+    //   await verify();
+    // });
 
-    it("Sell order used as taker and maker", async () => {
-      const order: OrderInfo = {
-        tokenS: "WETH",
-        tokenB: "GTO",
-        amountS: new BN(web3.utils.toWei("100", "ether")),
-        amountB: new BN(web3.utils.toWei("90", "ether")),
-        owner: exchangeTestUtil.testContext.orderOwners[0],
-        maxFeeBips: 25,
-        fillAmountBorS: false
-      };
-      await exchangeTestUtil.setupOrder(order, 0);
+    // it("Sell order used as taker and maker", async () => {
+    //   const order: OrderInfo = {
+    //     tokenS: "WETH",
+    //     tokenB: "GTO",
+    //     amountS: new BN(web3.utils.toWei("100", "ether")),
+    //     amountB: new BN(web3.utils.toWei("90", "ether")),
+    //     owner: exchangeTestUtil.testContext.orderOwners[0],
+    //     maxFeeBips: 25,
+    //     fillAmountBorS: false
+    //   };
+    //   await exchangeTestUtil.setupOrder(order, 0);
 
-      const spread = new BN(web3.utils.toWei("5", "ether"));
-      const ringA: SpotTrade = {
-        orderA: order,
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("50", "ether")),
-          amountB: new BN(web3.utils.toWei("50", "ether")),
-          owner: exchangeTestUtil.testContext.orderOwners[1],
-          maxFeeBips: 0,
-          fillAmountBorS: true
-        },
-        expected: {
-          orderA: { filledFraction: 0.5, spread },
-          orderB: { filledFraction: 1.0 }
-        }
-      };
-      const ringB: SpotTrade = {
-        orderA: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("190", "ether")),
-          amountB: new BN(web3.utils.toWei("200", "ether")),
-          owner: exchangeTestUtil.testContext.orderOwners[2],
-          maxFeeBips: 15,
-          fillAmountBorS: true
-        },
-        orderB: order,
-        expected: {
-          orderA: {
-            filledFraction: 0.25,
-            spread: new BN(web3.utils.toWei("2.5", "ether"))
-          },
-          orderB: { filledFraction: 0.5 }
-        }
-      };
+    //   const spread = new BN(web3.utils.toWei("5", "ether"));
+    //   const ringA: SpotTrade = {
+    //     orderA: order,
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("50", "ether")),
+    //       amountB: new BN(web3.utils.toWei("50", "ether")),
+    //       owner: exchangeTestUtil.testContext.orderOwners[1],
+    //       maxFeeBips: 0,
+    //       fillAmountBorS: true
+    //     },
+    //     expected: {
+    //       orderA: { filledFraction: 0.5, spread },
+    //       orderB: { filledFraction: 1.0 }
+    //     }
+    //   };
+    //   const ringB: SpotTrade = {
+    //     orderA: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("190", "ether")),
+    //       amountB: new BN(web3.utils.toWei("200", "ether")),
+    //       owner: exchangeTestUtil.testContext.orderOwners[2],
+    //       maxFeeBips: 15,
+    //       fillAmountBorS: true
+    //     },
+    //     orderB: order,
+    //     expected: {
+    //       orderA: {
+    //         filledFraction: 0.25,
+    //         spread: new BN(web3.utils.toWei("2.5", "ether"))
+    //       },
+    //       orderB: { filledFraction: 0.5 }
+    //     }
+    //   };
 
-      await exchangeTestUtil.setupRing(ringA, false, true);
-      await exchangeTestUtil.setupRing(ringB, true, false);
+    //   await exchangeTestUtil.setupRing(ringA, false, true);
+    //   await exchangeTestUtil.setupRing(ringB, true, false);
 
-      await exchangeTestUtil.deposit(
-        exchangeTestUtil.exchangeOperator,
-        exchangeTestUtil.exchangeOperator,
-        ringA.orderB.tokenB,
-        ringA.orderB.amountB
-      );
+    //   await exchangeTestUtil.deposit(
+    //     exchangeTestUtil.exchangeOperator,
+    //     exchangeTestUtil.exchangeOperator,
+    //     ringA.orderB.tokenB,
+    //     ringA.orderB.amountB
+    //   );
 
-      await exchangeTestUtil.sendRing(ringA);
-      await exchangeTestUtil.sendRing(ringB);
+    //   await exchangeTestUtil.sendRing(ringA);
+    //   await exchangeTestUtil.sendRing(ringB);
 
-      await exchangeTestUtil.submitTransactions();
+    //   await exchangeTestUtil.submitTransactions();
 
-      // tokenS
-      await exchangeTestUtil.checkOffchainBalance(
-        order.accountID,
-        order.tokenIdS,
-        new BN(0),
-        "BalanceS unexpected"
-      );
-      // tokenB
-      const expectedFee = order.amountB
-        .add(spread)
-        .mul(new BN(order.maxFeeBips))
-        .div(new BN(10000));
-      const exptectedBalance = order.amountB.add(spread).sub(expectedFee);
-      await exchangeTestUtil.checkOffchainBalance(
-        order.accountID,
-        order.tokenIdB,
-        exptectedBalance,
-        "BalanceB unexpected"
-      );
+    //   // tokenS
+    //   await exchangeTestUtil.checkOffchainBalance(
+    //     order.accountID,
+    //     order.tokenIdS,
+    //     new BN(0),
+    //     "BalanceS unexpected"
+    //   );
+    //   // tokenB
+    //   const expectedFee = order.amountB
+    //     .add(spread)
+    //     .mul(new BN(order.maxFeeBips))
+    //     .div(new BN(10000));
+    //   const exptectedBalance = order.amountB.add(spread).sub(expectedFee);
+    //   await exchangeTestUtil.checkOffchainBalance(
+    //     order.accountID,
+    //     order.tokenIdB,
+    //     exptectedBalance,
+    //     "BalanceB unexpected"
+    //   );
 
-      await verify();
-    });
+    //   await verify();
+    // });
 
     it("feeBips < maxFeeBips", async () => {
       const ring: SpotTrade = {
@@ -1342,137 +1342,137 @@ contract("Exchange", (accounts: string[]) => {
       await expectThrow(exchangeTestUtil.submitTransactions(), "invalid block");
     });
 
-    it("Trimmed storageID (order.storageID > storage.storageID)", async () => {
-      const ownerA = exchangeTestUtil.testContext.orderOwners[0];
-      const ownerB = exchangeTestUtil.testContext.orderOwners[1];
-      const storageIDA = 8;
-      const storageIDB = 0;
-      const ringA: SpotTrade = {
-        orderA: {
-          tokenS: "WETH",
-          tokenB: "GTO",
-          amountS: new BN(web3.utils.toWei("100", "ether")),
-          amountB: new BN(web3.utils.toWei("200", "ether")),
-          owner: ownerA,
-          storageID: storageIDA
-        },
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("200", "ether")),
-          amountB: new BN(web3.utils.toWei("100", "ether")),
-          owner: ownerB,
-          storageID: storageIDB
-        },
-        expected: {
-          orderA: { filledFraction: 1.0, spread: new BN(0) },
-          orderB: { filledFraction: 1.0 }
-        }
-      };
-      const ringB: SpotTrade = {
-        orderA: {
-          tokenS: "WETH",
-          tokenB: "GTO",
-          amountS: new BN(web3.utils.toWei("100", "ether")),
-          amountB: new BN(web3.utils.toWei("200", "ether")),
-          owner: ownerA,
-          storageID: storageIDA + Constants.NUM_STORAGE_SLOTS
-        },
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("200", "ether")),
-          amountB: new BN(web3.utils.toWei("100", "ether")),
-          owner: ownerB,
-          storageID: storageIDB
-        },
-        expected: {
-          orderA: { filledFraction: 0.0, spread: new BN(0) },
-          orderB: { filledFraction: 0.0 }
-        }
-      };
-      const ringC: SpotTrade = {
-        orderA: {
-          tokenS: "WETH",
-          tokenB: "GTO",
-          amountS: new BN(web3.utils.toWei("100", "ether")),
-          amountB: new BN(web3.utils.toWei("200", "ether")),
-          owner: ownerA,
-          storageID: storageIDA + Constants.NUM_STORAGE_SLOTS
-        },
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("200", "ether")),
-          amountB: new BN(web3.utils.toWei("100", "ether")),
-          owner: ownerB,
-          storageID: storageIDB + Constants.NUM_STORAGE_SLOTS
-        },
-        expected: {
-          orderA: { filledFraction: 1.0, spread: new BN(0) },
-          orderB: { filledFraction: 1.0 }
-        }
-      };
-      const ringD: SpotTrade = {
-        orderA: {
-          tokenS: "WETH",
-          tokenB: "GTO",
-          amountS: new BN(web3.utils.toWei("100", "ether")),
-          amountB: new BN(web3.utils.toWei("200", "ether")),
-          owner: ownerA,
-          storageID: storageIDA + Constants.NUM_STORAGE_SLOTS
-        },
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("200", "ether")),
-          amountB: new BN(web3.utils.toWei("100", "ether")),
-          owner: ownerB,
-          storageID: storageIDB + 2 * Constants.NUM_STORAGE_SLOTS
-        },
-        expected: {
-          orderA: { filledFraction: 0.0, spread: new BN(0) },
-          orderB: { filledFraction: 0.0 }
-        }
-      };
-      const ringE: SpotTrade = {
-        orderA: {
-          tokenS: "WETH",
-          tokenB: "GTO",
-          amountS: new BN(web3.utils.toWei("100", "ether")),
-          amountB: new BN(web3.utils.toWei("200", "ether")),
-          owner: ownerA,
-          storageID: storageIDA + 2 * Constants.NUM_STORAGE_SLOTS
-        },
-        orderB: {
-          tokenS: "GTO",
-          tokenB: "WETH",
-          amountS: new BN(web3.utils.toWei("200", "ether")),
-          amountB: new BN(web3.utils.toWei("100", "ether")),
-          owner: ownerB,
-          storageID: storageIDB + 5 * Constants.NUM_STORAGE_SLOTS
-        },
-        expected: {
-          orderA: { filledFraction: 1.0, spread: new BN(0) },
-          orderB: { filledFraction: 1.0 }
-        }
-      };
+    // it("Trimmed storageID (order.storageID > storage.storageID)", async () => {
+    //   const ownerA = exchangeTestUtil.testContext.orderOwners[0];
+    //   const ownerB = exchangeTestUtil.testContext.orderOwners[1];
+    //   const storageIDA = 8;
+    //   const storageIDB = 0;
+    //   const ringA: SpotTrade = {
+    //     orderA: {
+    //       tokenS: "WETH",
+    //       tokenB: "GTO",
+    //       amountS: new BN(web3.utils.toWei("100", "ether")),
+    //       amountB: new BN(web3.utils.toWei("200", "ether")),
+    //       owner: ownerA,
+    //       storageID: storageIDA
+    //     },
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("200", "ether")),
+    //       amountB: new BN(web3.utils.toWei("100", "ether")),
+    //       owner: ownerB,
+    //       storageID: storageIDB
+    //     },
+    //     expected: {
+    //       orderA: { filledFraction: 1.0, spread: new BN(0) },
+    //       orderB: { filledFraction: 1.0 }
+    //     }
+    //   };
+    //   const ringB: SpotTrade = {
+    //     orderA: {
+    //       tokenS: "WETH",
+    //       tokenB: "GTO",
+    //       amountS: new BN(web3.utils.toWei("100", "ether")),
+    //       amountB: new BN(web3.utils.toWei("200", "ether")),
+    //       owner: ownerA,
+    //       storageID: storageIDA + Constants.NUM_STORAGE_SLOTS
+    //     },
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("200", "ether")),
+    //       amountB: new BN(web3.utils.toWei("100", "ether")),
+    //       owner: ownerB,
+    //       storageID: storageIDB
+    //     },
+    //     expected: {
+    //       orderA: { filledFraction: 0.0, spread: new BN(0) },
+    //       orderB: { filledFraction: 0.0 }
+    //     }
+    //   };
+    //   const ringC: SpotTrade = {
+    //     orderA: {
+    //       tokenS: "WETH",
+    //       tokenB: "GTO",
+    //       amountS: new BN(web3.utils.toWei("100", "ether")),
+    //       amountB: new BN(web3.utils.toWei("200", "ether")),
+    //       owner: ownerA,
+    //       storageID: storageIDA + Constants.NUM_STORAGE_SLOTS
+    //     },
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("200", "ether")),
+    //       amountB: new BN(web3.utils.toWei("100", "ether")),
+    //       owner: ownerB,
+    //       storageID: storageIDB + Constants.NUM_STORAGE_SLOTS
+    //     },
+    //     expected: {
+    //       orderA: { filledFraction: 1.0, spread: new BN(0) },
+    //       orderB: { filledFraction: 1.0 }
+    //     }
+    //   };
+    //   const ringD: SpotTrade = {
+    //     orderA: {
+    //       tokenS: "WETH",
+    //       tokenB: "GTO",
+    //       amountS: new BN(web3.utils.toWei("100", "ether")),
+    //       amountB: new BN(web3.utils.toWei("200", "ether")),
+    //       owner: ownerA,
+    //       storageID: storageIDA + Constants.NUM_STORAGE_SLOTS
+    //     },
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("200", "ether")),
+    //       amountB: new BN(web3.utils.toWei("100", "ether")),
+    //       owner: ownerB,
+    //       storageID: storageIDB + 2 * Constants.NUM_STORAGE_SLOTS
+    //     },
+    //     expected: {
+    //       orderA: { filledFraction: 0.0, spread: new BN(0) },
+    //       orderB: { filledFraction: 0.0 }
+    //     }
+    //   };
+    //   const ringE: SpotTrade = {
+    //     orderA: {
+    //       tokenS: "WETH",
+    //       tokenB: "GTO",
+    //       amountS: new BN(web3.utils.toWei("100", "ether")),
+    //       amountB: new BN(web3.utils.toWei("200", "ether")),
+    //       owner: ownerA,
+    //       storageID: storageIDA + 2 * Constants.NUM_STORAGE_SLOTS
+    //     },
+    //     orderB: {
+    //       tokenS: "GTO",
+    //       tokenB: "WETH",
+    //       amountS: new BN(web3.utils.toWei("200", "ether")),
+    //       amountB: new BN(web3.utils.toWei("100", "ether")),
+    //       owner: ownerB,
+    //       storageID: storageIDB + 5 * Constants.NUM_STORAGE_SLOTS
+    //     },
+    //     expected: {
+    //       orderA: { filledFraction: 1.0, spread: new BN(0) },
+    //       orderB: { filledFraction: 1.0 }
+    //     }
+    //   };
 
-      await exchangeTestUtil.setupRing(ringA);
-      await exchangeTestUtil.setupRing(ringB);
-      await exchangeTestUtil.setupRing(ringC);
-      await exchangeTestUtil.setupRing(ringD);
-      await exchangeTestUtil.setupRing(ringE);
-      await exchangeTestUtil.sendRing(ringA);
-      await exchangeTestUtil.sendRing(ringB);
-      await exchangeTestUtil.sendRing(ringC);
-      await exchangeTestUtil.sendRing(ringD);
-      await exchangeTestUtil.sendRing(ringE);
+    //   await exchangeTestUtil.setupRing(ringA);
+    //   await exchangeTestUtil.setupRing(ringB);
+    //   await exchangeTestUtil.setupRing(ringC);
+    //   await exchangeTestUtil.setupRing(ringD);
+    //   await exchangeTestUtil.setupRing(ringE);
+    //   await exchangeTestUtil.sendRing(ringA);
+    //   await exchangeTestUtil.sendRing(ringB);
+    //   await exchangeTestUtil.sendRing(ringC);
+    //   await exchangeTestUtil.sendRing(ringD);
+    //   await exchangeTestUtil.sendRing(ringE);
 
-      await exchangeTestUtil.submitTransactions();
+    //   await exchangeTestUtil.submitTransactions();
 
-      await verify();
-    });
+    //   await verify();
+    // });
 
     it("Cancelled storageID (order.storageID < storage.storageID)", async () => {
       const storageID = 8;

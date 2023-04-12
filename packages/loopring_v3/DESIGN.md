@@ -1,6 +1,6 @@
 ## Table of Contents
 
-- [Loopring 3.6](#loopring-3)
+- [Degate](#degate)
   - [Introduction](#introduction)
   - [Trading with Off-chain Balances](#trading-with-off-chain-balances)
     - [Apparent Immediate Finality](#apparent-immediate-finality)
@@ -18,15 +18,14 @@
   - [zkRollup Transactions](#zkRollup-Transactions)
     - [Spot trade](#spot-trade)
       - [Fee Model](#fee-model)
-      - [AMM](#AMM)
       - [Canceling Orders](#canceling-orders)
       - [Storage](#storage)
+    - [Batch Spot trade](#batch-spot-trade)
     - [Transfer](#transfer)
     - [Deposit](#deposit)
     - [Withdraw](#withdraw)
     - [Account Update](#account-update)
-    - [AMM Update](#AMM-update)
-    - [Signature Verification](#signature-verification)
+    - [AppKey Update](#app-key-update)
     - [No-op](#no-op)
     - [Block](#block)
   - [Account Creation](#account-creation)
@@ -48,13 +47,13 @@
     - [Setting up the exchange](#setting-up-the-exchange)
     - [Trading](#trading)
 
-# Loopring 3
+# Degate
 
-Loopring 3 is a zkRollup Exchange and Payment Protocol. The most recent version is Loopring 3.6.
+Degate 3 is a zkRollup Exchange and Payment Protocol, based on Loopring 3.6 version. We focus on order book trading, adding features like grid trading, asset key support, and also several big changes that can significantly save gas per transaction.
 
 # Introduction
 
-In Loopring Protocol 3, we want to improve the throughput of the protocol significantly. We do this by using zkSNARKs -- as much work as possible is done off-chain, and we only verify the work on-chain.
+In Degate, we want to improve the throughput of the protocol significantly. We do this by using zkSNARKs -- as much work as possible is done off-chain, and we only verify the work on-chain.
 
 For the highest throughput, we only support off-chain balances. These are balances that are stored in Merkle trees. Users can deposit and withdraw tokens to our smart contracts, and their balance will be updated in the Merkle trees. This way, we can transfer tokens between users just by updating the Merkle tree off-chain, there is no need for expensive token transfers on-chain.
 
@@ -78,17 +77,22 @@ An off-chain token transfer takes only a minimal cost for generating the proof f
 
 A Merkle tree is used to store all the permanent data needed in the circuits.
 
-![Merkle Tree](https://i.imgur.com/dNvIuso.png)
+![Merkle Tree](merkletree.png)
 
 There are many ways the Merkle tree can be structured (or can be even split up in multiple trees, like a separate tree for the trading history, or a separate tree for the fees). The Merkle tree above has the right balance between complexity, proving times, and user-friendliness.
 
 - Only a single account needed for all tokens that are or will be registered
-- No special handling for anything. Every actor in the Loopring ecosystem has an account in the same tree.
+- No special handling for anything. Every actor in the Degate ecosystem has an account in the same tree.
 - A single nonce for every account (instead of e.g., a nonce for every token a user owns) allows off-chain requests to be ordered on the account level, which users will expect.
 - While trading, two token balances are modified for a user (tokenS, tokenB). Because the balances are stored in their own sub-trees, only this smaller sub-tree needs to be updated two times. The account itself is modified only a single time (the balances Merkle root is stored inside the account leaf). The same is useful for operators because they also pay/receive fees in different tokens.
 - The storage tree is a sub-tree of the token balance, which may seem strange at first, but is very efficient. Because the storage is stored for tokenS, we already need to update the balance for this token, so updating the storage only has an extra cost of updating this small sub-tree. The storage is not part of the account leaf because that way, we would only have 2^14 leaves for all tokens together. Note that account owners can create [a lot more orders](#storage) for each token than the 2^14 slots available in this tree!
 
 The first account with accountID 0 is used to store the protocol fees until they are withdrawn to layer 1.
+
+In Degate we made the following adjustments to the Merkle tree
+
+1. We modified the Merkle Tree, moving the StorageRoot from token leaf to account leaf, making StorageRoot as the sibling of TokenRoot.
+2. We calculate 2 Merkle Tree roots, a complete root and a simple asset root. The complete root ensures the whole Merkle Tree, ensure the circuit logic, and the simpler root is reduced withhout StorageRoots. Both roots are verified for each ZKP submitted to smart contract, and latest roots are stored on-chain. User can use simple asset root and the data published on-chain to restore the Merkle Tree without StorageRoots, and withdraw their tokens in withdrawal mode, ensuring trust-less.
 
 # Blocks
 
@@ -100,11 +104,7 @@ The operator is responsible for creating, proving, and submitting blocks. Blocks
 
 The operator can be a simple Ethereum address or a complex contract that allows multiple operators to work together to submit and prove blocks. It is up to the exchange for how this is set up.
 
-The operator contract can also be used to enforce an off-chain data-availability system. A simple scheme could be that multiple parties need to sign off on a block before it can be committed. This can be checked in the operator contract. As long as one member is trustworthy and actually shares the data, then data-availability is ensured.
-
 The operator creates a block and submits it on-chain by calling `submitBlocks`. Multiple blocks can be submitted at the same time. All blocks will be verified immediately. If possible, batch verification is used to verify multiple blocks of the same type.
-
-An operator can only submit new blocks when the exchange owner has `minExchangeStakeWithDataAvailability`LRC staked.
 
 ## Replay protection
 
@@ -113,6 +113,7 @@ All zkRollup transactions increase the **nonce** of the account which authorized
 - Deposits
 - Forced withdrawals
 - Spot trades
+- Batch spot trades
 - Transfers
 
 The first two are authorized on-chain, and thus the replay protection is handled on that level. Spot trades and transfers can be processed more flexibly and protected against replay using the Merkle tree's storage sub-tree.
@@ -123,7 +124,7 @@ Block submission needs to be done sequentially so the Merkle tree can be updated
 
 Note that user accounts and orders cannot be shared over different exchanges. Exchanges can decide to use the same Exchange contract to share orders and users' accounts if they desire.
 
-The Loopring contract is the creator of all exchanges built on top of the Loopring protocol. This contract contains data and functionality shared over all exchanges and enforces some minimal exchange settings, such as the forced withdrawal fee.
+The Degate contract is the creator of all exchanges built on top of the Degate protocol. This contract contains data and functionality shared over all exchanges and enforces some minimal exchange settings, such as the forced withdrawal fee.
 
 ## Deposit Contract
 
@@ -137,9 +138,9 @@ It is also possible to use the token addresses as seen by the exchange as a key 
 
 ## Exchange Creation
 
-Anyone can create a new exchange by calling `forgeExchange` on the ProtocolRegistry contract. A small amount of LRC may need to be burned to create a new exchange.
+In Degaet, we will only create one exchange instance.
 
-An Exchange has an owner. The owner is the only one who can submit blocks (more commonly called the operator in this role), but the owner call functions related to the more business side of things like registering tokens.
+An Exchange has an owner. The owner is the only one who can submit blocks (more commonly called the operator in this role).
 
 ## Exchange Staking
 
@@ -149,39 +150,34 @@ The stake ensures that the exchange behaves correctly. This is done by only allo
 
 Exchanges with a large stake have a lot to lose by not playing by the rules and have nothing to gain because the operator/owner can never steal funds for itself.
 
-## Protocol Fee Staking
-
-The exchange owner can stake LRC to lower the [protocol fee](#trading-protocol-fee). Anyone can add to the stake of a particular exchange by calling `depositProtocolFeeStake`, withdrawing the stake can be done using `withdrawProtocolFeeStake`.
-
-Note that the amount staked this way only counts for 50% to reduce the protocol fees because of the extra flexibility compared to the exchange stake. The surplus amount of LRC staked in exchange staking (i.e., everything above the minimum amount required to submit new blocks) is counted for the complete 100%. This is to incentivize exchange staking, which gives more guarantees to users.
-
-The protocol fees can be linearly reduced from `maxProtocolTakerFeeBips` to `minProtocolTakerFeeBips` by staking `targetProtocolTakerFeeStake`LRC, and from `maxProtocolMakerFeeBips` to `minProtocolMakerFeeBips` by staking `targetProtocolMakerFeeStake`LRC.
-
 ## Exchange Shutdown
 
 The exchange owner can choose to shut down the exchange at any time by calling `shutdown`. However, an exchange's stake can only be withdrawn using `withdrawExchangeStake` when the exchange was shut down and did not enter withdrawal mode for `MIN_TIME_IN_SHUTDOWN` seconds. This ensures users are notified well in advance and can still withdraw their funds efficiently and in a user-friendly way with the operator's help.
 
 ## Token Registration
 
-Before a token can be used in the exchange, it needs to be registered, so a small token ID of 2 bytes can be used instead. Only the exchange owner can register tokens by calling `registerToken`. We ensure a token can only be registered once. ETH and LRC are registered when the exchange is created.
+Before a token can be used in the exchange, it needs to be registered, so a small token ID of 2 bytes can be used instead. Only the exchange owner can register tokens by calling `registerToken`. We ensure a token can only be registered once. ETH and DG are registered when the exchange is created.
 
-We limit the token ID to just 16 bits (i.e., a maximum of ETH + 65535 tokens) to increase the circuits' performance.
+In Degate, everyone can register tokens by calling `registerToken`.
+And token ID is changed to 32 bits to support more tokens.
 
 # zkRollup Transactions
 
 A single circuit was created that can handle all the different zkRollup transactions we support:
 
-- Spot trade
+- Spot trade (May Be Removed)
+- Batch Spot Trade
+- Order Cancel
+- Init Account (TODO - will deliver this in next release)
 - Transfer
 - Deposit
 - Withdraw
-- Update account
-- Update AMM
+- Update Account
 - No-op
 
 We support a couple of different block sizes for the circuit to reduce the proving time without padding too many no-op works (or long delays until the block can be completely filled). We also support block versions so that we can upgrade the circuits.
 
-## Spot trade
+## Spot Trade
 
 Spot trades allow trading to happen between two orders. Orders and order-matching are completely off-chain, only trade settlements are included in a block for verification.
 
@@ -192,18 +188,27 @@ Order {
   exchange (160bit)
   storageID (32bit)
   accountID (32bit)
-  tokenS (16bit)
-  tokenB (16bit)
+  tokenS (32bit)
+  tokenB (32bit)
   amountS (96bit)
   amountB (96bit)
   validUntil (32bit)
-  maxFeeBips (6bit)
+  maxFee (96bit)
+  feeBips (12bit)
+  tradingFee (96bit)
   fillAmountBorS (1bit)
   taker (160bit)
+  feeTokenID (32bit)
+  type (8bit)
+  gridOffset (96bit)
+  orderOffset (96bit)
+  maxLevel (8bit)
+  startOrder (used for automarket order)
+  useAppKey (1bit)
 }
 ```
 
-This data is hashed using Poseidon/t12f6p53 in the sequence given above. The hash is signed by the order Owner using the private key associated with the public key stored in `account[accountID]`.
+This data is hashed using Poseidon/t18f6p53 in the sequence given above. The hash is signed by the order Owner using the private key associated with the public key stored in `account[accountID]`.
 
 ```
 SpotTrade {
@@ -211,6 +216,10 @@ SpotTrade {
   Order orderB
   orderA_fillS （24 bits, 19 bits for the mantissa part and 5 for the exponent part)
   orderB_fillS （24 bits, 19 bits for the mantissa part and 5 for the exponent part)
+  orderA_feeTokenID
+  orderB_feeTokenID
+  orderA_fee（16 bits, 11 bits for the mantissa part and 5 for the exponent part)
+  orderB_fee（16 bits, 11 bits for the mantissa part and 5 for the exponent part)
   orderA_feeBips (6bit)
   orderB_feeBips (6bit)
   orderA_amm (1bit)
@@ -230,20 +239,22 @@ The `fillAmountBorS` parameter can be used to decide which amount is the limitin
 - For both Orders:
     - Account ID: 4 bytes
     - Storage ID: 4 bytes
-    - TokenS: 2 bytes
-    - FillS: 3 bytes （24 bits, 19 bits for the mantissa part and 5 for the exponent part)
+    - TokenS: 4 bytes
+    - FillS: 4 bytes （24 bits, 19 bits for the mantissa part and 5 for the exponent part)
+    - FeeTokenID: 4 bytes
+    - Fee: 2 bytes （16 bits, 11 bits for the mantissa part and 5 for the exponent part)
     - Order data (fillAmountBorS,feeBips): 1 byte
 ```
 
-- => **28 bytes/ring**
-- => Calldata cost: 28 \* 16 = **448 gas/ring**
+- => **44 bytes/ring**
+- => Calldata cost: 44 \* 16 = **704 gas/ring**
 
 ### Fee Model
 
-#### Trading Protocol Fee
+#### Trading Fee
 
-This fee is proportionally applied on every token transfer part of the trade. The protocol fee can be lowered by staking LRC. A different protocol fee can be used for maker orders and taker orders.
-A protocol fee value is stored in a single byte in `bips/10`. This allows us to set the protocol fee up to `0.255%` in steps of `0.001%` (`0.1 bips`).
+This fee is proportionally applied on every token transfer part of the trade. The trading fee can be lowered by staking DG. A same max trading fee can be used for maker orders and taker orders.
+A trading fee value is stored in a single byte in `bips/10`. This allows us to set the trading fee up to `0.255%` in steps of `0.001%` (`0.1 bips`).
 
 ##### Different treatment of maker and taker orders
 
@@ -252,53 +263,13 @@ The first order in the ring is always the taker order, and the second order is a
 
 ##### Fee payments
 
-They are paid in the tokenB of the order. These are not taxed or do not have any other disadvantages. The order owner pays the fee to the operator respecting `feeBips`. These values are calculated on the full amount bought, and the protocol fee does not change this in any way.
+They are paid in the tokenB of the order. These are not taxed or do not have any other disadvantages. The order owner pays the fee to the operator respecting `feeBips`. These values are calculated on the full amount bought. feeBips must less than protocolFeeBips which saved in L2 contract.
 
 The maximum value of `feeBips` is `0.63%` in steps of `0.01%` (`1 bips`).
 
 ##### Buy/Sell orders
 
 Users can decide if they want to buy a fixed number of tokens (a buy order) if they want to sell a fixed number of tokens (a sell order). A buy order contains the maximum price the user wants to spend (by increasing amountS), a sell order contains the minimum price the users wants to get (by decreasing amountB). This allows us to do market orders.
-
-##### Operators pays all actual costs for a trade
-
-The operator is responsible for paying the protocol fee. By doing this, we decouple the protocol fee from the fee paid by the order owners. This is useful because the fee paid by the order can be lower than the protocol fee. Otherwise, this could give issues when the protocol fee changes or when the order is used as maker/taker, and different protocol fees apply.
-
-Note that the operator normally receives fees from both orders, which he can use to pay the protocol fees.
-
-Nevertheless, if the operator pays the protocol fee, why have different protocol fee rates? One could argue that a 0.05% taker fee and a 0.01% maker fee is the same as a fixed 0.03% rate because the same entity pays the fee. That is true, but in general, the operator will get a larger fee for the taker order than for the maker order so he will receive more tokens in `takerOrder.amountB` than in `makerOrder.amountB`. By having different rates, it is more likely that the operator can pay the complete protocol fee just by using the tokens he receives.
-
-### AMM
-
-It is possible to enable Automated Market-Maker (AMM) functionality on an account. This is done by setting the AMM token weights of at least two tokens to non-zero (using [AMM Update](#AMM-Update) transactions). Once that is the case, the operator can create any orders between those tokens, without any signature or other explicit approval of the account owner, as long as the price for the order is equal or better (from the AMM's point of view) than the price required by the AMM price curve. From the protocol's point of view, AMM swaps are the same as trades between different orders, but instead of approved with a signature from the account owner, it is approved by the curve set by the account owner. The fee paid by the AMM account for the trade to the operator is enforced to be 0.
-
-The curve enforced in the protocol is the balancer/bancorV2 curve `x^a*y^b = k` and is defined as follows in the protocol:
-
-```
-const calcOutGivenIn = (
-  balanceIn: number,
-  weightIn: number,
-  balanceOut: number,
-  weightOut: number,
-  amountIn: number,
-  feeBips: number
-  ) => {
-    const weightRatio = weightIn / weightOut;
-    const fee = amountIn * feeBips / 10000;
-    const y = balanceIn / (balanceIn + (amountIn - fee));
-    const p = pow(y, weightRatio);
-    return balanceOut * p;
-}
-```
-
-Thus, the formula depends on the following parameters:
-
-- The current balances of the two tokens being traded in the AMM account
-- The weights set for the two tokens being traded in the AMM account
-- The required fee for the AMM account
-- The amount being traded
-
-The power operation cannot be efficiently implemented inside circuits (or solidity), and so we use an [approximation](https://docs.balancer.finance/protocol/index/approxing) similarly to the one used by Balancer. As an additional safety check against potential rounding errors, extra checks are added so that the price after a trade can never be decreased.
 
 ### Canceling Orders
 
@@ -342,6 +313,186 @@ A user could create an order selling X tokenZ for either N tokenA or M tokenB (o
 
 A practical use case would be selling some token for one of the available stablecoins, or selling some token for ETH and WETH. In these cases, the user does not care which specific token he buys, but he increases his chance of finding a matching order.
 
+## Batch Spot Trade
+
+Batch Spot trades allow trading to happen between six users. the first user have 4 orders, second 2 orders, third 1 orders, fourth 1 orders, fifth 1 orders, sixth 1 orders。Orders and order-matching are completely off-chain, only trade settlements are included in a block for verification.
+
+**Partial order filling** is fully supported, just like Spot Trade.
+
+```
+Order {
+  exchange (160bit)
+  storageID (32bit)
+  accountID (32bit)
+  tokenS (32bit)
+  tokenB (32bit)
+  amountS (96bit)
+  amountB (96bit)
+  validUntil (32bit)
+  maxFee (96bit)
+  feeBips (12bit)
+  tradingFee (96bit)
+  fillAmountBorS (1bit)
+  taker (160bit)
+  feeTokenID (32bit)
+  type (8bit)
+  gridOffset (96bit)
+  orderOffset (96bit)
+  maxLevel (8bit)
+  startOrder (used for automarket order)
+  useAppKey (1bit)
+}
+```
+
+This data is hashed using Poseidon/t18f6p53 in the sequence given above. The hash is signed by the order Owner using the private key associated with the public key stored in `account[accountID]`.
+
+```
+BatchSpotTrade {
+  tokens: [0,1,2],
+  bindToken: 2
+  users: [
+    {
+      accountID (32bit)
+      isNoop (1bit)
+      orders [
+        Order order1
+        Order order2
+      ]
+    }
+  ]
+}
+```
+
+The `taker` parameter must be `0`.
+
+##### Fee payments
+
+They are paid in the tokenB of the order. These are not taxed or do not have any other disadvantages. The order owner pays the fee to the operator respecting `tradingFee`. These values are less than this value of calculated on the full amount bought by the operator respecting `feeBips`. feeBips must less than protocolFeeBips which saved in L2 contract.
+
+### Data-availability
+
+```
+- For both Users:
+    - Account ID: 4 bytes
+    - FirstTokenAmountExchange: 3 bytes （24 bits, 1 bit is used for the symbols of positive and negative numbers, 18 bits for the mantissa part and 5 for the exponent part)
+    - SecondTokenAmountExchange: 3 bytes （24 bits, 1 bit is used for the symbols of positive and negative numbers, 18 bits for the mantissa part and 5 for the exponent part)
+    - ThirdTokenAmountExchange: 3 bytes （24 bits, 1 bit is used for the symbols of positive and negative numbers, 18 bits for the mantissa part and 5 for the exponent part), just first user had third token amount exhcnage, and first user need put into last position.
+- For Outside
+    - Type Tx: 3 bits
+    - Bind Token: 5 bits
+    - FirstToken: 4 bytes
+    - SecondToken: 4 bytes
+    - SecondUserTokenType: 2 bits
+    - ThirdUserTokenType: 2 bits
+    - FourthdUserTokenType: 2 bits
+    - FifthUserTokenType: 2 bits
+    - ZeroPad: 6 bits
+    - SixthUserTokenType: 2 bits
+```
+
+- => **74 bytes/ring**
+- => Calldata cost: 74 \* 16 = **1184 gas/ring**
+
+### Auto Market Order
+
+Auto market order(type 6 or 7) is special orders - one signature, indicating a chain of orders (255 maximum). Grid trading is supported by this special order.
+type = 6, for sell orders.
+type = 7, for buy orders.
+
+#### max order quantity
+
+MaxLevel which defined in order signature determines the quantity of auto market order.
+
+#### order chain
+
+Auto market orders will generate maxLevel number of order chains, and each order chain has a common storage space in merkle tree. The forward and reverse sign and matching data are all stored in this storage space. When a forward order match is completed, the next order match in the current order chain must be a reverse order.
+
+#### order signature
+
+User just need one signature for sell or buy auto market order. this signature contains type, maxLevel, gridOffset, orderOffset.
+Gridoffset determines the price interval for different levels of orders. Orderoffset determines the price interval of forward and reverse orders.
+With these fields, can easily calculate the specific data of orders at different levels, provided that each order must contain the user's signed order(startOrder) information.
+
+### Customized batch spot trade
+
+In order to save the size of calldata, only two token ID are pushed into calldata, which means that the ID of the other token must be bound to the transaction. Therefore, we will have multiple batch transactions bound with different Tokens.
+
+## Order Cancel
+
+Orders can be cancelled in circuit for trust-less.
+
+```
+  exchange (160bit)
+  accountID (32bit)
+  tokenID (32bit)
+  storageID (32bit)
+  fee (16bit)
+  maxFee (16bit))
+  feeTokenID (32bit)
+  useAppKey (1bit)
+```
+
+Order cancellation is actually setting the canceled field of the storage space bound to the order. Set to 1 is canceled
+
+### Data-availability
+
+```
+- Type Tx: 3 bits
+- Type Tx Pad: 1 bit
+- Account owner: 20 bytes
+- Account ID: 4 bytes
+- Fee token ID: 4 bytes
+- Fee amount: 2 bytes （16 bits, 11 bits for the mantissa part and 5 for the exponent part)
+- StorageID: 4 bytes
+```
+
+- => **35 bytes/transfer** (in the most common case)
+- => Calldata cost: 35 \* 16 = **560 gas/transfer**
+
+## AppKey Update
+
+The EdDSA key of an account can be updated. This key is the app key with the limited authority. User can set the switches of transfer, withdraw, spot trade and batch spot trade for app key.
+
+```
+AppKeyUpdate {
+  exchange (160bit)
+  accountID (32bit)
+  feeTokenID (32bit)
+  fee (96bit)
+  appKeyX (254bit)
+  appKeyY (254bit)
+  validUntil (32bit)
+  nonce (32bit)
+  disableAppKeySpotTrade (1bit)
+  disableAppKeyWithdraw (1bit)
+  disableAppKeyTransferToOther (1bit)
+}
+```
+
+This data is hashed using Poseidon/t12f6p53 in the sequence given above. The hash is signed by the account owner using the asset key stored in `account[accountID]`.
+
+An appKey update can must be approved using an eddsa signature.
+
+```
+bytes32 constant public APPKEYUPDATE_TYPEHASH = keccak256(
+    "AppKeyUpdate(exchange, uint32 accountID,uint16 feeTokenID,uint96 maxFee,uint256 appKey,uint32 validUntil,uint32 nonce,uint32 disableAppKeySpotTrade,uint32 disableAppKeyWithdraw,uint32 disableAppKeyTransferToOther)"
+);
+```
+
+### Data-availability
+
+```
+- Type Tx: 3 bits
+- Type Tx Pad: 1 bit
+- Account ID: 4 bytes
+- Fee token ID: 4 bytes
+- Fee amount: 2 bytes （16 bits, 11 bits for the mantissa part and 5 for the exponent part)
+- Nonce: 4 bytes
+```
+
+- => **15 bytes/appKey update**
+- => Calldata cost: 15 \* 16 = **240 gas/appKey update**
+
 ## Transfer
 
 Transfers can be used to transfer tokens (including ETH) between two accounts. A fee can be paid to the operator in any token.
@@ -351,19 +502,20 @@ Transfer {
   exchange (160bit)
   fromAccountID (32bit)
   toAccountID (32bit)
-  tokenID (16bit)
+  tokenID (32bit)
   amount (96bit)
-  feeTokenID (16bit)
+  feeTokenID (32bit)
   fee (96bit)
   to (160bit)
   dualAuthorX (254bit)
   dualAuthorY (254bit)
   validUntil (32bit)
   storageID (32bit)
+  useAppKey (1bit)
 }
 ```
 
-This data is hashed using Poseidon/t13f6p53 in the sequence given above. The hash is signed by the account owner of `fromAccountID` using the private key associated with the public key stored in `account[fromAccountID]`.
+This data is hashed using Poseidon/t14f6p53 in the sequence given above. The hash is signed by the account owner of `fromAccountID` using the private key associated with the public key stored in `account[fromAccountID]`.
 
 A transfer is done to the specified `to` address. `toAccountID` can be left to 0 to allow the operator to decide which account should receive the funds. This allows the operator to create a new account for `to` if needed.
 
@@ -384,24 +536,28 @@ Not all features available for transfers using EdDSA signatures are available us
 ### Data-availability
 
 ```
+- Type Tx: 3 bits
+- Type Tx Pad: 1 bit
 - Type: 1 bytes (type > 0 for conditional transfers)
 - From account ID: 4 bytes
 - To account ID: 4 bytes
-- Token ID: 2 bytes
+- Token ID: 4 bytes
 - Amount: 3 bytes （24 bits, 19 bits for the mantissa part and 5 for the exponent part)
-- Fee token ID: 2 bytes
+- Fee token ID: 4 bytes
 - Fee amount: 2 bytes （16 bits, 11 bits for the mantissa part and 5 for the exponent part)
 - StorageID: 4 bytes
 - To: 20 bytes （only set when transferring to a new account)
 - From: 20 bytes （only set for conditional transfers)
 ```
 
-- => **22 bytes/transfer** (in the most common case)
-- => Calldata cost: 22 \* 16 = **352 gas/transfer**
+- => **27 bytes/transfer** (in the most common case)
+- => Calldata cost: 27 \* 16 = **432 gas/transfer**
 
 ## Deposit
 
 A user can deposit funds by calling `deposit`. If ERC-20 tokens are deposited, the user first needs to approve the Exchange contract so the contract can transfer them to the contract using `transferFrom`. **ETH is supported**, no need to wrap it in WETH when using off-chain balances.
+
+A user can also deposit funds by transfering tokens to deposit contract directly, called gas saving deposit. In this case, user does not need to call approve. To validate the deposit tx, the unconfirmed token balance in deposit contract needs to be greater than the deposit amount.
 
 A user can deposit to any Ethereum address, even if that address does not have an account yet.
 
@@ -419,14 +575,15 @@ Both methods allow the user to pay for the deposit in any token (on layer 1 or l
 ### Data-availability
 
 ```
+- Type: 1 byte (0 for calling `deposit`, 1 for gas saving deposit)
 - Owner: 20 bytes
 - Account ID: 4 bytes
-- Token ID: 2 bytes
-- Amount: 12 bytes
+- Token ID: 4 bytes
+- Amount: 31 bytes
 ```
 
-- => **38 bytes/deposit (max)**
-- => Calldata cost: 38 \* 16 = **608 gas/deposit**
+- => **41 bytes/deposit (max)**
+- => Calldata cost: 41 \* 16 = **656 gas/deposit**
 
 ## Withdraw
 
@@ -436,17 +593,18 @@ A withdrawal is used to transfer funds from layer 2 to layer 1. It can also be u
 Withdrawal {
   exchange (160bit)
   accountID (32bit)
-  tokenID (16bit)
+  tokenID (32bit)
   amount (96bit)
-  feeTokenID (16bit)
+  feeTokenID (32bit)
   fee (96bit)
   onchainDataHash (160bit)
   validUntil (32bit)
   nonce (32bit)
+  useAppKey (1bit)
 }
 ```
 
-This data is hashed using Poseidon/t10f6p53 in the sequence given above. The hash is signed by the account owner using the private key associated with the public key stored in `account[accountID]`.
+This data is hashed using Poseidon/t11f6p53 in the sequence given above. The hash is signed by the account owner using the private key associated with the public key stored in `account[accountID]`.
 
 `onchainDataHash` contains extra data not directly used in the circuit and is calculated as follows:
 
@@ -455,14 +613,12 @@ bytes20 onchainDataHash = bytes20(keccak256(
     abi.encodePacked(
         minGas,
         to,
-        extraData
+        amount
     )
 ));
 ```
 
 The withdrawal is made to the specified `to` address. The amount of gas provided for this withdrawal needs to be at least `minGas`. If the withdrawal fails, anyone can still withdraw the funds to `to` using `withdrawFromApprovedWithdrawal`.
-
-The user can send extra data to the deposit contract stored into `extraData`. How this data is interpreted is left to the deposit contract, but the deposit contract can be sure the user has approved this data and can use it as it sees fit. Possible use cases for this are sending wrapped BTC on Ethereum to the account owner's BTC address. Another example is a meta transaction system where the user can do arbitrary contract calls (potentially directly after the withdrawal) very efficiently Most meta transaction overhead on-chain is very limited as replay protection, fee payment, and signature checks are done on layer 2 when possible.
 
 `setWithdrawalRecipient` can be used to specify a different recipient address than was initially specified in the withdrawal request. This can be used to implement functionality like fast withdrawals.
 
@@ -470,13 +626,13 @@ A withdrawal can also be approved using an on-chain signature or by approving th
 
 ```
 bytes32 constant public WITHDRAWAL_TYPEHASH = keccak256(
-  "Withdrawal(address owner,uint32 accountID,uint16 tokenID,uint96 amount,uint16 feeTokenID,uint96 maxFee,address to,bytes extraData,uint minGas,uint32 validUntil,uint32 nonce)"
+  "Withdrawal(address owner,uint32 accountID,uint16 tokenID,uint248 amount,uint16 feeTokenID,uint96 maxFee,address to,uint minGas,uint32 validUntil,uint32 nonce)"
 );
 ```
 
 ### Forced Withdrawals
 
-It is possible to force the operator to process a withdrawal for the complete balance in an account. This is done by doing a withdrawal request on-chain using `forceWithdraw`. A fee in ETH needs to be paid for this request, and the fee paid by the user is fixed and decided by the Loopring contract at `forcedWithdrawalFee()`. `forceWithdraw` takes the account owner, the token address and the account ID as parameters. On-chain we do not know which account has which owner, or if the owner even has an account. So when this function is called, we do not know if it is a valid withdrawal (started by the account owner or an agent of his) or a withdrawal that needs to be ignored because it was started by someone that is not authorized to approve transactions for the account. The operator and circuits know if the withdrawal was valid or not, and if it is valid, the full balance is withdrawn; otherwise, the account is left unchanged.
+It is possible to force the operator to process a withdrawal for the complete balance in an account. This is done by doing a withdrawal request on-chain using `forceWithdraw`. A fee in ETH needs to be paid for this request, and the fee paid by the user is fixed and decided by the Degate contract at `forcedWithdrawalFee()`. `forceWithdraw` takes the account owner, the token address and the account ID as parameters. On-chain we do not know which account has which owner, or if the owner even has an account. So when this function is called, we do not know if it is a valid withdrawal (started by the account owner or an agent of his) or a withdrawal that needs to be ignored because it was started by someone that is not authorized to approve transactions for the account. The operator and circuits know if the withdrawal was valid or not, and if it is valid, the full balance is withdrawn; otherwise, the account is left unchanged.
 
 The operator is allowed to process these forced withdrawals in any order but must process them within `MAX_AGE_FORCED_REQUEST_UNTIL_WITHDRAW_MODE` seconds the request was made on-chain. From that point on, `notifyForcedRequestTooOld` can be called by anyone to enable withdrawal mode.
 
@@ -492,18 +648,17 @@ This problem can be solved by making use of `validUntil` in the withdrawal reque
 - Type: 1 bytes (type > 0 for conditional withdrawals, type == 2 for a valid forced withdrawal, type == 3 when invalid)
 - Owner: 20 bytes
 - Account ID: 4 bytes
-- Token ID: 2 bytes
-- Amount: 12 bytes
-- Fee token ID: 2 bytes
+- Token ID: 4 bytes
+- Fee token ID: 4 bytes
 - Fee amount: 2 bytes （16 bits, 11 bits for the mantissa part and 5 for the exponent part)
 - Nonce: 4 bytes
 - OnchainDataHash: 20 bytes
 ```
 
-- => **67 bytes/withdrawal**
-- => Calldata cost: 67 \* 16 = **1072 gas/withdrawal**
+- => **59 bytes/withdrawal**
+- => Calldata cost: 59 \* 16 = **944 gas/withdrawal**
 
-## Account Update
+## Update Account
 
 The EdDSA key of an account can be updated.
 
@@ -511,7 +666,7 @@ The EdDSA key of an account can be updated.
 AccountUpdate {
   exchange (160bit)
   accountID (32bit)
-  feeTokenID (16bit)
+  feeTokenID (32bit)
   fee (96bit)
   publicKeyX (254bit)
   publicKeyY (254bit)
@@ -538,58 +693,15 @@ This allows setting the initial EdDSA key when an account was created without an
 - Type: 1 byte (type > 0 for a conditional transaction)
 - Account owner: 20 bytes
 - Account ID: 4 bytes
-- Fee token ID: 2 bytes
+- Fee token ID: 4 bytes
 - Fee amount: 2 bytes （16 bits, 11 bits for the mantissa part and 5 for the exponent part)
 - Public key: 32 bytes
 - Nonce: 4 bytes
 ```
 
-- => **65 bytes/account update**
-- => Calldata cost: 65 \* 16 = **1040 gas/account update**
-
-## AMM Update
-
-An AMM update can be approved using an on-chain signature or by approving the hash of the transaction using `approveTransaction`.
-
-```
-bytes32 constant public AMMUPDATE_TYPEHASH = keccak256(
-      "AmmUpdate(address owner,uint32 accountID,uint16 tokenID,uint8 feeBips,uint96 tokenWeight,uint32 validUntil,uint32 nonce)"
-  );
-```
-
-This transaction is used to update the fee bips expected for each trade by the account. Like other AMM designs, this is simply done by increasing the price of the token being sold, not by an additional token transfer, and is part of the AMM formula implemented in the protocol. It is also used to set the AMM weight of the specified token. The weights of the token directly impact the curve followed by the AMM.
-
-The transaction also makes the balance of the specified token in the account available in the data-availability data. This is to facilitate efficient communication between layer 1 and layer 2. This is especially useful for the necessary logic needed on layer 1 to e.g., manage pool contracts for the AMM.
-
-### Data-availability
-
-```
-- Account owner: 20 bytes
-- Account ID: 4 bytes
-- Token ID: 2 bytes
-- AMM fee bips: 1 byte
-- Token weight: 12 bytes
-- Nonce: 4 bytes
-- Balance: 12 bytes
-```
-
-- => **55 bytes/AMM update**
-- => Calldata cost: 55 \* 16 = **880 gas/AMM update**
-
-## Signature Verification
-
-This transaction allows checking if an account owner signed some data (up to 253 bits) using EdDSA. This makes it possible to efficiently check EdDSA signatures on-chain.
-
-### Data-availability
-
-```
-- Account owner: 20 bytes
-- Account ID: 4 bytes
-- Data: 32 bytes
-```
-
-- => **56 bytes/Signature verification**
-- => Calldata cost: 56 \* 16 = **896 gas/Signature verification**
+- => **67 bytes/account update**
+- => Calldata cost: 67 \* 16 = **1072 gas/account update**
+  cost: 56 \* 16 = **896 gas/Signature verification**
 
 ## No-op
 
@@ -618,14 +730,24 @@ A block can contain many conditional transactions. For each conditional transact
 - Exchange address: 20 bytes
 - Merkle root before: 32 bytes
 - Merkle root after: 32 bytes
+- Merkle asset root before: 32 bytes
+- Merkle asset root after: 32 bytes
 - Block timestamp: 4 bytes
-- Protocol taker fee: 1 byte
-- Protocol maker fee: 1 byte
-- Num conditional transactions: 4 bytes
+- Protocol fee: 1 byte
+- Num conditional transactions: 4 bytes (May Be Removed)
 - Operator account ID: 4 bytes
+- Deposit Transaction size: 2 bytes
+- Account Update Transaction size: 2 bytes
+- Withdraw Transaction size: 2 bytes
 - For every transaction (blockSize):
-  - Transaction type: 1 byte
-  - Transaction data: 67 bytes/transaction (padded with zeros when necessary)
+  - Transactions to be processed by the contract(Deposit, Accont Update)
+    - Transaction type: 0 byte
+    - Transaction data: 74 bytes/transaction (padded with zeros when necessary)
+  - Transactions not to be processed by the contract(Spot Trade, Batch Spot Trade, Transfer, Order Cancel, Account Update)
+    - Transaction data: 74 bytes/transaction (padded with zeros when necessary)
+  - Transactions to be processed by the contract(Withdraw)
+    - Transaction type: 0 byte
+    - Transaction data: 74 bytes/transaction (padded with zeros when necessary)
 ```
 
 Most blocks will contain transactions that only need a minimal amount of transaction data. As such, the data will contain many zeros. Compression is used on the full calldata of the block submission to reduce the calldata gas costs.
@@ -638,8 +760,6 @@ There are multiple ways an account can be created for an Ethereum address:
 - A deposit is made to an address that does not exist yet in the Merkle tree.
 
 Only the account owner can set the EdDSA public key for the account (directly or indirectly). This ensures that, if an account for an Ethereum address exists in the Merkle tree, it is indeed entirely owned by the owner. Otherwise, it would be possible to create an account for an Ethereum address, which is not owned by that address, which would be dangerous. The EdDSA public key will be stored in the Merkle tree for the account. This will ensure the account can be used for all transactions types as efficiently as possible.
-
-It is possible to create multiple accounts for a single Ethereum address, though generally there is no need to do that.
 
 # Signatures
 
@@ -667,8 +787,6 @@ On-chain we support multiple signature types:
 
 Signatures data is stored in an opaque `bytes` field, the type of the signature is stored in the last byte.
 
-It is also possible to directly approve a transaction by having the account owner or his agent call the `approveTransaction` smart contract function on the exchange contract.
-
 # Forced Request Handling
 
 Currently, only withdrawals have the option to force the operator to include the request in a block.
@@ -689,28 +807,6 @@ Users can only withdraw their funds using the state of the last block that was s
 
 - Balances still stored in the Merkle tree can be withdrawn with a Merkle proof by calling `withdrawFromMerkleTree`
 - Deposits not yet included in a submitted block can be withdrawn (even when not in withdrawal mode after some time) using `withdrawFromDepositRequest`
-- Approved withdrawals can manually be withdrawn (even when not in withdrawal mode) using `withdrawFromApprovedWithdrawal`
-
-# Conditional Transactions
-
-Conditional transactions are transactions that are approved on-chain by the account owner or an [agent](#Agents) of the account owner, either by an on-chain signature or by calling `approveTransaction`. This allows any on-chain mechanism (done by the account owner himself or by an [agent](#Agents)) to decide if a transaction can be executed or not.
-
-# Agents
-
-An agent is an address that is allowed to authorize on-chain operations for the account owner. By definition, the account owner is an agent for himself. `setAgentRegistry` can be used by the exchange owner to set the contract implementing this agent registration logic. On this contract, `isAgent` is called to check if `msg.sender` is authorized for the user's account.
-
-Agents can be simple EOAs or smart contracts. Smart contracts are the most interesting case. This allows extending the exchange functionality by implementing extra logic on top of the basic exchange functionality built into the exchange contract. There is much functionality that can be added this way for users. Some examples:
-
-- [Layer 1 composability](https://medium.com/loopring-protocol/composability-between-ethereum-layer-1-and-2-10650b7411e5)
-- Fast withdrawals (by using a [conditional transfer](#Conditional-Transactions))
-- Support for any 3rd party meta-transactions
-- ...
-
-# Brokers
-
-A broker is someone that can manage orders for an account it does not own.
-
-The account system is used for this. A user can create a special account for a broker, still with the user's Ethereum address as the owner, and deposit funds the broker can use. The user can now set the EdDSA keys to a set of keys known to the broker. The broker from that point has full access to the account and is authorized for all transactions. However, the owner of the account can revoke access to the account at any time by changing the EdDSA keys.
 
 # Timestamp in Circuits
 
@@ -718,9 +814,9 @@ A block and its proof are always made for a fixed input. The operator cannot acc
 
 We do, however, know the approximate time the block will be committed to the Ethereum blockchain. When committing the block, the operator also includes the timestamp he used in the block (as a part of the public data). This timestamp is checked against the timestamp on-chain, and if the difference is less than `TIMESTAMP_HALF_WINDOW_SIZE_IN_SECONDS` the block can be committed.
 
-# Protocol Fee
+# Trading Fee
 
-The protocol fee is sent to the exchange account with `accountID == 0` and can be withdrawn from the exchange to the `ProtocolFeeVault` (this address is set for all exchanges on the Loopring contract) at any time without authorization (or forced using `withdrawProtocolFees` on the Exchange contract). The `ProtocolFeeVault` contains logic to distribute these funds between LRC stakers, LRC that will be burned, and the DAO fund. Non-LRC tokens are sold on-chain directly in a decentralized way.
+The trading fee is sent to the operator account and can be withdrawn at any time.
 
 # Throughput
 
@@ -753,7 +849,7 @@ Currently, our ring settlement circuit with data-availability support uses ~130,
 
 - `2^28` / 130,000 = 2048 trades/block
 
-## Results
+## Results(TBD)
 
 In a single block, we are currently limited by the number of constraints used in the circuit. Multiple blocks can be submitted at once (+ more efficient batch verification for circuits of the same type) to mitigate this.
 

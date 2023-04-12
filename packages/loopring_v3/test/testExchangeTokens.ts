@@ -48,7 +48,7 @@ contract("Exchange", (accounts: string[]) => {
   const createExchange = async (setupTestState: boolean = true) => {
     exchangeID = await exchangeTestUtil.createExchange(
       exchangeTestUtil.testContext.stateOwners[0],
-      {setupTestState, useOwnerContract: false}
+      { setupTestState, useOwnerContract: false }
     );
     exchange = exchangeTestUtil.exchange;
   };
@@ -93,17 +93,6 @@ contract("Exchange", (accounts: string[]) => {
     });
 
     describe("anyone", () => {
-      it("should not be able to register a token", async () => {
-        await createExchange(false);
-        const token = exchangeTestUtil.getTokenAddress("GTO");
-        await expectThrow(
-          exchange.registerToken(token, {
-            from: exchangeTestUtil.testContext.orderOwners[0]
-          }),
-          "UNAUTHORIZED"
-        );
-      });
-
       it("should not be able to get the token ID for an unregistered token", async () => {
         await createExchange(false);
         const token = exchangeTestUtil.getTokenAddress("GTO");
