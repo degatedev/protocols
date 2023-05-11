@@ -107,7 +107,7 @@ After much research and discussion, DeGate finally chose Groth16 for its zero kn
 
 ## Steps To Prove
 ### Pre-condition
-DeGate has invited multiple trusted institutions or any users to participate in the process of Zero Knowledge Proof Trusted-Setup, which generates proving key and verifying key that are both public and open to challenge. The proving key is used for a proof generation while verifying key is used for verification. For more details about Trusted-Setup please refer to the document.
+DeGate has invited multiple trusted institutions or any users to participate in the process of Zero Knowledge Proof Trusted-Setup, which generates proving key and verifying key that are both public and open to challenge. The proving key is used for a proof generation while verifying key is used for verification. For more details about Trusted-Setup please refer to the [document](https://github.com/degatedev/trusted_setup).
 
 DeGate hardcodes the verifying key into the contract on deployment, so no one has the privilege to delete or replace it after deployment.
 
