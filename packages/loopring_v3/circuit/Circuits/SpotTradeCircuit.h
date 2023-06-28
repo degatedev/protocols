@@ -19,8 +19,8 @@ namespace Loopring
 class SpotTradeCircuit : public BaseTransactionCircuit
 {
   public:
-    DualVariableGadget typeTx;
-    DualVariableGadget typeTxPad;
+    ToBitsGadget typeTx;
+    ToBitsGadget typeTxPad;
     // Orders
     OrderGadget orderA;
     OrderGadget orderB;
@@ -98,8 +98,8 @@ class SpotTradeCircuit : public BaseTransactionCircuit
       const std::string &prefix)
         : BaseTransactionCircuit(pb, state, prefix),
 
-          typeTx(pb, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
-          typeTxPad(pb, NUM_BITS_BIT, FMT(prefix, ".typeTxPad")),
+          typeTx(pb, state.constants.txTypeSpotTrade, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
+          typeTxPad(pb, state.constants._0, NUM_BITS_BIT, FMT(prefix, ".typeTxPad")),
           // Orders
           orderA(pb, state.constants, state.exchange, state.protocolFeeBips, state.constants._1, state.accountA.account.disableAppKeySpotTrade, FMT(prefix, ".orderA")),
           orderB(pb, state.constants, state.exchange, state.protocolFeeBips, state.constants._1, state.accountB.account.disableAppKeySpotTrade, FMT(prefix, ".orderB")),
@@ -347,8 +347,8 @@ class SpotTradeCircuit : public BaseTransactionCircuit
     void generate_r1cs_witness(const SpotTrade &spotTrade)
     {
         LOG(LogDebug, "in SpotTradeCircuit", "generate_r1cs_witness");
-        typeTx.generate_r1cs_witness(pb, ethsnarks::FieldT(int(Loopring::TransactionType::SpotTrade)));
-        typeTxPad.generate_r1cs_witness(pb, ethsnarks::FieldT(0));
+        typeTx.generate_r1cs_witness();
+        typeTxPad.generate_r1cs_witness();
         // Orders
         orderA.generate_r1cs_witness(spotTrade.orderA);
         orderB.generate_r1cs_witness(spotTrade.orderB);
@@ -423,8 +423,8 @@ class SpotTradeCircuit : public BaseTransactionCircuit
     void generate_r1cs_constraints()
     {
         LOG(LogDebug, "in SpotTradeCircuit", "generate_r1cs_constraints");
-        typeTx.generate_r1cs_constraints(true);
-        typeTxPad.generate_r1cs_constraints(true);
+        typeTx.generate_r1cs_constraints();
+        typeTxPad.generate_r1cs_constraints();
         // Orders
         orderA.generate_r1cs_constraints();
         orderB.generate_r1cs_constraints();

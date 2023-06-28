@@ -27,7 +27,7 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
   public:
     Constants constants;
     TransactionState state;
-    DualVariableGadget typeTx;
+    ToBitsGadget typeTx;
     DualVariableGadget bindTokenID;
     VariableT blockExchange;
     VariableT maxTradingFeeBips;
@@ -163,7 +163,7 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
         : BaseTransactionCircuit(pb, _state, prefix),
         constants(_state.constants),
         state(_state),
-        typeTx(pb, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
+        typeTx(pb, state.constants.txTypeBatchSpotTrade, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
         bindTokenID(pb, NUM_BITS_BIND_TOKEN_ID_SIZE, FMT(prefix, ".bindTokenID")),
         blockExchange(_state.exchange),
         maxTradingFeeBips(_state.protocolFeeBips),
@@ -620,7 +620,7 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
     void generate_r1cs_witness(const BatchSpotTrade &batchSpotTrade)
     {
         LOG(LogDebug, "in BatchSpotTradeCircuit", "generate_r1cs_witness");
-        typeTx.generate_r1cs_witness(pb, ethsnarks::FieldT(int(Loopring::TransactionType::BatchSpotTrade)));
+        typeTx.generate_r1cs_witness();
         bindTokenID.generate_r1cs_witness(pb, batchSpotTrade.bindTokenID);
         isBatchSpotTradeTx.generate_r1cs_witness();
         for (size_t i = 0; i < 3; i++) 
@@ -764,7 +764,7 @@ class BatchSpotTradeCircuit : public BaseTransactionCircuit
     void generate_r1cs_constraints()
     {
         LOG(LogDebug, "in BatchSpotTradeCircuit", "generate_r1cs_constraints");
-        typeTx.generate_r1cs_constraints(true);
+        typeTx.generate_r1cs_constraints();
         bindTokenID.generate_r1cs_constraints(true);
         isBatchSpotTradeTx.generate_r1cs_constraints();
         for (size_t i = 0; i < 3; i++) 

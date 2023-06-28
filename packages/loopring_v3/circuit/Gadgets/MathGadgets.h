@@ -89,6 +89,7 @@ class Constants : public GadgetT
     const VariableT txTypeTransfer;
     const VariableT txTypeWithdrawal;
     const VariableT txTypeOrderCancel;
+    const VariableT txTypeAppKeyUpdate;
     const VariableT feeMultiplier;
 
     const VariableT depositType;
@@ -144,6 +145,8 @@ class Constants : public GadgetT
             make_variable(pb, ethsnarks::FieldT(int(TransactionType::Withdrawal)), FMT(prefix, ".txTypeWithdrawal"))),
           txTypeOrderCancel(
             make_variable(pb, ethsnarks::FieldT(int(TransactionType::OrderCancel)), FMT(prefix, ".txTypeOrderCancel"))),
+          txTypeAppKeyUpdate(
+            make_variable(pb, ethsnarks::FieldT(int(TransactionType::AppKeyUpdate)), FMT(prefix, ".txTypeAppKeyUpdate"))),
           feeMultiplier(make_variable(pb, ethsnarks::FieldT(FEE_MULTIPLIER), FMT(prefix, ".feeMultiplier"))),
 
           depositType(make_variable(pb, ethsnarks::FieldT(6), FMT(prefix, ".depositType"))),
@@ -225,6 +228,10 @@ class Constants : public GadgetT
         pb.add_r1cs_constraint(
           ConstraintT(txTypeOrderCancel, FieldT::one(), ethsnarks::FieldT(int(TransactionType::OrderCancel))),
           ".txTypeOrderCancel");
+        pb.add_r1cs_constraint(
+          ConstraintT(txTypeAppKeyUpdate, FieldT::one(), ethsnarks::FieldT(int(TransactionType::AppKeyUpdate))),
+          ".txTypeAppKeyUpdate");
+          
         pb.add_r1cs_constraint(
           ConstraintT(feeMultiplier, FieldT::one(), ethsnarks::FieldT(FEE_MULTIPLIER)), ".feeMultiplier");
 

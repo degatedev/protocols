@@ -22,8 +22,8 @@ namespace Loopring
 class OrderCancelCircuit : public BaseTransactionCircuit
 {
   public:
-    DualVariableGadget typeTx;
-    DualVariableGadget typeTxPad;
+    ToBitsGadget typeTx;
+    ToBitsGadget typeTxPad;
     // Inputs
     DualVariableGadget accountID;
     DualVariableGadget storageID;
@@ -63,8 +63,8 @@ class OrderCancelCircuit : public BaseTransactionCircuit
       const std::string &prefix)
         : BaseTransactionCircuit(pb, state, prefix),
 
-          typeTx(pb, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
-          typeTxPad(pb, NUM_BITS_BIT, FMT(prefix, ".typeTxPad")),
+          typeTx(pb, state.constants.txTypeOrderCancel, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
+          typeTxPad(pb, state.constants._0, NUM_BITS_BIT, FMT(prefix, ".typeTxPad")),
           // Inputs
           accountID(pb, NUM_BITS_ACCOUNT, FMT(prefix, ".accountID")),
           storageID(pb, NUM_BITS_STORAGEID, FMT(prefix, ".storageID")),
@@ -145,8 +145,8 @@ class OrderCancelCircuit : public BaseTransactionCircuit
     {
         LOG(LogDebug, "in OrderCancelCircuit", "generate_r1cs_witness");
         // Inputs
-        typeTx.generate_r1cs_witness(pb, ethsnarks::FieldT(int(Loopring::TransactionType::OrderCancel)));
-        typeTxPad.generate_r1cs_witness(pb, ethsnarks::FieldT(0));
+        typeTx.generate_r1cs_witness();
+        typeTxPad.generate_r1cs_witness();
 
         accountID.generate_r1cs_witness(pb, update.accountID);
         storageID.generate_r1cs_witness(pb, update.storageID);
@@ -181,8 +181,8 @@ class OrderCancelCircuit : public BaseTransactionCircuit
     void generate_r1cs_constraints()
     {
         LOG(LogDebug, "in OrderCancelCircuit", "generate_r1cs_constraints");
-        typeTx.generate_r1cs_constraints(true);
-        typeTxPad.generate_r1cs_constraints(true);
+        typeTx.generate_r1cs_constraints();
+        typeTxPad.generate_r1cs_constraints();
         // Inputs
         accountID.generate_r1cs_constraints(true);
         storageID.generate_r1cs_constraints(true);

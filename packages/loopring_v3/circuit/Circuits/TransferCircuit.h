@@ -36,8 +36,8 @@ namespace Loopring
 class TransferCircuit : public BaseTransactionCircuit
 {
   public:
-    DualVariableGadget typeTx;
-    DualVariableGadget typeTxPad;
+    ToBitsGadget typeTx;
+    ToBitsGadget typeTxPad;
     // Inputs
     DualVariableGadget fromAccountID;
     DualVariableGadget toAccountID;
@@ -132,8 +132,8 @@ class TransferCircuit : public BaseTransactionCircuit
       const std::string &prefix)
         : BaseTransactionCircuit(pb, state, prefix),
 
-          typeTx(pb, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
-          typeTxPad(pb, NUM_BITS_BIT, FMT(prefix, ".typeTxPad")),
+          typeTx(pb, state.constants.txTypeTransfer, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
+          typeTxPad(pb, state.constants._0, NUM_BITS_BIT, FMT(prefix, ".typeTxPad")),
           // Inputs
           fromAccountID(pb, NUM_BITS_ACCOUNT, FMT(prefix, ".fromAccountID")),
           toAccountID(pb, NUM_BITS_ACCOUNT, FMT(prefix, ".toAccountID")),
@@ -402,8 +402,8 @@ class TransferCircuit : public BaseTransactionCircuit
     void generate_r1cs_witness(const Transfer &transfer)
     {
         LOG(LogDebug, "in TransferCircuit", "generate_r1cs_witness");
-        typeTx.generate_r1cs_witness(pb, ethsnarks::FieldT(int(Loopring::TransactionType::Transfer)));
-        typeTxPad.generate_r1cs_witness(pb, ethsnarks::FieldT(0));
+        typeTx.generate_r1cs_witness();
+        typeTxPad.generate_r1cs_witness();
         // Inputs
         fromAccountID.generate_r1cs_witness(pb, transfer.fromAccountID);
         toAccountID.generate_r1cs_witness(pb, transfer.toAccountID);
@@ -494,8 +494,8 @@ class TransferCircuit : public BaseTransactionCircuit
     void generate_r1cs_constraints()
     {
         LOG(LogDebug, "in TransferCircuit", "generate_r1cs_constraints");
-        typeTx.generate_r1cs_constraints(true);
-        typeTxPad.generate_r1cs_constraints(true);
+        typeTx.generate_r1cs_constraints();
+        typeTxPad.generate_r1cs_constraints();
         // Inputs
         fromAccountID.generate_r1cs_constraints(true);
         toAccountID.generate_r1cs_constraints(true);

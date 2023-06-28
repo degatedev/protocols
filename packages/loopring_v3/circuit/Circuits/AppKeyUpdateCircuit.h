@@ -23,9 +23,9 @@ namespace Loopring
 class AppKeyUpdateCircuit : public BaseTransactionCircuit
 {
   public:
-    DualVariableGadget typeTx;
+    ToBitsGadget typeTx;
     // type used 3bits, however as 3bits cannot be converted to hex, it cannot be less then 4bits. so it needs to be pad to 1bit
-    DualVariableGadget typeTxPad;
+    ToBitsGadget typeTxPad;
     // Inputs
     DualVariableGadget accountID;
     DualVariableGadget validUntil;
@@ -68,8 +68,8 @@ class AppKeyUpdateCircuit : public BaseTransactionCircuit
       const std::string &prefix)
         : BaseTransactionCircuit(pb, state, prefix),
 
-          typeTx(pb, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
-          typeTxPad(pb, NUM_BITS_BIT, FMT(prefix, ".typeTxPad")),
+          typeTx(pb, state.constants.txTypeAppKeyUpdate, NUM_BITS_TX_TYPE, FMT(prefix, ".typeTx")),
+          typeTxPad(pb, state.constants._0, NUM_BITS_BIT, FMT(prefix, ".typeTxPad")),
           // Inputs
           accountID(pb, NUM_BITS_ACCOUNT, FMT(prefix, ".accountID")),
           validUntil(pb, NUM_BITS_TIMESTAMP, FMT(prefix, ".validUntil")),
@@ -168,8 +168,8 @@ class AppKeyUpdateCircuit : public BaseTransactionCircuit
     void generate_r1cs_witness(const AppKeyUpdate &update)
     {
         LOG(LogDebug, "in AppKeyUpdateCircuit", "generate_r1cs_witness");
-        typeTx.generate_r1cs_witness(pb, ethsnarks::FieldT(int(Loopring::TransactionType::AppKeyUpdate)));
-        typeTxPad.generate_r1cs_witness(pb, ethsnarks::FieldT(0));
+        typeTx.generate_r1cs_witness();
+        typeTxPad.generate_r1cs_witness();
         // Inputs
         accountID.generate_r1cs_witness(pb, update.accountID);
         validUntil.generate_r1cs_witness(pb, update.validUntil);
@@ -209,8 +209,8 @@ class AppKeyUpdateCircuit : public BaseTransactionCircuit
     void generate_r1cs_constraints()
     {
         LOG(LogDebug, "in AppKeyUpdateCircuit", "generate_r1cs_constraints");
-        typeTx.generate_r1cs_constraints(true);
-        typeTxPad.generate_r1cs_constraints(true);
+        typeTx.generate_r1cs_constraints();
+        typeTxPad.generate_r1cs_constraints();
         // Inputs
         accountID.generate_r1cs_constraints(true);
         validUntil.generate_r1cs_constraints(true);
