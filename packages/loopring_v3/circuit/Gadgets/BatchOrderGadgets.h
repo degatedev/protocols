@@ -1266,6 +1266,9 @@ class BatchUserGadget: public GadgetT
         std::vector<AddGadget> tokenTwoTradingFeeAmount;
         std::vector<AddGadget> tokenThreeTradingFeeAmount;
 
+        // require accountID equal
+        std::vector<IfThenRequireEqualGadget> requireAccountsEqual;
+
         // Accumulate GasFee, because GasFee is charged separately, there is no need to additionally calculate the overall balance, 
         // so you can directly accumulate the GasFee of all orders, but you need to distinguish the TokenID
         std::vector<AddGadget> tokenOneGasFeeAmount;
@@ -1423,6 +1426,13 @@ class BatchUserGadget: public GadgetT
                     orders[i].getSelectTokenThreeGasFee(),
                     NUM_BITS_AMOUNT,
                     std::string(".tokenThreeGasFeeAmount_") + std::to_string(i));
+
+                requireAccountsEqual.emplace_back(
+                    pb,
+                    orders.back().isNotNoop.result(),
+                    accountID.packed,
+                    orders.back().order.accountID.packed,
+                    std::string(".requireAccountsEqual_") + std::to_string(i));
             }
             
             // Execute the accumulation operation according to the sign. Sign = = 1 is added to forward, sign = = 2 is added to reverse, 
@@ -1541,6 +1551,8 @@ class BatchUserGadget: public GadgetT
                 tokenOneGasFeeAmount[i].generate_r1cs_witness();
                 tokenTwoGasFeeAmount[i].generate_r1cs_witness();
                 tokenThreeGasFeeAmount[i].generate_r1cs_witness();
+
+                requireAccountsEqual[i].generate_r1cs_witness();
             }
 
             // Execute the accumulation operation according to the sign. Sign = = 1 is added to forward, sign = = 2 is added to reverse, 
@@ -1604,6 +1616,8 @@ class BatchUserGadget: public GadgetT
                 tokenOneGasFeeAmount[i].generate_r1cs_constraints();
                 tokenTwoGasFeeAmount[i].generate_r1cs_constraints();
                 tokenThreeGasFeeAmount[i].generate_r1cs_constraints();
+
+                requireAccountsEqual[i].generate_r1cs_constraints();
             }
 
             tokenOneAmountsSum->generate_r1cs_constraints();
