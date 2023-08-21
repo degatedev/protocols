@@ -46,6 +46,7 @@ library ExchangeDeposits
         internal  // inline call
     {
         require(to != address(0), "ZERO_ADDRESS");
+        require(from == to, "INVALID_DEPOSIT_FROM"); // Only allow deposits to the user's own account
 
         // Deposits are still possible when the exchange is being shutdown, or even in withdrawal mode.
         // This is fine because the user can easily withdraw the deposited amounts again.
