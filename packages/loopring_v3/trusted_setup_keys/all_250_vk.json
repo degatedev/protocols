@@ -1,46 +1,46 @@
 {
-  "alpha": [
-    "0xbd568c2600afe2db53a5a394d08a97867841cf51ceca5acd5fc8a9c521d83cc",
-    "0x22ccc5a3bd42568b026b61daa0737f3956b28298e2543d822f918f920a6b6c3e"
-  ],
-  "beta": [
-    [
-      "0x1e58165d5f17ffb362279bec39ccc4fab444271cbeebda759a72f1321c7e05c",
-      "0x1197a461ec1115734ef1970cc41c789400454b13460c699cd14db09e75791baa"
+    "alpha": [
+        "0xdefef0e62981a7f00b2497f506caf75c4b733a58ddd294d5c6a78283cfe5590",
+        "0x2a6f18b68a9a02e9a94454e7333d95aa96c0643e149dd97c6bc109a9fd759016"
     ],
-    [
-      "0x21b6474881b02de0fe231935d577aca92622de6f3f604e2bf6112159581e44b1",
-      "0x3f71baafa76e61c32c559eb9a1c649ac8fc3bab4f5ce0a8c261aef476c00019"
-    ]
-  ],
-  "delta": [
-    [
-      "0x18b9371e227e4a25ec7a174ffff23312b5ad22bf1dfcc597f5d88e561483baaa",
-      "0x12556be71d039709e03efafa30150f106f4cd273e2998b3ee7536bcae431c395"
+    "beta": [
+        [
+            "0x18f57047acf209888af5a986629bd7361315e3bb0680cb173e9d1f7b8db0cb6c",
+            "0x279253d0de1519da31caa2c73f99978a205c4dd2a03e872595d730ffa02bf2de"
+        ],
+        [
+            "0x2a4cbb21c798002c1573dd1f857bc9bc4e10e7dd4aa3e77b35f72b7cbdeb4c84",
+            "0x136e466afa727a2dd322331fa4b8fe11067b2df813ae713d1bf9a78a2423e068"
+        ]
     ],
-    [
-      "0x289b556f30d6582c45faed6d286aa3235c0dbcfa454bc24b0e7ac031a318e198",
-      "0x1fdafa0bd872858b7242d62de6741603ead8c31365e209128e1d43bbb99cfa7"
-    ]
-  ],
-  "gamma": [
-    [
-      "0x198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c2",
-      "0x1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed"
+    "delta": [
+        [
+            "0xd404fea0d7074dfde6a29e5061c4c4ac1c4a8cf813d9a451bcbcaab7b4307be",
+            "0x254bbadb4190b51a754a009a27584b26b2aa1b50aca7ee56cc3bfbab89d245a2"
+        ],
+        [
+            "0x255737b9987ddeac3ed6f874246ebfaba471e1092cb4ca9eef65984db0e00f4c",
+            "0x9367299bbf8c7fb1eed0d5a7dfd1a64a37dbe90ad8a51a45c09819d1ac43ae6"
+        ]
     ],
-    [
-      "0x90689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b",
-      "0x12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa"
-    ]
-  ],
-  "gammaABC": [
-    [
-      "0xe00c9b495e3dc3a86e8c2c40b1d306eeac8ecfdf42551fbc05c43954ed8f12c",
-      "0x146a5f1d0327345e1226dfcd6a8647f6dc26247d8238813b369e62905ee65193"
+    "gamma": [
+        [
+            "0x198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c2",
+            "0x1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed"
+        ],
+        [
+            "0x90689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b",
+            "0x12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa"
+        ]
     ],
-    [
-      "0x26e98fe37a39875497d5f70c3457a7c3eb004431ccb3b13fda9f003ed830082c",
-      "0x1f932e4c610915a98d6decda4268cfbb75260dd884131c1b655ff68dc565d09c"
+    "gammaABC": [
+        [
+            "0x18bc11453a808deab7b8e809fa3a19055cb535646566d628e5dbb579b68449c8",
+            "0x91489488c3fd20f92977143069ebf346f237d2e703dd1ea7261b6c090acc56c"
+        ],
+        [
+            "0x1d57cce448db120cc69ab36587c28f2c9d6567899fb412da7296d89f0393f303",
+            "0x99b4b9ab3bfc4fe0b15a51d6dd2e1671f04badfacb5a638bcb7a472f93f85ee"
+        ]
     ]
-  ]
 }
