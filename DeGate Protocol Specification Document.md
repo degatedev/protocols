@@ -4,7 +4,7 @@ DeGate is a decentralized order book exchange based on a Zero Knowledge (ZK) Rol
 # Glossary
 | Terms |      Description        |
 | :--------:|:-------------------|
-|Layer 1 (L1)|ayer 1 refers to a base blockchain network/protocol that validates and finalizes transactions.|
+|Layer 1 (L1)|Layer 1 refers to a base blockchain network/protocol that validates and finalizes transactions.|
 |Layer 2 (L2)	|Layer 2 refers to scaling solutions for the blockchain layer 1 network that handles transactions off the layer 1 network and at the same time, benefits from layer 1 security, data availability, and decentralization.	|
 |Asset Merkle Tree	|The asset Merkle tree is a Merkle tree that stores all important data of DeGate's accounts and assets.	|
 |Entire Merkle Tree|The entire Merkle tree is a Merkle tree that stores all data of DeGate's accounts, assets, and orders.	|
