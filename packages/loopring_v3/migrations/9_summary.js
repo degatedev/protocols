@@ -11,6 +11,7 @@ const ExchangeWithdrawals = artifacts.require("ExchangeWithdrawals");
 const ExchangeV3 = artifacts.require("./impl/ExchangeV3.sol");
 const DefaultDepositContract = artifacts.require("DefaultDepositContract");
 const LoopringIOExchangeOwner = artifacts.require("LoopringIOExchangeOwner");
+const OwnedUpgradabilityProxy = artifacts.require("./thirdparty/proxies/OwnedUpgradabilityProxy");
 
 const LoopringV3 = artifacts.require("LoopringV3");
 
@@ -28,7 +29,12 @@ module.exports = function(deployer, network, accounts) {
   console.log("- ExchangeGenesis:", ExchangeGenesis.address);
   console.log("- ExchangeTokens:", ExchangeTokens.address);
   console.log("- ExchangeWithdrawals:", ExchangeWithdrawals.address);
-  console.log("- ExchangeV3:", ExchangeV3.address);
-  console.log("- DefaultDepositContract:", DefaultDepositContract.address);
+  console.log("- ExchangeV3Imp:", ExchangeV3.address);
+
+  console.log("- DefaultDepositContractImp:", DefaultDepositContract.address);
   console.log("- LoopringIOExchangeOwner:", LoopringIOExchangeOwner.address);
+
+  if (network != "development") {
+    console.log("- ExchangeV3Proxy:", OwnedUpgradabilityProxy.address);
+  }
 };
