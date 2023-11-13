@@ -15,10 +15,12 @@ const ExchangeV3 = artifacts.require("./impl/ExchangeV3.sol");
 const LoopringV3 = artifacts.require("LoopringV3");
 const DefaultDepositContract = artifacts.require("DefaultDepositContract");
 const LoopringIOExchangeOwner = artifacts.require("LoopringIOExchangeOwner");
+const OwnedUpgradabilityProxy = artifacts.require("./thirdparty/proxies/OwnedUpgradabilityProxy");
 
 const LRCToken = artifacts.require("./test/tokens/LRC.sol");
 const GTOToken = artifacts.require("./test/tokens/GTO.sol");
 
+const BatchVerifier = artifacts.require("BatchVerifier");
 const BlockVerifier = artifacts.require("BlockVerifier");
 
 module.exports = function(deployer, network, accounts) {
@@ -44,9 +46,12 @@ module.exports = function(deployer, network, accounts) {
 
     await deployer.deploy(ExchangeV3, { gas: 6700000 });
     await deployer.deploy(DefaultDepositContract, { gas: 6700000 });
-    await deployer.deploy(LoopringIOExchangeOwner, ExchangeV3.address, {
-      gas: 6700000
-    });
+
+    if (network == "development") {
+      await deployer.deploy(LoopringIOExchangeOwner, ExchangeV3.address, {
+        gas: 6700000
+      });
+    }
 
     if (process.env.TEST_ENV == "docker") {
       console.log("setup exchange:");
@@ -114,16 +119,31 @@ module.exports = function(deployer, network, accounts) {
     }
 
     if (network == "live" || network == "live-fork" || network == "goerli") {
+      const depositContractProxy = await deployer.deploy(OwnedUpgradabilityProxy);
+      const exchangeV3Proxy = await deployer.deploy(OwnedUpgradabilityProxy);
+
+      await deployer.deploy(LoopringIOExchangeOwner, exchangeV3Proxy.address, {
+        gas: 6700000
+      });
+
       console.log("exchange init:");
       const emptyMerkleRoot = "0x3e1788bf14436c39a3841ae888ffb3e6ec8405bc2773afa28b6d4dfc309cf19";
       const emptyMerkleAssetRoot = "0x71c8b14d71d432750479f5fe6e08abe1ec04712835a83cdf84d0483b9382ae8";
 
-      const exchangeV3 = await ExchangeV3.deployed();
+      const exchangeV3Imp = await ExchangeV3.deployed();
+      await exchangeV3Proxy.upgradeTo(exchangeV3Imp.address);
+
+      const exchangeV3 = await ExchangeV3.at(exchangeV3Proxy.address);
+
       await exchangeV3.initialize(LoopringV3.address, accounts[0], emptyMerkleRoot, emptyMerkleAssetRoot);
 
       console.log("exchange setDepositContract:");
-      const depositContract = await DefaultDepositContract.deployed();
-      await depositContract.initialize(ExchangeV3.address);
+
+      const depositContractImp = await DefaultDepositContract.deployed();
+      await depositContractProxy.upgradeTo(depositContractImp.address);
+      const depositContract = await DefaultDepositContract.at(depositContractProxy.address);
+
+      await depositContract.initialize(exchangeV3.address);
       await exchangeV3.setDepositContract(depositContract.address);
 
       console.log("exchange transferOwnership:");
@@ -132,6 +152,29 @@ module.exports = function(deployer, network, accounts) {
       await exchangeV3.transferOwnership(ownerContract.address);
       const claimData = exchangeV3.contract.methods.claimOwnership().encodeABI();
       await ownerContract.transact(claimData);
+
+      console.log(">>> deployed to network: " + network);
+
+      console.log("- BatchVerifier:", BatchVerifier.address);
+      console.log("- BlockVerifier:", BlockVerifier.address);
+
+      console.log("- LoopringV3:", LoopringV3.address);
+      console.log("- ExchangeAdmins:", ExchangeAdmins.address);
+      console.log("- ExchangeBalances:", ExchangeBalances.address);
+      console.log("- ExchangeBlocks:", ExchangeBlocks.address);
+      console.log("- ExchangeDeposits:", ExchangeDeposits.address);
+      console.log("- ExchangeGenesis:", ExchangeGenesis.address);
+      console.log("- ExchangeTokens:", ExchangeTokens.address);
+      console.log("- ExchangeWithdrawals:", ExchangeWithdrawals.address);
+      console.log("- ExchangeV3Imp:", ExchangeV3.address);
+      console.log("- DefaultDepositContractImp:", DefaultDepositContract.address);
+
+      if (network != "development") {
+        console.log("- ExchangeV3Proxy:", exchangeV3.address);
+        console.log("- DepositContractProxy:", depositContract.address);
+      }
+
+      console.log("- LoopringIOExchangeOwner:", LoopringIOExchangeOwner.address);
     }
   });
 };

@@ -39,9 +39,8 @@ For more details, refer to [Circuit Design Document - Entire Merkle Tree](./Circ
 ## No Limitation On Deposit/Withdrawal
 All funds deposited by users are stored in the smart contract of Layer 1, which can neither be transferred by any account in DeGate nor locked by the smart contract itself. Users can request to withdraw their funds at any time and complete their withdrawal within a set period of time.
 
-## Certainty of Smart Contracts & Circuits 
-DeGate smart contracts and circuits do not include any code upgrade logic. Once Smart Contracts & Circuits are deployed, no one can update them.
-
+## Delayed Upgradable of Smart Contracts 
+In order to enhance product functionality and safety, products can evolve and improve sustainably, DeGate smart contracts deployment adopts a delayed upgradable scheme. In the scheme, the admin rights to upgrade the contract are jointly managed by the Timelock contract and HomeDAO multi-signature account. When an upgrade occurs, DeGate users have at least 45 days to review the upcoming transaction and take action to decide whether to continue using DeGate, thus ensuring the highest level of trustless.
 
 ## Asset Independence
 Users can withdraw their assets from Layer 1 through Exodus Mode in the event that DeGate stops operation for any reason or accident.
