@@ -909,7 +909,7 @@ Any wallet address that the fund is returned to.
 
 This field specifies the amount to withdraw and is expressed as a 248bit value. Since the BN128 curve does not allow the value to be calculated to exceed 253bits, to make the calculation easier while reducing cost, DeGate sets the amount field as 248bits.
 
-#### PublicInputData信息
+#### PublicInputData
 ```
 - Type Tx: 3 bits  Trade Type, for AppKeyUpdate it is 4
 - Type Tx Pad: 1 bit
