@@ -1,9 +1,11 @@
+> **:warning: Historical repository.** These are the smart contracts of DeGate's zkRollup
+> orderbook DEX, which was sunset in 2025 and is no longer in operation.
+> DeGate is now a self-custodial multichain crypto wallet: [degate.com](https://degate.com).
+
 # DeGate Protocol using zkSNARKs
 
 ## About
-
-DeGate is a Decentralized Exchange (DEX) protocol built on Zero Knowledge (ZK) technology. As a ZK Rollup, DeGate fills a key gap in the market by providing spot order book trading and grid trading within the Ethereum ecosystem, offering an experience similar to centralized exchanges (CEX).
-To understand several concepts introduced by the DeGate Protocol, please read our [documentation](https://docs.degate.com/what-is-degate/) for DeGate protocol.
+Smart contracts of DeGate’s sunset zkRollup orderbook DEX (historical). DeGate is now a self-custodial multichain crypto wallet: degate.com
 
 ## Top Features
 
