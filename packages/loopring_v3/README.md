@@ -2,6 +2,7 @@
 
 ## Build
 
+### MacOS
 If you are using a Mac, you will need to (re）install the commandline tool:
 
 ```
@@ -23,8 +24,15 @@ Then you may also need to install "lgmpxx":
 	sudo make install
 ```
 
-Please use node v14.15.5.
-- `git submodule update --init --recursive` execute in the protocols directory
+### Build steps
+Use the following build dependencies:
+- node v14.15.5 (`nvm install 14.15.5`)
+- python 3.10	(`pyenv local 3.10`)
+
+Execute the following in the `protocols` directory:
+- `rm packages/loopring_v3/contracts/thirdparty/timelock/ -r`
+> The Timelock was directly copied from Compound, so its version is ^0.8.0 which is indeed incompatible with degate contracts. To compile the entire  of contracts to understand the degate protocol, you can first remove the Timelock. It can be deployed separately afterwards. [*](https://discord.com/channels/787092485969150012/1176356057505865758/1176443266154123264)
+- `git submodule update --init --recursive`
 - `npm install`
 - `npm run build` or `npm run compile` or `npm run watch`.
 
